@@ -1,0 +1,6 @@
+[submodule "ptcgp-db-data/ptcgp-data"]
+	path = ptcgp-db-data/ptcgp-data
+	url = ../ptcgp-data
+[submodule "ptcgp-db-data/ptcgp-images"]
+	path = ptcgp-db-data/ptcgp-images
+	url = ../ptcgp-images

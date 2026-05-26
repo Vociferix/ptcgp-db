@@ -1,0 +1,28 @@
+[package]
+name = "ptcgp-db-data"
+version = "0.1.0"
+edition = "2024"
+build = "codegen/main.rs"
+
+[dependencies]
+chrono = { version = "0.4.44", features = ["serde"] }
+gcd = "2.3.0"
+manganis = { version = "0.7.9", optional = true }
+memchr = "2.8.0"
+smallvec = "1.15.1"
+smol_str = "0.3.6"
+
+[build-dependencies]
+anyhow = "1.0.102"
+chrono = { version = "0.4.44", features = ["serde"] }
+gcd = "2.3.0"
+prettyplease = "0.2.37"
+proc-macro2 = { version = "1.0.106", default-features = false }
+quote = { version = "1.0.45", default-features = false }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.150", features = ["arbitrary_precision"] }
+syn = { version = "2.0.117", default-features = false, features = ["parsing"] }
+
+[features]
+default = []
+images = ["dep:manganis"]
