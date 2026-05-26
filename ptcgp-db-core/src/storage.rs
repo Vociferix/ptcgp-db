@@ -17,10 +17,6 @@ use crate::save_data::{AppSettingsSaveData, ProfilesSaveData, SavedQueriesSaveDa
 /// Implementations must be cheap to clone (wrapping shared state in `Arc` if necessary), since
 /// `ProfileStore` may need to pass a handle to background save tasks.
 ///
-/// `async fn` is used here rather than RPITIT + `Send` because the web backend (IndexedDB,
-/// T03) uses `!Send` types. Callers always hold a concrete backend type, not `dyn Storage`,
-/// so the missing auto-trait bounds on the returned futures are not an issue.
-#[allow(async_fn_in_trait)]
 pub trait Storage {
     /// Error type returned by all storage operations.
     type Error: std::error::Error + Send + Sync + 'static;
