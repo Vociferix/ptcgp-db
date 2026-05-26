@@ -301,4 +301,3 @@ fn dragon_is_only_element_without_code() {
         }
     }
 }
-
