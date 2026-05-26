@@ -35,7 +35,7 @@ In `ptcgp-db-core`, define the persistence interfaces — the trait and the type
 - Define the save data structs (the types that are serialized). Every save data struct must include a `format_version` field. Use `serde` for derive macros. The internal format may vary per backend; the user-facing export format must be JSON.
 - See DESIGN.md §What Is Stored and §Data Format and Versioning.
 
-- [ ] **T02**
+- [x] **T02**
 
 ---
 
