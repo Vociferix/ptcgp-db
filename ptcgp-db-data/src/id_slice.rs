@@ -1,16 +1,28 @@
+//! Indirection slice: a DST that resolves stored IDs to `&'static T` on access.
+
 use std::marker::PhantomData;
 
+/// A dynamically-sized slice of IDs that resolves each ID to `&'static T` on access.
+///
+/// Stored in memory as a `[usize]` (via `transmute`). Accessing an element performs a single
+/// array index into `T::INDEXED` — no allocation, no copying. This allows many-to-many
+/// relationships (e.g., a card's attacks, a pack's card pool) to be stored compactly without
+/// duplicating the pointed-to data.
 pub struct IdSlice<T: 'static> {
     _phantom: PhantomData<fn() -> &'static T>,
     slice: [usize],
 }
 
+/// Iterator over an [`IdSlice<T>`], yielding `&'static T`.
 pub struct Iter<'a, T: 'static> {
     iter: std::slice::Iter<'a, usize>,
     _phantom: PhantomData<fn() -> &'static T>,
 }
 
+/// Marker trait connecting `T` to its global backing slice, enabling [`IdSlice<T>`] to resolve
+/// IDs to references.
 pub trait Indexed: Sized + 'static {
+    /// The global static slice that IDs index into.
     const INDEXED: &'static [Self];
 }
 
@@ -22,6 +34,17 @@ mod sealed {
     impl Sealed for [usize] {}
 }
 
+/// Bridges the output of [`SliceIndex`] on `[usize]` to the corresponding output on [`IdSlice<T>`].
+///
+/// Implemented for:
+/// - `usize` — the output of single-element indexing (`slice[i]`); resolves to `&T`
+/// - `[usize]` — the output of range indexing (`slice[a..b]`, `slice[..n]`, etc.); resolves to
+///   `&IdSlice<T>`, rewrapping the sub-slice of IDs
+///
+/// Callers index with a `usize` or a range; `[usize]` is an intermediate output type produced
+/// by [`SliceIndex`], never passed directly by the user.
+///
+/// [`SliceIndex`]: std::slice::SliceIndex
 pub trait IdSliceIndex<T: Indexed>: sealed::Sealed + 'static {
     type Output: ?Sized;
 
@@ -45,23 +68,31 @@ impl<T: Indexed> IdSliceIndex<T> for [usize] {
 }
 
 impl<T: Indexed> IdSlice<T> {
-    // SAFETY: `indexes` must consist entirely of valid indexes into `T::INDEXED`
-    pub const unsafe fn new_unchecked<'a>(indexes: &'a [usize]) -> &'a Self {
+    /// Creates an `IdSlice` from a slice of IDs without validating that they are in range.
+    ///
+    /// # Safety
+    ///
+    /// Every element of `indexes` must be a valid index into `T::INDEXED`.
+    pub const unsafe fn new_unchecked(indexes: &[usize]) -> &Self {
         unsafe { core::mem::transmute(indexes) }
     }
 
+    /// Number of elements.
     pub const fn len(&self) -> usize {
         self.slice.len()
     }
 
+    /// True if the slice contains no elements.
     pub const fn is_empty(&self) -> bool {
         self.slice.is_empty()
     }
 
+    /// The underlying ID slice, useful for serialization or binary search by ID.
     pub const fn as_ids(&self) -> &[usize] {
         &self.slice
     }
 
+    /// First element, or `None` if empty.
     pub const fn first(&self) -> Option<&'static T> {
         if let Some(id) = self.slice.first() {
             Some(&T::INDEXED[*id])
@@ -70,6 +101,7 @@ impl<T: Indexed> IdSlice<T> {
         }
     }
 
+    /// Last element, or `None` if empty.
     pub const fn last(&self) -> Option<&'static T> {
         if let Some(id) = self.slice.last() {
             Some(&T::INDEXED[*id])
@@ -78,10 +110,12 @@ impl<T: Indexed> IdSlice<T> {
         }
     }
 
+    /// Element at position `n`. Panics if out of bounds.
     pub const fn get_at(&self, n: usize) -> &'static T {
         &T::INDEXED[self.slice[n]]
     }
 
+    /// Sub-slice over the given index range. Panics if the range is invalid or out of bounds.
     pub const fn get_slice(&self, range: std::ops::Range<usize>) -> &Self {
         if range.start > range.end {
             panic!("invalid slice range");
@@ -94,6 +128,11 @@ impl<T: Indexed> IdSlice<T> {
         unsafe { Self::new_unchecked(std::slice::from_raw_parts(ptr, len)) }
     }
 
+    /// Returns the element or sub-slice at `index` without bounds checking.
+    ///
+    /// # Safety
+    ///
+    /// `index` must be in range for the underlying ID slice.
     pub unsafe fn get_unchecked<I>(&self, index: I) -> &<I::Output as IdSliceIndex<T>>::Output
     where
         I: std::slice::SliceIndex<[usize]>,
@@ -103,6 +142,7 @@ impl<T: Indexed> IdSlice<T> {
         index.indirect()
     }
 
+    /// Returns the element or sub-slice at `index`, or `None` if out of bounds.
     pub fn get<I>(&self, index: I) -> Option<&<I::Output as IdSliceIndex<T>>::Output>
     where
         I: std::slice::SliceIndex<[usize]>,
@@ -115,6 +155,7 @@ impl<T: Indexed> IdSlice<T> {
         }
     }
 
+    /// Splits off the first element, returning `(first, rest)`, or `None` if empty.
     pub const fn split_first(&self) -> Option<(&'static T, &Self)> {
         if let Some((head, tail)) = self.slice.split_first() {
             let head = &T::INDEXED[*head];
@@ -125,6 +166,7 @@ impl<T: Indexed> IdSlice<T> {
         }
     }
 
+    /// Splits off the last element, returning `(last, rest)`, or `None` if empty.
     pub const fn split_last(&self) -> Option<(&'static T, &Self)> {
         if let Some((tail, head)) = self.slice.split_last() {
             let tail = &T::INDEXED[*tail];
@@ -135,6 +177,11 @@ impl<T: Indexed> IdSlice<T> {
         }
     }
 
+    /// Splits at position `mid` without bounds checking, returning `(head, tail)`.
+    ///
+    /// # Safety
+    ///
+    /// `mid` must be ≤ `self.len()`.
     pub const unsafe fn split_at_unchecked(&self, mid: usize) -> (&Self, &Self) {
         let (head, tail) = unsafe { self.slice.split_at_unchecked(mid) };
         (unsafe { Self::new_unchecked(head) }, unsafe {
@@ -142,6 +189,7 @@ impl<T: Indexed> IdSlice<T> {
         })
     }
 
+    /// Splits at position `mid`, returning `(head, tail)`. Panics if `mid > self.len()`.
     pub const fn split_at(&self, mid: usize) -> (&Self, &Self) {
         let (head, tail) = self.slice.split_at(mid);
         (unsafe { Self::new_unchecked(head) }, unsafe {
@@ -149,6 +197,7 @@ impl<T: Indexed> IdSlice<T> {
         })
     }
 
+    /// Splits at position `mid`, returning `Some((head, tail))`, or `None` if out of bounds.
     pub const fn split_at_checked(&self, mid: usize) -> Option<(&Self, &Self)> {
         if let Some((head, tail)) = self.slice.split_at_checked(mid) {
             Some((unsafe { Self::new_unchecked(head) }, unsafe {
@@ -159,6 +208,7 @@ impl<T: Indexed> IdSlice<T> {
         }
     }
 
+    /// Returns an iterator yielding `&'static T` in order.
     pub fn iter(&self) -> Iter<'_, T> {
         Iter {
             iter: self.slice.iter(),

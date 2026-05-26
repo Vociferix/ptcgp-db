@@ -1,21 +1,43 @@
+//! String table: a sorted, deduplicated store of `&'static str`s with fast search.
+
 use std::marker::PhantomData;
 
 use smallvec::SmallVec;
 use smol_str::{SmolStr, StrExt};
 
+/// A sorted, deduplicated table of `&'static str`s.
+///
+/// Strings are alphabetically sorted at build time. Each string has a stable numeric ID
+/// usable for O(1) retrieval via [`get`] / [`get_entry`] and for compact storage (e.g., inside
+/// generated data structures). [`search`] performs a tokenized, case-insensitive substring
+/// search across the whole table.
+///
+/// [`get`]: StrTable::get
+/// [`get_entry`]: StrTable::get_entry
+/// [`search`]: StrTable::search
 pub struct StrTable {
     strs: &'static [&'static str],
     lower: &'static [&'static str],
 }
 
+/// A string together with its [`StrTable`] index.
+///
+/// The ID is stable and can be used for equality comparisons or as a compact storage key.
+/// Derefs to `&str` for transparent string operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StrEntry {
     id: usize,
     str: &'static str,
 }
 
+/// An iterator type alias for iterating over all strings in a [`StrTable`] in sorted order.
 pub type Iter = std::iter::Copied<std::slice::Iter<'static, &'static str>>;
 
+/// A tokenized, case-insensitive search iterator over a [`StrTable`].
+///
+/// Produced by [`StrTable::search`]. The query is split on whitespace; the iterator yields
+/// all entries whose lowercase text contains any token as a substring. Implements
+/// [`DoubleEndedIterator`].
 #[derive(Debug, Clone)]
 pub struct Search<'table> {
     front: usize,
@@ -45,26 +67,36 @@ impl StrTable {
         Self { strs, lower }
     }
 
+    /// Number of strings in the table.
     pub const fn len(&self) -> usize {
         self.strs.len()
     }
 
+    /// True if the table contains no strings.
     pub const fn is_empty(&self) -> bool {
         self.strs.is_empty()
     }
 
+    /// The underlying `&'static str` slice in alphabetically sorted order.
     pub const fn as_strs(&self) -> &'static [&'static str] {
         self.strs
     }
 
+    /// Iterator over all strings in the table in sorted order.
     pub fn iter(&self) -> Iter {
         self.strs.iter().copied()
     }
 
+    /// Returns the string at `id` without bounds checking.
+    ///
+    /// # Safety
+    ///
+    /// `id` must be less than `self.len()`.
     pub const unsafe fn get_unchecked(&self, id: usize) -> &'static str {
         unsafe { *self.strs.as_ptr().add(id) }
     }
 
+    /// Returns the string at `id`, or `None` if out of range.
     pub const fn get(&self, id: usize) -> Option<&'static str> {
         if id < self.strs.len() {
             Some(unsafe { self.get_unchecked(id) })
@@ -73,6 +105,11 @@ impl StrTable {
         }
     }
 
+    /// Returns the string and its ID at `id` without bounds checking.
+    ///
+    /// # Safety
+    ///
+    /// `id` must be less than `self.len()`.
     pub const unsafe fn get_entry_unchecked(&self, id: usize) -> StrEntry {
         StrEntry {
             id,
@@ -80,6 +117,7 @@ impl StrTable {
         }
     }
 
+    /// Returns the string and its ID at `id`, or `None` if out of range.
     pub const fn get_entry(&self, id: usize) -> Option<StrEntry> {
         if id < self.strs.len() {
             Some(unsafe { self.get_entry_unchecked(id) })
@@ -88,9 +126,10 @@ impl StrTable {
         }
     }
 
-    // Performs a tokenized, case insensitive search. `needle` is split on whitespace
-    // to create multiple "tokens". The returned iterator yields all entries that
-    // contain (case insensitively) any of these tokens.
+    /// Returns an iterator over all entries whose lowercase text contains any
+    /// whitespace-separated token from `needle` as a case-insensitive substring.
+    ///
+    /// An empty or whitespace-only `needle` matches nothing (the token list is empty).
     pub fn search(&self, needle: &str) -> Search<'_> {
         let needles: SmallVec<[SmolStr; 4]> = needle
             .trim()
@@ -140,18 +179,23 @@ impl std::ops::Index<usize> for StrTable {
 }
 
 impl StrEntry {
+    /// Numeric index into the originating [`StrTable`]. Stable across program runs; suitable
+    /// as a compact storage key.
     pub const fn id(&self) -> usize {
         self.id
     }
 
+    /// The string value.
     pub const fn as_str(&self) -> &str {
         self.str
     }
 
+    /// Byte length of the string.
     pub const fn len(&self) -> usize {
         self.str.len()
     }
 
+    /// True if the string is empty.
     pub const fn is_empty(&self) -> bool {
         self.str.is_empty()
     }

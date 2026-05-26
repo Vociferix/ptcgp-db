@@ -1,3 +1,10 @@
+//! All PTCGP card, pack, set, and pull rate data as compile-time constants.
+//!
+//! Data is generated from `ptcgp-data` JSON at build time — no runtime JSON parsing or database
+//! access is required. All sequences are pre-sorted: sequences with a canonical display order
+//! (e.g., [`CardVersion::ALL`]) use that order; others are sorted for binary search (numerically
+//! by ID for ID-keyed data, alphabetically for string-keyed data).
+
 mod ability;
 mod attack;
 mod base_pokemon;

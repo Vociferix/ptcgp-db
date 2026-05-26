@@ -1,9 +1,12 @@
+//! Card attacks.
+
 use crate::{
     Element,
     id_slice::IdSlice,
     str_table::{StrEntry, StrTable},
 };
 
+/// A card attack, usable by one or more Pokémon cards.
 pub struct Attack {
     pub(crate) id: usize,
     pub(crate) name_id: usize,
@@ -14,16 +17,25 @@ pub struct Attack {
 }
 
 impl Attack {
+    /// All attacks, sorted by ID.
     pub const ALL: &[Self] = crate::data::ATTACKS;
 
+    /// Attack name strings.
     pub const NAMES: &StrTable = crate::data::ATTACK_NAMES;
 
+    /// Attack effect text strings.
     pub const EFFECTS: &StrTable = crate::data::ATTACK_EFFECTS;
 
+    /// Returns the attack with the given ID without bounds checking.
+    ///
+    /// # Safety
+    ///
+    /// `id` must be less than `Self::ALL.len()`.
     pub const unsafe fn from_id_unchecked(id: usize) -> &'static Attack {
         unsafe { crate::get_unchecked(Self::ALL, id) }
     }
 
+    /// Returns the attack with the given ID, or `None` if out of range.
     pub const fn from_id(id: usize) -> Option<&'static Attack> {
         if id < Self::ALL.len() {
             Some(unsafe { Self::from_id_unchecked(id) })
@@ -32,14 +44,18 @@ impl Attack {
         }
     }
 
+    /// Numeric index into [`Attack::ALL`].
     pub const fn id(&self) -> usize {
         self.id
     }
 
+    /// Attack name.
     pub const fn name(&self) -> StrEntry {
         unsafe { Self::NAMES.get_entry_unchecked(self.name_id) }
     }
 
+    /// Effect text, if the attack has one. May contain element placeholders (e.g., `[R]` for
+    /// Fire) intended to be replaced with [`Element`] symbol images in the UI.
     pub const fn effect(&self) -> Option<StrEntry> {
         if let Some(id) = self.effect_id {
             Some(unsafe { Self::EFFECTS.get_entry_unchecked(id) })
@@ -48,14 +64,23 @@ impl Attack {
         }
     }
 
+    /// Numeric base damage value, not accounting for the suffix character.
     pub const fn base_damage(&self) -> u32 {
         self.base_damage
     }
 
+    /// Optional suffix character appended to the damage display. Known values:
+    /// - `'+'` — attack can do additional damage (condition described in the effect text)
+    /// - `'-'` — attack can do reduced damage (condition described in the effect text)
+    /// - `'×'` — base damage applies multiple times (typically coin-flip based, described in
+    ///   the effect text)
+    ///
+    /// `None` means the attack deals exactly the base damage with no variation.
     pub const fn damage_suffix(&self) -> Option<char> {
         self.damage_suffix
     }
 
+    /// Formats the full damage string as `"{base_damage}{suffix}"` (e.g., `"120+"`, `"50"`).
     pub const fn damage(&self) -> impl std::fmt::Display {
         struct FmtDamage {
             base: u32,
@@ -79,6 +104,9 @@ impl Attack {
         }
     }
 
+    /// Energy cost as an ordered list of [`Element`]s. Elements may repeat for multi-energy
+    /// costs (e.g., three Fire entries for a 3-Fire cost). An empty list means zero cost;
+    /// display [`Element::NO_COST`] in that case.
     pub const fn cost(&self) -> &'static IdSlice<Element> {
         unsafe { IdSlice::new_unchecked(self.cost_element_ids) }
     }

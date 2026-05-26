@@ -1,8 +1,12 @@
+//! Pokémon energy types.
+
 use crate::str_table::{StrEntry, StrTable};
 
 #[cfg(feature = "images")]
 use manganis::{Asset, asset};
 
+/// A Pokémon energy type (Grass, Fire, Water, Lightning, Fighting, Psychic, Darkness, Metal,
+/// Dragon, or Colorless).
 pub struct Element {
     pub(crate) id: usize,
     pub(crate) code: Option<char>,
@@ -14,18 +18,27 @@ pub struct Element {
 }
 
 impl Element {
+    /// All elements in canonical display order (Grass, Fire, Water, Lightning, Fighting,
+    /// Psychic, Darkness, Metal, Dragon, Colorless).
     pub const ALL: &[Self] = crate::data::ELEMENTS;
 
+    /// Element name strings (e.g., `"Grass"`, `"Fire"`).
     pub const NAMES: &StrTable = crate::data::ELEMENT_NAMES;
 
-    // Energy symbol used for attack cost when cost is zero energies.
+    /// Icon to display for an attack with zero energy cost, in place of any element icon.
     #[cfg(feature = "images")]
     pub const NO_COST: Asset = asset!("ptcgp-images/elements/icons/no_cost.png");
 
+    /// Returns the element with the given ID without bounds checking.
+    ///
+    /// # Safety
+    ///
+    /// `id` must be less than `Self::ALL.len()`.
     pub const unsafe fn from_id_unchecked(id: usize) -> &'static Self {
         unsafe { crate::get_unchecked(Self::ALL, id) }
     }
 
+    /// Returns the element with the given ID, or `None` if out of range.
     pub const fn from_id(id: usize) -> Option<&'static Self> {
         if id < Self::ALL.len() {
             Some(unsafe { Self::from_id_unchecked(id) })
@@ -34,23 +47,32 @@ impl Element {
         }
     }
 
+    /// Numeric index into [`Element::ALL`].
     pub const fn id(&self) -> usize {
         self.id
     }
 
+    /// Single-letter code used in card effect text placeholders (e.g., `'R'` for Fire,
+    /// `'G'` for Grass). `None` for the Dragon element only — Dragon is not a real energy
+    /// type in PTCGP; Dragon-type Pokémon use a mix of other energy types for their attack
+    /// costs and Dragon never appears as an energy in effect text.
     pub const fn code(&self) -> Option<char> {
         self.code
     }
 
+    /// Display name (e.g., `"Grass"`, `"Fire"`, `"Colorless"`).
     pub const fn name(&self) -> StrEntry {
         unsafe { Self::NAMES.get_entry_unchecked(self.name_id) }
     }
 
+    /// Element icon, suitable for non-text UI contexts (e.g., filter chips, attack cost display).
     #[cfg(feature = "images")]
     pub const fn icon(&self) -> Asset {
         self.icon
     }
 
+    /// Element symbol image (text-height), suitable for replacing letter placeholders inline
+    /// in card effect text.
     #[cfg(feature = "images")]
     pub const fn symbol(&self) -> Asset {
         self.symbol

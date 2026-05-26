@@ -1,5 +1,10 @@
+//! Pokémon abilities.
+
 use crate::str_table::{StrEntry, StrTable};
 
+/// A Pokémon ability. Only some Pokémon cards have an ability; check [`PokemonCard::ability`].
+///
+/// [`PokemonCard::ability`]: crate::PokemonCard::ability
 pub struct Ability {
     pub(crate) id: usize,
     pub(crate) name_id: usize,
@@ -7,16 +12,25 @@ pub struct Ability {
 }
 
 impl Ability {
+    /// All abilities, sorted by ID.
     pub const ALL: &[Self] = crate::data::ABILITIES;
 
+    /// Ability name strings.
     pub const NAMES: &StrTable = crate::data::ABILITY_NAMES;
 
+    /// Ability effect text strings.
     pub const EFFECTS: &StrTable = crate::data::ABILITY_EFFECTS;
 
+    /// Returns the ability with the given ID without bounds checking.
+    ///
+    /// # Safety
+    ///
+    /// `id` must be less than `Self::ALL.len()`.
     pub const unsafe fn from_id_unchecked(id: usize) -> &'static Self {
         unsafe { crate::get_unchecked(Self::ALL, id) }
     }
 
+    /// Returns the ability with the given ID, or `None` if out of range.
     pub const fn from_id(id: usize) -> Option<&'static Self> {
         if id < Self::ALL.len() {
             Some(unsafe { Self::from_id_unchecked(id) })
@@ -25,14 +39,20 @@ impl Ability {
         }
     }
 
+    /// Numeric index into [`Ability::ALL`].
     pub const fn id(&self) -> usize {
         self.id
     }
 
+    /// Ability name.
     pub const fn name(&self) -> StrEntry {
         unsafe { Self::NAMES.get_entry_unchecked(self.name_id) }
     }
 
+    /// Effect text. May contain element placeholders (e.g., `[R]` for Fire) intended to be
+    /// replaced with [`Element`] symbol images in the UI.
+    ///
+    /// [`Element`]: crate::Element
     pub const fn effect(&self) -> StrEntry {
         unsafe { Self::EFFECTS.get_entry_unchecked(self.effect_id) }
     }

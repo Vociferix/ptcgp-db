@@ -1,5 +1,19 @@
+//! Exact rational probability arithmetic.
+
 use gcd::binary_u64 as gcd;
 
+/// An exact rational probability stored as a `numerator / denominator` pair.
+///
+/// All pull rate data from ptcgp-data is stored as exact fractions to avoid floating-point
+/// error. Intermediate calculations must stay in rational form; only convert with [`as_f64`]
+/// at final display time.
+///
+/// Arithmetic operations preserve exactness where `u64` allows. When an intermediate product
+/// would overflow `u64`, the implementation falls back to a lossy bit-halving loop to bring
+/// the values back into range. For the denominators present in PTCGP pull rate data this
+/// approximation is negligible, but callers should be aware the result is not always exact.
+///
+/// [`as_f64`]: Prob::as_f64
 #[derive(Clone, Copy, Default)]
 pub struct Prob {
     pub(crate) num: u64,
@@ -7,10 +21,15 @@ pub struct Prob {
 }
 
 impl Prob {
+    /// The probability 0 (impossible event).
     pub const ZERO: Self = Self { num: 0, den: 1 };
 
+    /// The probability 1 (certain event).
     pub const ONE: Self = Self { num: 1, den: 1 };
 
+    /// Constructs a `Prob` with the given numerator and denominator.
+    ///
+    /// The fraction is stored as-is without reduction. `denominator` must not be zero.
     pub const fn new(numerator: u64, denominator: u64) -> Self {
         Self {
             num: numerator,
@@ -18,14 +37,23 @@ impl Prob {
         }
     }
 
+    /// Raw numerator. May share a common factor with the denominator; use [`simplify`] to
+    /// obtain the reduced form.
+    ///
+    /// [`simplify`]: Prob::simplify
     pub const fn numerator(&self) -> u64 {
         self.num
     }
 
+    /// Raw denominator. May share a common factor with the numerator; use [`simplify`] to
+    /// obtain the reduced form.
+    ///
+    /// [`simplify`]: Prob::simplify
     pub const fn denominator(&self) -> u64 {
         self.den
     }
 
+    /// Returns an equivalent fraction in lowest terms.
     pub const fn simplify(&self) -> Self {
         let gcd = gcd(self.num, self.den);
         Self {
@@ -34,6 +62,8 @@ impl Prob {
         }
     }
 
+    /// Converts to `f64` for display. Not suitable for intermediate probability arithmetic —
+    /// use the arithmetic methods to keep calculations exact.
     pub const fn as_f64(&self) -> f64 {
         let Prob { num, den } = self.simplify();
 
@@ -77,10 +107,13 @@ impl Prob {
         }
     }
 
+    /// Adds `other` to `self`. Usable in `const` contexts; equivalent to the `+` operator
+    /// in non-const contexts.
     pub const fn add(&self, other: &Self) -> Self {
         self.add_impl(other)
     }
 
+    /// Subtracts `other` from `self`, returning `None` if the result would be negative.
     pub const fn checked_sub(&self, other: &Self) -> Option<Self> {
         let (a, b) = make_common(self, other);
         if let Some(num) = a.num.checked_sub(b.num) {
@@ -90,6 +123,7 @@ impl Prob {
         }
     }
 
+    /// Subtracts `other` from `self`, clamping at zero instead of underflowing.
     pub const fn saturating_sub(&self, other: &Self) -> Self {
         let (a, b) = make_common(self, other);
         Prob {
@@ -106,6 +140,14 @@ impl Prob {
         }
     }
 
+    /// Subtracts `other` from `self`. Usable in `const` contexts; equivalent to the `-`
+    /// operator in non-const contexts.
+    ///
+    /// Panics on underflow in debug builds. Prefer [`checked_sub`] or [`saturating_sub`]
+    /// when the sign of the result is not guaranteed.
+    ///
+    /// [`checked_sub`]: Prob::checked_sub
+    /// [`saturating_sub`]: Prob::saturating_sub
     pub const fn sub(&self, other: &Self) -> Self {
         self.sub_impl(other)
     }
@@ -142,6 +184,8 @@ impl Prob {
         }
     }
 
+    /// Multiplies `self` by `other`. Usable in `const` contexts; equivalent to the `*`
+    /// operator in non-const contexts.
     pub const fn mul(&self, other: &Self) -> Self {
         self.mul_impl(other)
     }
@@ -153,10 +197,14 @@ impl Prob {
         })
     }
 
+    /// Divides `self` by `other`. Usable in `const` contexts; equivalent to the `/` operator
+    /// in non-const contexts.
     pub const fn div(&self, other: &Self) -> Self {
         self.div_impl(other)
     }
 
+    /// Multiplies by an integer scalar. Usable in `const` contexts; equivalent to the
+    /// `* usize` operator in non-const contexts.
     pub const fn mul_usize(&self, rhs: usize) -> Self {
         let rhs = rhs as u64;
 
@@ -178,6 +226,8 @@ impl Prob {
         }
     }
 
+    /// Divides by an integer scalar. Usable in `const` contexts; equivalent to the `/ usize`
+    /// operator in non-const contexts.
     pub const fn div_usize(&self, rhs: usize) -> Self {
         let rhs = rhs as u64;
 
@@ -205,10 +255,13 @@ impl Prob {
         lhs == rhs
     }
 
+    /// Tests equality in `const` contexts. Equivalent to `PartialEq` in non-const contexts.
     pub const fn eq(&self, other: &Self) -> bool {
         self.eq_impl(other)
     }
 
+    /// Compares two probabilities in `const` contexts. Equivalent to `Ord::cmp` in non-const
+    /// contexts.
     pub const fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         let lhs = self.num as u128 * other.den as u128;
         let rhs = other.num as u128 * self.den as u128;
@@ -264,6 +317,8 @@ impl std::fmt::Debug for Prob {
     }
 }
 
+/// Formats the probability as a decimal by default, or as `numerator/denominator` with the
+/// `{:#}` alternate flag.
 impl std::fmt::Display for Prob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if f.alternate() {

@@ -151,12 +151,12 @@ call should use these paths relative to the `ptcgp-images` root.
 | Set icon | `sets/icons/{SET}.png` | |
 | Pack art | `packs/art/{SET}/{subtitle}.png` | subtitle is lowercase, spaces → `_` |
 | Pack logo | `packs/logos/{SET}/{subtitle}.png` | same subtitle convention |
-| Rarity icon | `rarities/icons/{group}/{count}.png` | group = `diamond`/`star`/`shiny`/`crown` (lowercase); count = `group_symbol_count` from `rarities.json` |
+| Rarity icon | `rarities/icons/{group}/{count}.png` | group = `diamond`/`star`/`shiny`/`crown` (lowercase); count = `RarityClass::count()` |
 | Rarity symbol | `rarities/symbols/{group}/{count}.png` | same as rarity icon |
 | Element icon | `elements/icons/{element}.png` | element name lowercased, e.g. `grass.png` |
 | Element symbol | `elements/symbols/{element}.png` | same element convention |
 | No-cost icon | `elements/icons/no_cost.png` | used for 0-energy attack cost |
-| Card source icon | `card_sources/{code}.png` | code from `card_sources.json`, lowercased, spaces → `_`; used for non-Pack card sources |
+| Card source icon | `card_sources/{code}.png` | `CardSource::name()`, lowercased, spaces → `_`; used for non-Pack card sources |
 
 All derivations from data fields are done at compile time in `codegen/` or via constants — never
 construct image paths from runtime strings.
@@ -179,13 +179,12 @@ The data distinguishes two levels of card identity:
   particular set, collector number, rarity, illustrator, and finish (foil or not). This is what
   users actually own copies of.
 
-Key linking fields:
-- `card_id` on a card version → references the abstract card
-- `versions` array on the abstract card → lists all card versions that share its mechanics
-- `duplicates` array on a card version → lists other card versions with the same rarity,
-  illustrator, and finish (the same physical card released again in a different set)
-- `is_original: true` on a card version → marks it as the original printing. Inversely,
-  `is_original: false` marks that the card is a reprint or an earlier card.
+Key linking fields (expressed as `ptcgp-db-data` API calls):
+- `CardVersion::card()` → the abstract card for a given version
+- `Card::versions()` → all card versions that share an abstract card's mechanics
+- `CardVersion::duplicates()` → other card versions with the same rarity, illustrator, and
+  finish (the same physical card released again in a different set)
+- `CardVersion::is_original()` → `true` for the original printing; `false` for a reprint
 
 **Owned counts are always tracked per card version**, not per abstract card. When displaying
 "how many do I own," the count refers to that specific card version.
@@ -193,21 +192,22 @@ Key linking fields:
 ### Sets and Series
 
 Sets are identified by a short code (e.g., `A1`, `B2a`, `P-A`). Each set belongs to a series
-identified by a single letter (e.g., `A`, `B`; new series are added as the game expands). The
-`is_promo` field on a set indicates it is a promo set (see Promo Cards below).
+identified by a single letter (e.g., `A`, `B`; new series are added as the game expands).
+`Set::is_promo()` returns `true` for promo sets (see Promo Cards below).
 
 ### Set Availability
 
-Non-promo sets have an `availability` object with two date fields:
+Non-promo sets have two availability dates:
 
-- **`availability.start`**: the date the set became available
-- **`availability.end`**: the date the set became unobtainable, or null if still obtainable
+- **`Set::release_date()`**: the date the set became available
+- **`Set::retirement_date()`**: the date the set became unobtainable, or `None` if still obtainable
 
-A set is considered **unobtainable** if `availability.end` is non-null and its date is in the
-past. Currently the only unobtainable set is **A4b** — its packs can no longer be opened.
+A set is considered **unobtainable** if `Set::retirement_date()` returns a date in the past.
+Currently the only unobtainable set is **A4b** — its packs can no longer be opened.
 
-Promo sets have `availability: null` — they have no availability window (individual promo cards
-may be limited-time, but that is not tracked at the set level).
+Promo sets return `None` from both `Set::release_date()` and `Set::retirement_date()` — they
+have no availability window (individual promo cards may be limited-time, but that is not tracked
+at the set level).
 
 Unobtainable sets remain in the catalog and count toward completion by default. However,
 unobtainable packs are excluded from "next pack to open" recommendations everywhere in the app
@@ -220,41 +220,44 @@ Sets have one or more packs identified by a subtitle (e.g., "Charizard", "Mewtwo
 data lives at `data/pull_rates/{SET}/{subtitle}.json`. Promo sets also have packs, but they
 work differently — see Promo Cards.
 
-**Pack display name**: every set has a `name` (e.g., "Genetic Apex") and every pack has a
-`subtitle` (e.g., "Charizard"). Many sets have only one pack, in which case the subtitle is
-typically identical to the set name. The full display name of a pack is derived as follows:
+**Pack display name**: every set has a name (`Set::name()`, e.g., "Genetic Apex") and every pack
+has a subtitle (`Pack::subtitle()`, e.g., "Charizard"). Many sets have only one pack, in which
+case the subtitle is typically identical to the set name. Use `Pack::title()` to get the correct
+full display name — it implements this logic:
 
-- If `set.name == pack.subtitle`: display only `set.name` (no repetition)
+- If `Set::name() == Pack::subtitle()`: display only the set name (no repetition)
 - Otherwise: display `{set.name}: {pack.subtitle}` (e.g., "Genetic Apex: Charizard")
 
 Each pack has **variants** that determine what cards may appear and with what probability:
 
 | Variant | Approximate Rate | Slot Count |
 |---|---|---|
-| `normal` | ~94–99.95% | 5 |
-| `plus1` | ~5–8% | 6 (bonus slot) |
-| `rare` | 0.05% | 5 (star-rarity cards) |
-| `themed` | 0.005% | 5 (featured cards) |
+| Regular Pack | ~94–99.95% | 5 |
+| Regular Pack +1 | ~5–8% | 6 (bonus slot) |
+| Rare Pack | 0.05% | 5 (star-rarity cards) |
+| Themed Rare Pack | 0.005% | 5 (featured cards) |
 
-Not all packs have all variants. Each variant has a `rate` (exact fraction) representing the
-probability of that variant occurring. Variant rates sum to 1.
+Not all packs have all variants. Each variant's exact pull rate is `PackVariant::pull_rate()`
+(a `Prob`). Variant rates for a given pack sum to 1.
 
-Each variant has **slots** (one per card yielded). Slot 0 is the first card shown to the player,
-slot 1 the second, and so on. Pull rates differ per slot.
+Each variant has **slots** (one per card yielded), accessible via `PackVariant::slots()`. Slot 0
+is the first card shown to the player, slot 1 the second, and so on (`PackSlot::pull_number()`).
+Pull rates differ per slot.
 
 For each slot, the data provides:
-- **Rarity rates** (`rarity_rates_by_slot`): probability of each rarity appearing, split into
-  `normal` (non-foil) and `foil` sub-objects, each an exact fraction
-- **Card rates** (`card_rates`): per-card probability for each slot as an exact fraction;
-  `null` means the card cannot appear in that slot
+- **Rarity rates** (`PackSlot::rarities()`, a `&[RarityPullRate]`): probability of each rarity
+  appearing, split into non-foil (`RarityPullRate::normal_pull_rate()`) and foil
+  (`RarityPullRate::foil_pull_rate()`), each a `Prob`
+- **Card rates** (`PackSlot::card_versions()`, a `&[CardVersionPullRate]`): per-card probability
+  for each slot (`CardVersionPullRate::pull_rate()`); cards absent from the list have an implicit
+  rate of `Prob::ZERO`
 
-All rates are stored as exact integer fractions `{ numerator, denominator }` to avoid
-floating-point error. Intermediate probability calculations must use rational arithmetic;
-only convert to a percentage for final display to the user.
+All rates are `Prob` values — exact rational arithmetic. Intermediate probability calculations
+must use `Prob`; only convert to a float (`Prob::as_f64()`) or percentage for final display.
 
 ### Promo Cards
 
-Promo cards belong to promo sets (identified by `is_promo: true`). Normal sets never contain
+Promo cards belong to promo sets (`Set::is_promo()` returns `true`). Normal sets never contain
 promo cards.
 
 Promo sets have packs with pull rate data like normal packs, but structured differently: each
@@ -274,12 +277,12 @@ Where set completion is shown, promo sets are included but without any "chance t
 
 ### Card Sources
 
-Every card version has exactly one `source` field indicating how it is obtained in PTCGP. Source
-codes reference entries in `data/card_sources.json`. The special source value **`Pack`** means the
-card is available from packs and has associated pull rate data and assigned packs. All other source
-values mean the card is obtainable only through other in-game means (missions, events, shop, etc.),
-and these cards have **no pull rate data and no assigned packs** — even if they belong to a
-non-promo set.
+Every card version has exactly one source (`CardVersion::source()`, a `&CardSource`) indicating
+how it is obtained in PTCGP. The special source whose `CardSource::name()` is `"Pack"` means the
+card is available from packs and has associated pull rate data and assigned packs
+(`CardVersion::packs()`). All other sources mean the card is obtainable only through other
+in-game means (missions, events, shop, etc.), and these cards have **no pull rate data and no
+assigned packs** (`CardVersion::packs()` is empty) — even if they belong to a non-promo set.
 
 The only known non-promo card with a non-Pack source is **A1 283** (IM Mew), obtainable only by
 completing a mission to collect one of each Kanto Pokémon.
@@ -326,13 +329,13 @@ For a given non-promo pack and a target card (or set of cards), the aggregate pu
 ```
 P(card from pack) =
   sum over all variants v:
-    rate(v) * sum over all slots s in v:
-      card_rate(card, s, v)
+    v.pull_rate() * sum over all slots s in v.slots():
+      card_rate(card, s)
 ```
 
-Where `card_rate(card, s, v)` is the card's pull rate in slot `s` of variant `v` (0 if the card
-cannot appear in that slot). All arithmetic uses exact rational numbers (the fractions from the
-data). Convert to a percentage only at final display time.
+Where `card_rate(card, s)` is the `Prob` from the `CardVersionPullRate` entry for `card` in
+`s.card_versions()`, or `Prob::ZERO` if the card is absent. All arithmetic uses `Prob` (exact
+rational arithmetic). Convert to a percentage only at final display time.
 
 ### Probability of Pulling Any "Desired" Card
 
@@ -342,9 +345,9 @@ For features like "next pack to open," the target is not one card but a set of d
 ```
 P(any desired card from pack) =
   sum over all variants v:
-    rate(v) * sum over all slots s in v:
-      sum over all desired cards c that can appear in slot s:
-        card_rate(c, s, v)
+    v.pull_rate() * sum over all slots s in v.slots():
+      sum over all desired cards c in s.card_versions():
+        c.pull_rate()
 ```
 
 This works because within any given slot, cards are mutually exclusive (only one card appears
@@ -753,11 +756,12 @@ Applied based on the card's rarity group (rarity codes listed for reference only
 | Crown | UR | Gold border or gold-accented row styling |
 
 **Layer 3 — Foil effect**
-Foil card versions (`is_foil: true`) get a static rainbow/iridescent CSS gradient applied to
-the row border or background, regardless of rarity group.
+Foil card versions (`CardVersion::is_foil()` is `true`) get a static rainbow/iridescent CSS
+gradient applied to the row border or background, regardless of rarity group.
 
 **Layer 4 — Premium source tint**
-Cards whose `source` is `Premium Mission` or `Gold Shop` require spending real money to obtain.
+Cards whose `CardVersion::source().name()` is `"Premium Mission"` or `"Gold Shop"` require
+spending real money to obtain.
 These rows get a distinct gold/amber tint or border overlay to signal this — separate from the
 element tint — so users can immediately recognize that obtaining the card has a monetary cost.
 The exact color should feel "premium" (gold or amber), remain legible in both light and dark
@@ -772,8 +776,9 @@ Default sort: **canonical set order, then collector number within the set.**
 
 Canonical set order is defined as:
 1. Series alphabetically (A, B, C, …)
-2. Within a series: by `availability.start` ascending; promo sets (which have null `availability`
-   in `ptcgp-data`) always sort last within their series regardless of when promo cards were released
+2. Within a series: by `Set::release_date()` ascending; promo sets (`Set::is_promo()` is `true`,
+   and `Set::release_date()` returns `None`) always sort last within their series regardless of
+   when promo cards were released
 3. Within a set: collector number ascending (numeric)
 
 Example order: A1, A1a, A2, …, A4b, P-A, B1, B1a, …, P-B
@@ -809,8 +814,8 @@ explicit "no results" message.
 | **Mega** | Toggle: show only Mega ex Pokémon, or exclude them. |
 | **Stage** | Single-select: Basic, Stage 1, Stage 2. |
 | **Element** | Multi-select. Filter Pokémon by element. |
-| **Foil** | Toggle: show only foil card versions, or exclude foil card versions (`is_foil` field). |
-| **Card Source** | Multi-select. Filter to cards with one or more specific source values (e.g., `Pack`, `Premium Mission`, `Gold Shop`). |
+| **Foil** | Toggle: show only foil card versions, or exclude foil card versions (`CardVersion::is_foil()`). |
+| **Card Source** | Multi-select. Filter by `CardVersion::source()` (e.g., `"Pack"`, `"Premium Mission"`, `"Gold Shop"`). |
 | **Obtainable** | Toggle: when set, restrict to cards from obtainable sets only, or to cards from unobtainable sets only. Hidden when the global "Ignore unobtainable sets" setting is on (unobtainable sets are already excluded). |
 | **Owned count** | Threshold: e.g., `= 0`, `< 2`, `>= 3`. Operates on the aggregate count across active profiles. |
 
@@ -838,20 +843,20 @@ aggregate sum and the count editor is disabled.
 - Rarity class icon; specific rarity name (e.g., "Common", "Super Rare") shown as supplemental text
 - Card type (Pokémon or Trainer)
 - Owned count with increment/decrement buttons
-- **Packs** this card version can be pulled from (`packs` field on the card version), with pull
-  rate per pack. Omit for cards whose `source` is not `Pack` — these have no pack data.
-- **Card source** (`source` field) — if not `Pack`, display the source description to explain how
-  the card is obtained (e.g., a mission or shop purchase)
-- **Duplicate versions** (`duplicates` field on the card version): other card versions with the
-  same rarity, illustrator, and finish released in a different set. These are the "same physical
-  card" reprinted.
-- **All versions** of the same abstract card (`versions` on the abstract card, via `card_id`):
-  includes duplicates and versions with different rarities/illustrators/finishes. All share the
-  same game mechanics.
+- **Packs** this card version can be pulled from (`CardVersion::packs()`), with pull rate per
+  pack. Empty (and omitted from display) when `CardVersion::source().name() != "Pack"`.
+- **Card source** (`CardVersion::source()`) — when source is not `"Pack"`, display
+  `CardSource::description()` to explain how the card is obtained (e.g., a mission or shop
+  purchase)
+- **Duplicate versions** (`CardVersion::duplicates()`): other card versions with the same rarity,
+  illustrator, and finish released in a different set. These are the "same physical card" reprinted.
+- **All versions** of the same abstract card (`CardVersion::card().versions()`): includes
+  duplicates and versions with different rarities/illustrators/finishes. All share the same game
+  mechanics.
 
 ### Pokémon-Only Fields
 
-- National Pokédex number (`natdex_number` on the abstract card)
+- National Pokédex number (`PokemonCard::base_pokemon().natdex_number()`)
 - Element (with icon)
 - Stage (Basic, Stage 1, Stage 2)
 - HP
@@ -969,26 +974,26 @@ to receive if the aggregate count across all active profiles is below target.
 
 PTCGP restricts which cards can move between accounts:
 
-- **`is_tradable: true`** — required for a card to be eligible for shares or trades; cards with
-  `is_tradable: false` are excluded from all recommendations
+- **`CardVersion::is_tradable()`** — must be `true` for a card to be eligible for shares or
+  trades; cards where it is `false` are excluded from all recommendations
 - **Shareable** — additionally requires the card's rarity group to be Diamond (C, U, R, or RR)
-- **Tradeable** — only `is_tradable: true` is required; any rarity class is eligible
+- **Tradeable** — only `CardVersion::is_tradable()` is required; any rarity class is eligible
 
 The global "Ignore" settings (unobtainable sets, Premium Mission, Gold Shop) apply to the Trade
 page as well — cards excluded by those settings do not appear in any recommendations.
 
 When **Merge duplicate printings** is enabled, the merged count (sum across all versions in a
 duplicate group) is used when determining need and excess. When a recommendation names a specific
-card version to trade or share, always use the version where `is_original: true` — never a
-reprint — to keep recommendations consistent.
+card version to trade or share, always use the version where `CardVersion::is_original()` is
+`true` — never a reprint — to keep recommendations consistent.
 
 ### Recommended Shares
 
 A **share** is a once-per-day, one-way transfer of a Diamond card from one account to another,
 free of charge. Recommendations identify the highest-value shares to perform:
 
-- **Candidate cards**: `is_tradable: true`, Diamond rarity group, and the aggregate count across
-  active profiles is below target for that card
+- **Candidate cards**: `CardVersion::is_tradable()` is `true`, Diamond rarity group, and the
+  aggregate count across active profiles is below target for that card
 - **Source**: any inactive profile with count > 0 for that card — source profiles are treated as
   a pool to drain into the destination, so any owned copy is a candidate regardless of how many
   the source would have left
@@ -1019,13 +1024,14 @@ currency; currency cost is not factored into recommendations.
 
 For each (source profile, rarity class) pair, the best trade is selected independently:
 
-- **Card B** (destination receives, source gives): among `is_tradable` cards of that rarity class
-  where the source count > 0 and the aggregate destination count < T, choose the one with the
-  **highest receive-value** — the card the destination most benefits from getting.
-- **Card A** (destination gives, source receives): among `is_tradable` cards of that same rarity
-  class where the aggregate destination count > T (excess > 0) and the source count < T (source
-  wants it), choose the one with the **lowest trade-candidate value** — the card cheapest for the
-  destination to part with (most surplus, most re-obtainable).
+- **Card B** (destination receives, source gives): among cards where `CardVersion::is_tradable()`
+  is `true` in that rarity class, where the source count > 0 and the aggregate destination
+  count < T, choose the one with the **highest receive-value** — the card the destination most
+  benefits from getting.
+- **Card A** (destination gives, source receives): among cards where `CardVersion::is_tradable()`
+  is `true` in that same rarity class, where the aggregate destination count > T (excess > 0) and
+  the source count < T (source wants it), choose the one with the **lowest trade-candidate value**
+  — the card cheapest for the destination to part with (most surplus, most re-obtainable).
 
 Both must exist for a recommendation to be generated for that (source, rarity class) pair. Rank
 recommendations by the receive-value of Card B. Display both sides of each proposed trade clearly
@@ -1066,9 +1072,9 @@ trade candidate. The list is sorted ascending by value.
 Intuitively: value falls as either factor grows, so a card that is both easy to re-obtain and
 held in large surplus scores the lowest and appears first.
 
-**Unobtainable set cards**: cards from sets whose `availability.end` is in the past cannot be
-re-obtained from packs, making them more precious despite having a non-zero `max_pull_rate` from
-historical data. These cards are **excluded from the list by default** and shown only when the
+**Unobtainable set cards**: cards from sets whose `Set::retirement_date()` is in the past cannot
+be re-obtained from packs, making them more precious despite having a non-zero `max_pull_rate`
+from historical data. These cards are **excluded from the list by default** and shown only when the
 user opts in via a toggle (consistent with how unobtainable packs are handled elsewhere). When
 shown, they are visually flagged (e.g., a warning indicator) to signal they cannot be re-obtained.
 
@@ -1149,9 +1155,9 @@ A settings area (page or panel) for app-wide preferences. At minimum:
 - Preference is persisted across sessions
 
 **Ignore unobtainable sets**
-- Toggle: when enabled, sets whose `availability.end` is non-null and in the past are excluded
-  from the entire app — hidden from the Card Catalog, excluded from set completion counts,
-  excluded from all probability calculations and analysis results
+- Toggle: when enabled, sets where `Set::retirement_date()` returns a date in the past are
+  excluded from the entire app — hidden from the Card Catalog, excluded from set completion
+  counts, excluded from all probability calculations and analysis results
 - Default: off (unobtainable sets appear in the catalog and completion, but their packs are
   excluded from recommendations by default — see Summary and Analysis pages)
 - When this setting is on, the per-page "include unobtainable" toggles on the Summary and
@@ -1159,14 +1165,16 @@ A settings area (page or panel) for app-wide preferences. At minimum:
 - Persisted across sessions
 
 **Ignore Premium Mission cards**
-- Toggle: when enabled, cards with source `Premium Mission` are excluded from the entire app —
+- Toggle: when enabled, cards where `CardVersion::source().name()` is `"Premium Mission"` are
+  excluded from the entire app —
   hidden from the Card Catalog, excluded from set completion counts, excluded from probability
   calculations, and excluded from all analysis results
 - Default: off (premium cards are shown)
 - Persisted across sessions
 
 **Ignore Gold Shop cards**
-- Toggle: when enabled, cards with source `Gold Shop` are excluded from the entire app in the
+- Toggle: when enabled, cards where `CardVersion::source().name()` is `"Gold Shop"` are excluded
+  from the entire app in the
   same way as above
 - Default: off
 - Persisted across sessions
@@ -1174,8 +1182,8 @@ A settings area (page or panel) for app-wide preferences. At minimum:
 These two settings are independent. Users may ignore one premium source but not the other.
 
 **Merge duplicate printings**
-- Toggle: when enabled, card versions that are physical reprints of each other (linked via the
-  `duplicates` field) are treated as a single logical card throughout the entire app:
+- Toggle: when enabled, card versions that are physical reprints of each other (linked via
+  `CardVersion::duplicates()`) are treated as a single logical card throughout the entire app:
   - The owned count for any version in a duplicate group is the **sum of owned counts across all
     versions in the group**, regardless of which sets those versions belong to
   - Completion percentages and denominators count the duplicate group as **one card**, not one

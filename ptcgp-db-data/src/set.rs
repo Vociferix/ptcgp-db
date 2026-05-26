@@ -1,3 +1,5 @@
+//! Card sets and their metadata.
+
 use crate::{
     CardVersion, Pack, Series,
     str_table::{StrEntry, StrTable},
@@ -10,6 +12,12 @@ use chrono::NaiveDate;
 
 use std::ops::Range;
 
+/// A card set (e.g., Genetic Apex, Triumphant Light).
+///
+/// Each set belongs to a [`Series`] and contains one or more [`Pack`]s. Promo sets are marked
+/// with [`is_promo`] and have no availability window.
+///
+/// [`is_promo`]: Set::is_promo
 pub struct Set {
     pub(crate) id: usize,
     pub(crate) series_id: usize,
@@ -27,16 +35,26 @@ pub struct Set {
 }
 
 impl Set {
+    /// All sets in canonical display order: series alphabetically, then by release date within
+    /// each series (promo sets sort last within their series).
     pub const ALL: &[Self] = crate::data::SETS;
 
+    /// Short set code strings (e.g., `"A1"`, `"B2a"`, `"P-A"`).
     pub const CODES: &StrTable = crate::data::SET_CODES;
 
+    /// Full set display name strings (e.g., `"Genetic Apex"`, `"Triumphant Light"`).
     pub const NAMES: &StrTable = crate::data::SET_NAMES;
 
+    /// Returns the set with the given ID without bounds checking.
+    ///
+    /// # Safety
+    ///
+    /// `id` must be less than `Self::ALL.len()`.
     pub const unsafe fn from_id_unchecked(id: usize) -> &'static Self {
         unsafe { crate::get_unchecked(Self::ALL, id) }
     }
 
+    /// Returns the set with the given ID, or `None` if out of range.
     pub const fn from_id(id: usize) -> Option<&'static Self> {
         if id < Self::ALL.len() {
             Some(unsafe { Self::from_id_unchecked(id) })
@@ -45,26 +63,32 @@ impl Set {
         }
     }
 
+    /// Numeric index into [`Set::ALL`].
     pub const fn id(&self) -> usize {
         self.id
     }
 
+    /// Short code identifying this set (e.g., `"A1"`, `"B2a"`, `"P-A"`).
     pub const fn code(&self) -> StrEntry {
         unsafe { Self::CODES.get_entry_unchecked(self.code_id) }
     }
 
+    /// Full display name (e.g., `"Genetic Apex"`).
     pub const fn name(&self) -> StrEntry {
         unsafe { Self::NAMES.get_entry_unchecked(self.name_id) }
     }
 
+    /// Release series this set belongs to.
     pub const fn series(&self) -> &'static Series {
         unsafe { Series::from_id_unchecked(self.series_id) }
     }
 
+    /// Packs belonging to this set, in source order.
     pub const fn packs(&self) -> &'static [Pack] {
         unsafe { crate::slice_unchecked(Pack::ALL, self.pack_ids.start, self.pack_ids.end) }
     }
 
+    /// All card versions in this set, sorted by collector number.
     pub const fn card_versions(&self) -> &'static [CardVersion] {
         unsafe {
             crate::slice_unchecked(
@@ -75,23 +99,32 @@ impl Set {
         }
     }
 
+    /// Date the set became available (`availability.start` in ptcgp-data). `None` for promo
+    /// sets, which have no availability window.
     pub const fn release_date(&self) -> Option<NaiveDate> {
         self.release_date
     }
 
+    /// Date the set became unobtainable (`availability.end` in ptcgp-data). A non-`None` date
+    /// in the past means this set's packs can no longer be opened. `None` for sets that are
+    /// still obtainable or for promo sets (which have no availability window).
     pub const fn retirement_date(&self) -> Option<NaiveDate> {
         self.retirement_date
     }
 
+    /// True for promo sets. Promo sets have no availability window; individual promo card
+    /// availability is not tracked at the set level.
     pub const fn is_promo(&self) -> bool {
         self.is_promo
     }
 
+    /// Full-width set logo, suitable for contexts where space allows.
     #[cfg(feature = "images")]
     pub const fn logo(&self) -> Asset {
         self.logo
     }
 
+    /// Compact set icon, suitable for space-constrained contexts.
     #[cfg(feature = "images")]
     pub const fn icon(&self) -> Asset {
         self.icon
