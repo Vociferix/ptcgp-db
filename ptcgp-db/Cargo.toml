@@ -1,0 +1,15 @@
+[package]
+name = "ptcgp-db"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dioxus = { version = "0.7", features = ["router"] }
+ptcgp-db-core = { path = "../ptcgp-db-core" }
+ptcgp-db-data = { path = "../ptcgp-db-data" }
+
+[features]
+default = []
+web = ["dioxus/web"]
+desktop = ["dioxus/desktop"]
+mobile = ["dioxus/mobile"]

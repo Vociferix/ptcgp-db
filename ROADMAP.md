@@ -19,7 +19,7 @@ Create the `ptcgp-db-core` and `ptcgp-db` Cargo crates and register them in the 
 
 See DESIGN.md §Workspace Structure for crate responsibilities. Verify that `cargo check --workspace` passes before closing this task.
 
-- [ ] **T01**
+- [x] **T01**
 
 ---
 
