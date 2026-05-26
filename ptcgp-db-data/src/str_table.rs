@@ -303,10 +303,7 @@ impl std::iter::FusedIterator for Search<'_> {}
 mod tests {
     use super::*;
 
-    fn make_table(
-        strs: &'static [&'static str],
-        lower: &'static [&'static str],
-    ) -> StrTable {
+    fn make_table(strs: &'static [&'static str], lower: &'static [&'static str]) -> StrTable {
         unsafe { StrTable::new_unchecked(strs, lower) }
     }
 

@@ -219,7 +219,8 @@ impl RawData {
         let mut card_versions: Vec<CardVersion> =
             Vec::with_capacity(sets.iter().map(|set| set.card_count).sum());
         let mut cards: HashMap<usize, Card> = HashMap::new();
-        let mut pack_data: Vec<PackData> = Vec::with_capacity(sets.iter().map(|set| set.packs.len()).sum());
+        let mut pack_data: Vec<PackData> =
+            Vec::with_capacity(sets.iter().map(|set| set.packs.len()).sum());
 
         for set in &sets {
             for num in 1..=set.card_count {

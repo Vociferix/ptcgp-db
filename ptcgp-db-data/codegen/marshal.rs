@@ -352,7 +352,7 @@ fn packs(state: &mut State) -> Result<()> {
         let set_model = &state.data.sets[set_id];
 
         for pack in &set.packs {
-            let subtitle_id = str_id(&state.data.pack_subtitles, &pack)
+            let subtitle_id = str_id(&state.data.pack_subtitles, pack)
                 .context("failed to resolve pack subtitle")?;
 
             let slug = pack.to_lowercase().replace(" ", "_");
