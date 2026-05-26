@@ -416,3 +416,135 @@ where
 }
 
 impl<T: Indexed> std::iter::FusedIterator for Iter<'_, T> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // A minimal type to drive IdSlice tests without depending on generated data.
+    #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    struct Item(usize);
+
+    // Values are the index * 10 so the value stored in BACKING differs from
+    // the ID, making bugs where we confuse the two more obvious.
+    static BACKING: [Item; 5] = [Item(0), Item(10), Item(20), Item(30), Item(40)];
+
+    impl Indexed for Item {
+        const INDEXED: &'static [Self] = &BACKING;
+    }
+
+    fn s(ids: &'static [usize]) -> &'static IdSlice<Item> {
+        unsafe { IdSlice::new_unchecked(ids) }
+    }
+
+    #[test]
+    fn len_and_is_empty() {
+        let empty: &IdSlice<Item> = Default::default();
+        assert!(empty.is_empty());
+        assert_eq!(empty.len(), 0);
+
+        assert!(!s(&[0, 1, 2]).is_empty());
+        assert_eq!(s(&[0, 1, 2]).len(), 3);
+    }
+
+    #[test]
+    fn first_and_last() {
+        assert_eq!(s(&[1, 2, 3]).first(), Some(&Item(10)));
+        assert_eq!(s(&[1, 2, 3]).last(), Some(&Item(30)));
+
+        let empty: &IdSlice<Item> = Default::default();
+        assert_eq!(empty.first(), None);
+        assert_eq!(empty.last(), None);
+    }
+
+    #[test]
+    fn get_at_and_usize_index() {
+        let sl = s(&[2, 4, 1]);
+        assert_eq!(sl.get_at(0), &Item(20));
+        assert_eq!(sl.get_at(1), &Item(40));
+        assert_eq!(sl.get_at(2), &Item(10));
+        // Index operator delegates through T::INDEXED
+        assert_eq!(&sl[0], &Item(20));
+        assert_eq!(&sl[2], &Item(10));
+    }
+
+    #[test]
+    fn range_index_produces_id_slice() {
+        let sl = s(&[0, 1, 2, 3, 4]);
+        let sub = &sl[1..3];
+        assert_eq!(sub.len(), 2);
+        assert_eq!(sub.get_at(0), &Item(10));
+        assert_eq!(sub.get_at(1), &Item(20));
+    }
+
+    #[test]
+    fn get_returns_none_out_of_bounds() {
+        let sl = s(&[0, 1]);
+        assert_eq!(sl.get(0), Some(&Item(0)));
+        assert_eq!(sl.get(1), Some(&Item(10)));
+        assert_eq!(sl.get(2usize), None);
+    }
+
+    #[test]
+    fn split_first_and_last() {
+        let sl = s(&[1, 2, 3]);
+        let (head, tail) = sl.split_first().unwrap();
+        assert_eq!(head, &Item(10));
+        assert_eq!(tail.len(), 2);
+        assert_eq!(tail.get_at(0), &Item(20));
+
+        let (last, rest) = sl.split_last().unwrap();
+        assert_eq!(last, &Item(30));
+        assert_eq!(rest.len(), 2);
+
+        let empty: &IdSlice<Item> = Default::default();
+        assert!(empty.split_first().is_none());
+        assert!(empty.split_last().is_none());
+    }
+
+    #[test]
+    fn split_at() {
+        let sl = s(&[0, 1, 2, 3]);
+        let (a, b) = sl.split_at(2);
+        assert_eq!(a.len(), 2);
+        assert_eq!(b.len(), 2);
+        assert_eq!(a.get_at(1), &Item(10));
+        assert_eq!(b.get_at(0), &Item(20));
+    }
+
+    #[test]
+    fn iter_yields_resolved_items() {
+        let sl = s(&[0, 2, 4]);
+        let v: Vec<_> = sl.iter().collect();
+        assert_eq!(v, vec![&Item(0), &Item(20), &Item(40)]);
+    }
+
+    #[test]
+    fn double_ended_iter() {
+        let sl = s(&[0, 1, 2, 3]);
+        let v: Vec<_> = sl.iter().rev().collect();
+        assert_eq!(v, vec![&Item(30), &Item(20), &Item(10), &Item(0)]);
+    }
+
+    #[test]
+    fn equality_between_id_slices() {
+        assert_eq!(s(&[1, 2, 3]), s(&[1, 2, 3]));
+        assert_ne!(s(&[1, 2, 3]), s(&[1, 2, 4]));
+        assert_ne!(s(&[1, 2]), s(&[1, 2, 3]));
+    }
+
+    #[test]
+    fn equality_with_plain_slice() {
+        let sl = s(&[0, 1, 2]);
+        let items = [Item(0), Item(10), Item(20)];
+        assert_eq!(sl, items.as_slice());
+        assert_eq!(items.as_slice(), sl);
+    }
+
+    #[test]
+    fn as_ids_round_trips() {
+        let ids: &[usize] = &[1, 3, 2];
+        let sl = s(ids);
+        assert_eq!(sl.as_ids(), ids);
+    }
+}

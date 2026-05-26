@@ -646,3 +646,176 @@ impl std::ops::DivAssign<&usize> for Prob {
         *self = self.div_usize(*other);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cmp::Ordering;
+
+    fn p(num: u64, den: u64) -> Prob {
+        Prob::new(num, den)
+    }
+
+    #[test]
+    fn constants() {
+        assert_eq!(Prob::ZERO, p(0, 1));
+        assert_eq!(Prob::ONE, p(1, 1));
+        assert_eq!(Prob::ZERO.as_f64(), 0.0);
+        assert_eq!(Prob::ONE.as_f64(), 1.0);
+    }
+
+    #[test]
+    fn equality_ignores_common_factor() {
+        assert_eq!(p(1, 2), p(2, 4));
+        assert_eq!(p(1, 3), p(3, 9));
+        assert_ne!(p(1, 2), p(1, 3));
+    }
+
+    #[test]
+    fn simplify_reduces_to_lowest_terms() {
+        let s = p(4, 6).simplify();
+        assert_eq!(s.numerator(), 2);
+        assert_eq!(s.denominator(), 3);
+        // Already reduced
+        let s = p(1, 3).simplify();
+        assert_eq!(s.numerator(), 1);
+        assert_eq!(s.denominator(), 3);
+    }
+
+    #[test]
+    fn add() {
+        assert_eq!(p(1, 3) + p(1, 6), p(1, 2));
+        assert_eq!(p(1, 4) + p(1, 4), p(1, 2));
+        assert_eq!(p(1, 2) + p(1, 2), Prob::ONE);
+    }
+
+    #[test]
+    fn sub() {
+        assert_eq!(p(1, 2) - p(1, 4), p(1, 4));
+        assert_eq!(Prob::ONE - p(1, 3), p(2, 3));
+    }
+
+    #[test]
+    fn checked_sub_returns_none_on_underflow() {
+        assert_eq!(p(1, 4).checked_sub(&p(1, 2)), None);
+        assert_eq!(p(1, 2).checked_sub(&p(1, 2)), Some(Prob::ZERO));
+        assert!(p(3, 4).checked_sub(&p(1, 4)).is_some());
+    }
+
+    #[test]
+    fn saturating_sub_clamps_at_zero() {
+        assert_eq!(p(1, 4).saturating_sub(&p(1, 2)), Prob::ZERO);
+        assert_eq!(p(3, 4).saturating_sub(&p(1, 4)), p(1, 2));
+        assert_eq!(Prob::ZERO.saturating_sub(&Prob::ONE), Prob::ZERO);
+    }
+
+    #[test]
+    fn mul() {
+        assert_eq!(p(1, 2) * p(1, 3), p(1, 6));
+        assert_eq!(p(2, 3) * p(3, 4), p(1, 2));
+        assert_eq!(Prob::ZERO * p(1, 2), Prob::ZERO);
+        assert_eq!(Prob::ONE * p(3, 7), p(3, 7));
+    }
+
+    #[test]
+    fn div() {
+        assert_eq!(p(1, 2) / p(1, 3), p(3, 2));
+        assert_eq!(p(3, 4) / p(3, 4), Prob::ONE);
+    }
+
+    #[test]
+    fn mul_usize() {
+        assert_eq!(p(1, 4) * 3usize, p(3, 4));
+        assert_eq!(p(1, 3) * 3usize, Prob::ONE);
+        assert_eq!(2usize * p(1, 5), p(2, 5));
+    }
+
+    #[test]
+    fn div_usize() {
+        assert_eq!(p(3, 4) / 3usize, p(1, 4));
+        assert_eq!(Prob::ONE / 4usize, p(1, 4));
+    }
+
+    #[test]
+    fn ordering() {
+        assert!(p(1, 3) < p(1, 2));
+        assert!(p(1, 2) < p(2, 3));
+        assert!(p(2, 3) < Prob::ONE);
+        assert_eq!(p(1, 2).cmp(&p(2, 4)), Ordering::Equal);
+        assert_eq!(p(1, 3).cmp(&p(1, 2)), Ordering::Less);
+        assert_eq!(p(1, 2).cmp(&p(1, 3)), Ordering::Greater);
+    }
+
+    #[test]
+    fn as_f64_exact_fractions() {
+        assert_eq!(p(1, 2).as_f64(), 0.5);
+        assert_eq!(p(1, 4).as_f64(), 0.25);
+        assert_eq!(p(3, 4).as_f64(), 0.75);
+        assert_eq!(p(1, 8).as_f64(), 0.125);
+    }
+
+    #[test]
+    fn as_f64_rounds_to_nearest_representable() {
+        // as_f64 uses truncating integer division, so results match only when the
+        // scaled numerator has no fractional part (or the truncation happens to equal
+        // the hardware-rounded result). 1/3 satisfies this; 1/5 does not (truncates
+        // to 0.19999999999999998 instead of 0.2).
+        assert_eq!(p(1, 3).as_f64(), 1.0_f64 / 3.0);
+    }
+
+    #[test]
+    fn display_alternate_shows_raw_fraction() {
+        assert_eq!(format!("{:#}", p(1, 4)), "1/4");
+        assert_eq!(format!("{:#}", p(3, 7)), "3/7");
+        // Shows the raw numerator/denominator without simplifying
+        assert_eq!(format!("{:#}", p(2, 4)), "2/4");
+    }
+
+    #[test]
+    fn display_default_shows_decimal() {
+        assert_eq!(format!("{}", p(1, 4)), "0.25");
+        assert_eq!(format!("{}", p(1, 2)), "0.5");
+        assert_eq!(format!("{}", Prob::ZERO), "0");
+        assert_eq!(format!("{}", Prob::ONE), "1");
+    }
+
+    #[test]
+    fn assign_ops() {
+        let mut x = p(1, 4);
+        x += p(1, 4);
+        assert_eq!(x, p(1, 2));
+
+        let mut x = p(3, 4);
+        x -= p(1, 4);
+        assert_eq!(x, p(1, 2));
+
+        let mut x = p(3, 4);
+        x *= p(2, 3);
+        assert_eq!(x, p(1, 2));
+
+        let mut x = p(3, 2);
+        x /= p(3, 4);
+        assert_eq!(x, p(2, 1));
+
+        let mut x = p(1, 3);
+        x *= 3usize;
+        assert_eq!(x, Prob::ONE);
+
+        let mut x = Prob::ONE;
+        x /= 4usize;
+        assert_eq!(x, p(1, 4));
+    }
+
+    #[test]
+    fn const_arithmetic() {
+        // Verify const versions produce the same results as operators
+        assert_eq!(p(1, 3).add(&p(1, 6)), p(1, 3) + p(1, 6));
+        assert_eq!(p(1, 2).sub(&p(1, 4)), p(1, 2) - p(1, 4));
+        assert_eq!(p(1, 2).mul(&p(2, 3)), p(1, 2) * p(2, 3));
+        assert_eq!(p(3, 4).div(&p(3, 8)), p(3, 4) / p(3, 8));
+        assert_eq!(p(1, 3).mul_usize(3), p(1, 3) * 3usize);
+        assert_eq!(p(3, 4).div_usize(3), p(3, 4) / 3usize);
+        assert!(p(1, 2).eq(&p(2, 4)));
+        assert_eq!(p(1, 3).cmp(&p(1, 2)), Ordering::Less);
+    }
+}

@@ -298,3 +298,119 @@ impl DoubleEndedIterator for Search<'_> {
 }
 
 impl std::iter::FusedIterator for Search<'_> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_table(
+        strs: &'static [&'static str],
+        lower: &'static [&'static str],
+    ) -> StrTable {
+        unsafe { StrTable::new_unchecked(strs, lower) }
+    }
+
+    #[test]
+    fn len_and_is_empty() {
+        let empty = make_table(&[], &[]);
+        assert!(empty.is_empty());
+        assert_eq!(empty.len(), 0);
+
+        let one = make_table(&["hello"], &["hello"]);
+        assert!(!one.is_empty());
+        assert_eq!(one.len(), 1);
+    }
+
+    #[test]
+    fn get_and_get_entry() {
+        let table = make_table(&["Alpha", "Beta"], &["alpha", "beta"]);
+        assert_eq!(table.get(0), Some("Alpha"));
+        assert_eq!(table.get(1), Some("Beta"));
+        assert_eq!(table.get(2), None);
+
+        let entry = table.get_entry(0).unwrap();
+        assert_eq!(entry.id(), 0);
+        assert_eq!(entry.as_str(), "Alpha");
+        assert_eq!(&*entry, "Alpha");
+        assert_eq!(entry.len(), 5);
+    }
+
+    #[test]
+    fn search_case_insensitive() {
+        let table = make_table(
+            &["Bulbasaur", "Charmander", "Squirtle"],
+            &["bulbasaur", "charmander", "squirtle"],
+        );
+        let results: Vec<_> = table.search("Char").collect();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].as_str(), "Charmander");
+        assert_eq!(results[0].id(), 1);
+
+        // All-lowercase query also matches
+        let results: Vec<_> = table.search("char").collect();
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn search_empty_needle_matches_nothing() {
+        let table = make_table(&["Bulbasaur", "Charmander"], &["bulbasaur", "charmander"]);
+        assert_eq!(table.search("").count(), 0);
+        assert_eq!(table.search("   ").count(), 0);
+        assert_eq!(table.search("\t\n").count(), 0);
+    }
+
+    #[test]
+    fn search_multi_token_matches_any() {
+        // Any one token matching is sufficient to include the entry
+        let table = make_table(
+            &["Bulbasaur", "Charmander", "Squirtle"],
+            &["bulbasaur", "charmander", "squirtle"],
+        );
+        let mut results: Vec<_> = table.search("bulb squirt").collect();
+        results.sort_by_key(|e| e.id());
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].as_str(), "Bulbasaur");
+        assert_eq!(results[1].as_str(), "Squirtle");
+    }
+
+    #[test]
+    fn search_double_ended() {
+        let table = make_table(
+            &["Bulbasaur", "Charmander", "Squirtle"],
+            &["bulbasaur", "charmander", "squirtle"],
+        );
+        // All three contain 'r'; iterate from the back
+        let mut iter = table.search("r");
+        assert_eq!(iter.next_back().as_deref(), Some("Squirtle"));
+        assert_eq!(iter.next_back().as_deref(), Some("Charmander"));
+        assert_eq!(iter.next_back().as_deref(), Some("Bulbasaur"));
+        assert_eq!(iter.next_back(), None);
+    }
+
+    #[test]
+    fn search_meets_in_middle() {
+        // Consuming from both ends should stop correctly when they meet
+        let table = make_table(
+            &["Ant", "Bear", "Cat", "Dog"],
+            &["ant", "bear", "cat", "dog"],
+        );
+        let mut iter = table.search("a"); // Ant, Bear, Cat match (Dog has no 'a')
+        assert_eq!(iter.next().as_deref(), Some("Ant"));
+        assert_eq!(iter.next_back().as_deref(), Some("Cat"));
+        assert_eq!(iter.next().as_deref(), Some("Bear"));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn str_entry_deref_and_borrow() {
+        let table = make_table(&["hello"], &["hello"]);
+        let entry = table.get_entry(0).unwrap();
+        // Deref to &str
+        assert_eq!(&*entry, "hello");
+        // Borrow as &str
+        let s: &str = &entry;
+        assert_eq!(s, "hello");
+        // starts_with via Deref
+        assert!(entry.starts_with("hel"));
+    }
+}

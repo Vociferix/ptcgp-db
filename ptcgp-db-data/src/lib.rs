@@ -5,6 +5,9 @@
 //! (e.g., [`CardVersion::ALL`]) use that order; others are sorted for binary search (numerically
 //! by ID for ID-keyed data, alphabetically for string-keyed data).
 
+#[cfg(test)]
+mod tests;
+
 mod ability;
 mod attack;
 mod base_pokemon;

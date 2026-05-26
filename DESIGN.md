@@ -503,7 +503,10 @@ Business logic (probability calculations, collection aggregation, migration) liv
   shared abstractions, using generics and traits where appropriate. Some repetition in tests is
   acceptable.
 - **Tests**: Test non-obvious behavior comprehensively, but omit tests for trivial logic and
-  for behavior that is the responsibility of a dependency to guarantee.
+  for behavior that is the responsibility of a dependency to guarantee. Place tests either in a
+  `#[cfg(test)] mod tests { ... }` block at the end of the file under test, or in a separate
+  file (e.g., `src/foo/tests.rs`). Do not interleave test code with production code in the
+  middle of a file. Colocating tests with the code they test is encouraged.
 - **Performance vs. build time**: App runtime performance takes priority over build time. Long
   build times (e.g., the data generation crate) are acceptable if isolated to their own crate
   for incremental compilation.

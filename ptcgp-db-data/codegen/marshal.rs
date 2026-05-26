@@ -563,7 +563,7 @@ fn card_versions(state: &mut State) -> Result<()> {
     for set in &mut state.data.sets {
         let len = card_versions[start..]
             .iter()
-            .position(|cv| cv.series_id != set.id)
+            .position(|cv| cv.set_id != set.id)
             .unwrap_or_else(|| card_versions.len() - start);
         let end = start + len;
         set.card_version_ids = start..end;
@@ -895,7 +895,7 @@ fn pack_variants(state: &mut State) -> Result<()> {
     for pack in &mut state.data.packs {
         let len = pack_variants[start..]
             .iter()
-            .position(|pv| pv.series_id != pack.id)
+            .position(|pv| pv.pack_id != pack.id)
             .unwrap_or_else(|| pack_variants.len() - start);
         let end = start + len;
         pack.variant_ids = start..end;
