@@ -1,3 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["ptcgp-db-data", "ptcgp-db-core", "ptcgp-db"]
+
+[workspace.lints.rust]
+# async fn in public traits is fine here — all Storage impls use concrete types, never
+# `dyn Storage`, so the missing auto-trait bounds on returned futures are not an issue.
+async_fn_in_trait = "allow"

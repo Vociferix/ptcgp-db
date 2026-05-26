@@ -3986,6 +3986,7 @@ name = "ptcgp-db-core"
 version = "0.1.0"
 dependencies = [
  "ptcgp-db-data",
+ "serde",
 ]
 
 [[package]]

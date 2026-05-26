@@ -3,6 +3,9 @@ name = "ptcgp-db"
 version = "0.1.0"
 edition = "2024"
 
+[lints]
+workspace = true
+
 [dependencies]
 dioxus = { version = "0.7", features = ["router"] }
 ptcgp-db-core = { path = "../ptcgp-db-core" }
