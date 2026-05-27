@@ -48,7 +48,7 @@ In `ptcgp-db-core`, implement the `Storage` trait for web using IndexedDB. Index
 - Use `web-sys` directly or a lightweight wrapper such as `rexie`.
 - Gate the implementation on `#[cfg(target_arch = "wasm32")]` (or a `web` feature flag) so it does not compile on non-web targets.
 
-- [ ] **T03**
+- [x] **T03**
 
 ---
 
@@ -76,7 +76,7 @@ In `ptcgp-db-core`, implement the migration layer so the app can load save data 
 - Start with format version 1 (no historical data to migrate from). Structure the code so future migration steps are easy to add.
 - Write tests that round-trip data through each defined version boundary.
 
-- [ ] **T05**
+- [x] **T05**
 
 ---
 
@@ -121,7 +121,7 @@ In `ptcgp-db-core`, implement the `AppSettings` and `SavedQueries` types. Both w
 - The serializable filter configuration struct can be defined here or in `ptcgp-db` and passed in; coordinate with T14 (Shared Filter Toolbar).
 - Persisted via the `Storage` backend.
 
-- [ ] **T07**
+- [x] **T07**
 
 ---
 
@@ -140,7 +140,7 @@ All intermediate arithmetic must use `Prob` (exact rational arithmetic). Only co
 
 Write tests for the core formulas, including edge cases (all owned, none owned, T=2, merge enabled).
 
-- [ ] **T08**
+- [x] **T08**
 
 ---
 
