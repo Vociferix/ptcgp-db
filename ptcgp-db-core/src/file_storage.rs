@@ -1,15 +1,22 @@
-//! File-based JSON storage backend for desktop and mobile targets.
+//! File-based JSON storage backend for desktop targets.
 //!
 //! Each of the three data types is stored as a separate JSON file in the platform data directory:
 //! - `profiles.json` — [`ProfilesSaveData`]
 //! - `settings.json` — [`AppSettingsSaveData`]
 //! - `saved_queries.json` — [`SavedQueriesSaveData`]
 //!
-//! The data directory is located via [`dirs::data_dir`]:
+//! The data directory is located via [`dirs::data_local_dir`]:
 //! - Linux: `~/.local/share/ptcgp-db/`
-//! - Windows: `%APPDATA%\ptcgp-db\`
+//! - Windows: `%LOCALAPPDATA%\ptcgp-db\`
 //! - macOS: `~/Library/Application Support/ptcgp-db/`
-//! - Android/iOS: platform data directory provided by `dirs`
+//!
+//! `local_data_dir` is preferred over `data_dir` on Windows because `data_dir` maps to the
+//! roaming profile (`%APPDATA%`), which syncs across domain machines. Collection data is
+//! large and machine-specific, so the local (non-roaming) directory is more appropriate.
+//!
+//! Mobile platforms (Android/iOS) use sandboxed filesystems that differ from desktop OS
+//! conventions; `dirs` does not explicitly support them. Mobile storage will need revisiting
+//! when mobile builds are targeted.
 //!
 //! Saves are written atomically: the JSON is first written to a `.tmp` file in the same
 //! directory, then renamed to the final path. This prevents corruption if the process is
@@ -56,7 +63,7 @@ pub struct FileStorage {
 impl FileStorage {
     /// Opens the storage backend, creating the data directory if it does not yet exist.
     pub fn open() -> Result<Self, FileStorageError> {
-        let dir = dirs::data_dir()
+        let dir = dirs::data_local_dir()
             .ok_or(FileStorageError::NoDataDir)?
             .join(APP_DIR_NAME);
         std::fs::create_dir_all(&dir)?;
