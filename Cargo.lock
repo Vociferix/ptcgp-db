@@ -4030,8 +4030,13 @@ name = "ptcgp-db"
 version = "0.1.0"
 dependencies = [
  "dioxus",
+ "futures-channel",
+ "futures-util",
+ "gloo-timers",
  "ptcgp-db-core",
  "ptcgp-db-data",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
