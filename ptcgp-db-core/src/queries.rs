@@ -5,6 +5,15 @@ use crate::{
     storage::Storage,
 };
 
+/// Failure modes for [`SavedQueries::rename`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RenameError {
+    /// No query with the given old name exists.
+    OldNameNotFound,
+    /// A query with the requested new name already exists.
+    NewNameTaken,
+}
+
 /// Named filter configurations shared across all profiles.
 ///
 /// Create via [`SavedQueries::load`] on startup; use the provided methods to add, remove,
@@ -75,17 +84,19 @@ impl SavedQueries {
         }
     }
 
-    /// Renames an existing query. Returns `false` if `old_name` does not exist or if
-    /// `new_name` is already taken by a different query.
-    pub fn rename(&mut self, old_name: &str, new_name: String) -> bool {
+    /// Renames an existing query.
+    ///
+    /// Returns `Err(RenameError::OldNameNotFound)` if no query with `old_name` exists, or
+    /// `Err(RenameError::NewNameTaken)` if a different query already uses `new_name`.
+    pub fn rename(&mut self, old_name: &str, new_name: String) -> Result<(), RenameError> {
         if self.data.queries.iter().any(|q| q.name == new_name) {
-            return false;
+            return Err(RenameError::NewNameTaken);
         }
         if let Some(q) = self.data.queries.iter_mut().find(|q| q.name == old_name) {
             q.name = new_name;
-            true
+            Ok(())
         } else {
-            false
+            Err(RenameError::OldNameNotFound)
         }
     }
 }
@@ -168,23 +179,29 @@ mod tests {
     fn rename_existing() {
         let mut sq = SavedQueries::default();
         sq.add("Old".to_string(), make_config(1));
-        assert!(sq.rename("Old", "New".to_string()));
+        assert!(sq.rename("Old", "New".to_string()).is_ok());
         assert_eq!(sq.queries()[0].name, "New");
     }
 
     #[test]
-    fn rename_collision_rejected() {
+    fn rename_collision_returns_new_name_taken() {
         let mut sq = SavedQueries::default();
         sq.add("A".to_string(), make_config(1));
         sq.add("B".to_string(), make_config(2));
-        assert!(!sq.rename("A", "B".to_string()));
+        assert_eq!(
+            sq.rename("A", "B".to_string()),
+            Err(RenameError::NewNameTaken)
+        );
         assert_eq!(sq.queries()[0].name, "A");
     }
 
     #[test]
-    fn rename_nonexistent_returns_false() {
+    fn rename_nonexistent_returns_old_name_not_found() {
         let mut sq = SavedQueries::default();
-        assert!(!sq.rename("nope", "new".to_string()));
+        assert_eq!(
+            sq.rename("nope", "new".to_string()),
+            Err(RenameError::OldNameNotFound)
+        );
     }
 
     #[test]
