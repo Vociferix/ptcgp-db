@@ -8,6 +8,7 @@ use crate::pages::{
 /// App routes. Web builds use hash routing (e.g. `/#/catalog`); desktop/mobile use the default
 /// native history. Route names match their corresponding page component functions.
 #[derive(Clone, Routable, Debug, PartialEq)]
+#[allow(clippy::enum_variant_names)]
 pub enum Route {
     #[route("/")]
     SummaryPage {},

@@ -5,8 +5,8 @@ mod routes;
 fn main() {
     #[cfg(target_arch = "wasm32")]
     {
-        use std::rc::Rc;
         use dioxus::web::{Config, HashHistory};
+        use std::rc::Rc;
         dioxus::LaunchBuilder::web()
             .with_cfg(Config::new().history(Rc::new(HashHistory::default())))
             .launch(app::App);
