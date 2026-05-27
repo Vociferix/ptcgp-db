@@ -21,6 +21,12 @@ use crate::save_data::CardVersionId;
 /// where `card_rate(card, s)` is the `Prob` from the `CardVersionPullRate` entry for the card
 /// in slot `s`, or zero if the card does not appear in that slot.
 ///
+/// **Performance note**: the innermost loop performs a linear scan over
+/// `PackSlot::card_versions()` (hundreds of entries per slot) for each of the ~2–4 variants
+/// and ~5–6 slots. For a single lookup this is negligible. A future optimization would be to
+/// store a per-card, per-pack precomputed rate directly in `ptcgp-db-data`, reducing each
+/// call to O(1). Profile before committing to that change.
+///
 /// Returns [`Prob::ZERO`] for promo packs.
 pub fn card_pull_rate(pack: &Pack, card_id: CardVersionId) -> Prob {
     if pack.set().is_promo() {
@@ -43,15 +49,16 @@ pub fn card_pull_rate(pack: &Pack, card_id: CardVersionId) -> Prob {
     total
 }
 
-/// Computes the expected number of "desired" cards yielded per opening of a specific pack.
-///
-/// Uses the formula from DESIGN.md §Probability of Pulling Any "Desired" Card:
+/// Applies the formula from DESIGN.md §Probability of Pulling Any "Desired" Card:
 /// ```text
-/// P = Σ_v [ v.pull_rate × Σ_s Σ_{desired c in s} c.pull_rate ]
+/// Σ_v [ v.pull_rate × Σ_s Σ_{desired c in s} c.pull_rate ]
 /// ```
-/// Within any given slot, cards are mutually exclusive (only one card appears per slot), so
-/// individual desired-card rates sum correctly. Across multiple slots the result may exceed 1
-/// when a pack yields many cards with high individual rates.
+/// Within any given slot cards are mutually exclusive (only one card appears per slot), so
+/// individual desired-card rates sum correctly within a slot. Across multiple slots the result
+/// is the **expected number of desired cards drawn per opening** — technically not a probability
+/// (it can exceed 1 for packs with many slots and high desired-card coverage), but it is the
+/// correct value for ranking packs by best-to-open. Display it as a percentage as DESIGN.md
+/// directs; in practice for typical desired-card sets the value is well below 1.
 ///
 /// Returns [`Prob::ZERO`] for promo packs or when `is_desired` returns `false` for every card.
 pub fn desired_pull_rate(pack: &Pack, is_desired: impl Fn(CardVersionId) -> bool) -> Prob {
