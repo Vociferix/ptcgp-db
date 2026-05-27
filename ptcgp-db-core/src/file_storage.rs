@@ -151,6 +151,7 @@ mod tests {
                 owned_counts: Default::default(),
             }],
             primary_profile_name: "Main".to_string(),
+            active_profile_names: vec!["Main".to_string()],
         }
     }
 
@@ -162,7 +163,6 @@ mod tests {
             ignore_premium_mission: false,
             ignore_gold_shop: false,
             merge_duplicate_printings: false,
-            active_profile_names: vec!["Main".to_string()],
         }
     }
 

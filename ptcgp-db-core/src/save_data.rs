@@ -38,6 +38,13 @@ pub struct ProfilesSaveData {
     /// [`profiles`](Self::profiles). On first run this is the name the user entered during
     /// onboarding.
     pub primary_profile_name: String,
+
+    /// Names of the currently active profiles. Always a non-empty subset of the profile names
+    /// in [`profiles`](Self::profiles) whenever profiles is non-empty. Deserialized with a
+    /// default of empty so that save files written before this field was added can be loaded
+    /// cleanly; [`ProfileStore`](crate::ProfileStore) fills in the primary profile when empty.
+    #[serde(default)]
+    pub active_profile_names: Vec<String>,
 }
 
 /// Persisted data for a single named profile.
@@ -78,10 +85,6 @@ pub struct AppSettingsSaveData {
     /// When `true`, card versions linked by `CardVersion::duplicates()` are treated as a
     /// single logical card throughout the app.
     pub merge_duplicate_printings: bool,
-
-    /// Names of the currently active profiles. Must be a non-empty subset of the profile
-    /// names stored in [`ProfilesSaveData`].
-    pub active_profile_names: Vec<String>,
 }
 
 /// UI color scheme preference.
