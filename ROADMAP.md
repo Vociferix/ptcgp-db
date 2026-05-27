@@ -61,7 +61,7 @@ In `ptcgp-db-core`, implement the `Storage` trait for desktop and mobile using a
 - Use the `dirs` crate to locate the data directory. See DESIGN.md §Storage Backends for the per-platform paths (`~/.local/share/ptcgp-db/` on Linux, `%APPDATA%\ptcgp-db\` on Windows, etc.).
 - Gate the implementation on non-wasm targets.
 
-- [ ] **T04**
+- [x] **T04**
 
 ---
 
