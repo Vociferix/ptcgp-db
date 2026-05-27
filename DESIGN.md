@@ -400,7 +400,7 @@ Define a storage trait and implement it per platform:
 - **Desktop / Mobile**: A JSON file in the platform-appropriate user data directory, located
   using the `dirs` crate:
   - Linux: `~/.local/share/ptcgp-db/`
-  - Windows: `%APPDATA%\ptcgp-db\`
+  - Windows: `%LOCALAPPDATA%\ptcgp-db\`
   - macOS: `~/Library/Application Support/ptcgp-db/`
   - Android/iOS: platform data directory provided by `dirs`
 
