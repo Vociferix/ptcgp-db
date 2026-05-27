@@ -732,13 +732,16 @@ mod tests {
     }
 
     // --- load / save round-trip ---
+    // These tests require tokio, which is only a dev-dependency on non-wasm targets.
 
+    #[cfg(not(target_arch = "wasm32"))]
     #[tokio::test]
     async fn load_empty_storage_returns_new_store() {
         let store = ProfileStore::load(MemStorage::default()).await.unwrap();
         assert!(store.is_first_run());
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     #[tokio::test]
     async fn save_then_load_round_trip() {
         let storage = MemStorage::default();
@@ -754,6 +757,7 @@ mod tests {
         assert_eq!(loaded.active_profile_names(), &["Main"]);
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     #[tokio::test]
     async fn load_heals_empty_active_profile_names() {
         // Simulate a save file that pre-dates the active_profile_names field
