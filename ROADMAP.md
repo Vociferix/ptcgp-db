@@ -98,7 +98,7 @@ In `ptcgp-db-core`, implement the `ProfileStore` type. This is the central state
 
 This type will be provided as a Dioxus context at the app root (T09).
 
-- [ ] **T06**
+- [x] **T06**
 
 ---
 
