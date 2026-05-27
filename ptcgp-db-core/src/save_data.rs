@@ -118,11 +118,107 @@ pub struct SavedQuery {
     pub config: FilterConfig,
 }
 
-/// Serializable representation of a filter toolbar configuration.
+/// Serializable representation of a filter toolbar configuration, used for saved queries.
 ///
-/// This struct is a stub at format version 1. All filter fields will be added in T07
-/// (AppSettings and SavedQueries types), coordinated with T14 (Shared Filter Toolbar).
+/// Fields that are `None` or empty have no filtering effect (they accept all cards).
+/// This struct is shared between the Card Catalog, Analysis, and Trade pages.
+/// Fields with `#[serde(default, skip_serializing_if = "...")]` are omitted from JSON when
+/// unset, keeping saved queries compact.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct FilterConfig {
-    // Fields to be added in T07 / T14.
+    /// Case-insensitive substring match on card name or collector number string.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name_query: Option<String>,
+
+    /// Series filter (single-select). Value is a `Series::id()`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub series: Option<usize>,
+
+    /// Set filter (multi-select). Values are `Set::id()`s.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sets: Vec<usize>,
+
+    /// Pack filter (multi-select). Values are `Pack::id()`s.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub packs: Vec<usize>,
+
+    /// Rarity class filter (multi-select). Values are `RarityClass::id()`s.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rarities: Vec<usize>,
+
+    /// Card kind filter (single-select). `None` accepts both Pokémon and Trainer cards.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub card_kind: Option<CardKindFilter>,
+
+    /// Ex filter. `Some(true)` = ex only; `Some(false)` = exclude ex; `None` = no filter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ex: Option<bool>,
+
+    /// Mega filter. `Some(true)` = Mega only; `Some(false)` = exclude Mega; `None` = no filter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mega: Option<bool>,
+
+    /// Stage filter (single-select). Value is a `Stage::id()`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stage: Option<usize>,
+
+    /// Element filter (multi-select). Values are `Element::id()`s.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub elements: Vec<usize>,
+
+    /// Foil filter. `Some(true)` = foil only; `Some(false)` = non-foil only; `None` = no filter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub foil: Option<bool>,
+
+    /// Card source filter (multi-select). Values are `CardSource::id()`s.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sources: Vec<usize>,
+
+    /// Obtainable filter. `Some(true)` = obtainable only; `Some(false)` = unobtainable only;
+    /// `None` = no filter. The Analysis page defaults this to `Some(true)`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub obtainable: Option<bool>,
+
+    /// Owned count threshold (Card Catalog only). `None` = no filter. The Analysis and Trade
+    /// pages use [`goal`] instead and ignore this field.
+    ///
+    /// [`goal`]: FilterConfig::goal
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owned_count: Option<CountThreshold>,
+
+    /// Goal count T (Analysis and Trade pages only). Cards where `count < goal` are "desired"
+    /// and drive pack probability calculations. Defaults to `1`.
+    #[serde(default = "FilterConfig::default_goal")]
+    pub goal: u32,
+
+    /// Any-version-owned toggle (Analysis and Trade pages only). When `true`, a card version
+    /// is treated as owned if any version of the same abstract card has aggregate count > 0.
+    #[serde(default)]
+    pub any_version_owned: bool,
+}
+
+impl FilterConfig {
+    fn default_goal() -> u32 {
+        1
+    }
+}
+
+/// Card kind discriminant used for filtering.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CardKindFilter {
+    /// Filter to Pokémon cards only.
+    Pokemon,
+    /// Filter to Trainer cards only.
+    Trainer,
+}
+
+/// Owned count comparison used as a filter threshold.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CountThreshold {
+    /// Match cards where owned count equals `n`.
+    Equal(u32),
+    /// Match cards where owned count is strictly less than `n`.
+    LessThan(u32),
+    /// Match cards where owned count is greater than or equal to `n`.
+    AtLeast(u32),
 }
