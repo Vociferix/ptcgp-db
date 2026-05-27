@@ -4038,11 +4038,14 @@ dependencies = [
 name = "ptcgp-db-core"
 version = "0.1.0"
 dependencies = [
+ "dirs",
  "ptcgp-db-data",
  "rexie",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.18",
+ "tokio",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
