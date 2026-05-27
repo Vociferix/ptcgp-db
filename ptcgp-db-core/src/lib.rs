@@ -8,11 +8,11 @@ pub mod save_data;
 pub mod settings;
 pub mod storage;
 
+pub use migration::{MigrationError, migrate_profiles, migrate_saved_queries, migrate_settings};
 pub use probability::{
     best_pack_for_desired, card_pull_rate, completion, completion_merged, desired_pull_rate,
     max_card_pull_rate,
 };
-pub use migration::{MigrationError, migrate_profiles, migrate_saved_queries, migrate_settings};
 pub use queries::{RenameError, SavedQueries};
 pub use save_data::{
     AppSettingsSaveData, CardKindFilter, CardVersionId, CountThreshold, FilterConfig,

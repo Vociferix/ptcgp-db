@@ -13,8 +13,8 @@
 //!    `if data.format_version < M { data = migrate_<type>_N_to_M(data); }`.
 
 use crate::save_data::{
-    AppSettingsSaveData, ProfilesSaveData, SavedQueriesSaveData, PROFILES_FORMAT_VERSION,
-    QUERIES_FORMAT_VERSION, SETTINGS_FORMAT_VERSION,
+    AppSettingsSaveData, PROFILES_FORMAT_VERSION, ProfilesSaveData, QUERIES_FORMAT_VERSION,
+    SETTINGS_FORMAT_VERSION, SavedQueriesSaveData,
 };
 
 /// Error returned by the migration functions.
