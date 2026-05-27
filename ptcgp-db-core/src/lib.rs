@@ -7,6 +7,8 @@ pub mod queries;
 pub mod save_data;
 pub mod settings;
 pub mod storage;
+#[cfg(target_arch = "wasm32")]
+pub mod web_storage;
 
 pub use migration::{MigrationError, migrate_profiles, migrate_saved_queries, migrate_settings};
 pub use probability::{
@@ -20,3 +22,5 @@ pub use save_data::{
     SETTINGS_FORMAT_VERSION, SavedQueriesSaveData, SavedQuery, Theme,
 };
 pub use settings::AppSettings;
+#[cfg(target_arch = "wasm32")]
+pub use web_storage::{WebStorage, WebStorageError};

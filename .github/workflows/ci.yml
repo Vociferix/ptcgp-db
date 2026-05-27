@@ -51,6 +51,26 @@ jobs:
         env:
           RUSTFLAGS: -D warnings
 
+  wasm-test:
+    name: WASM Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: browser-actions/setup-chrome@v1
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - name: WASM Tests
+        run: wasm-pack test --headless --chrome ptcgp-db-core
+        env:
+          RUSTFLAGS: -D warnings
+
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
