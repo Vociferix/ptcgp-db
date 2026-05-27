@@ -5,7 +5,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use std::sync::Arc;
+use std::rc::Rc;
 
 use rexie::{ObjectStore, Rexie, TransactionMode};
 use thiserror::Error;
@@ -47,7 +47,7 @@ impl From<rexie::Error> for WebStorageError {
 /// Cheap to clone — the underlying [`Rexie`] handle is reference-counted.
 #[derive(Clone)]
 pub struct WebStorage {
-    rexie: Arc<Rexie>,
+    rexie: Rc<Rexie>,
 }
 
 impl WebStorage {
@@ -61,7 +61,7 @@ impl WebStorage {
             .build()
             .await?;
         Ok(Self {
-            rexie: Arc::new(rexie),
+            rexie: Rc::new(rexie),
         })
     }
 
@@ -95,7 +95,9 @@ impl WebStorage {
             .rexie
             .transaction(&[store_name], TransactionMode::ReadWrite)?;
         let store = tx.store(store_name)?;
-        store.put(&js_val, Some(&JsValue::from_str(DOC_KEY))).await?;
+        store
+            .put(&js_val, Some(&JsValue::from_str(DOC_KEY)))
+            .await?;
         tx.done().await?;
         Ok(())
     }
