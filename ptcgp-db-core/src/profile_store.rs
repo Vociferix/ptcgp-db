@@ -386,7 +386,6 @@ impl<S: Storage + Clone> ProfileStore<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::save_data::PROFILES_FORMAT_VERSION;
 
     // A minimal in-memory Storage stub for unit tests.
     #[derive(Clone, Debug, Default)]
@@ -760,6 +759,7 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[tokio::test]
     async fn load_heals_empty_active_profile_names() {
+        use crate::save_data::PROFILES_FORMAT_VERSION;
         // Simulate a save file that pre-dates the active_profile_names field
         // by loading data with an empty active list.
         let storage = MemStorage::default();
