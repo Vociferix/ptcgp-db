@@ -1,12 +1,14 @@
 //! Business logic: probability calculations, collection model, storage, and migrations.
 //! See DESIGN.md §ptcgp-db-core for responsibilities.
 
+pub mod migration;
 pub mod probability;
 pub mod queries;
 pub mod save_data;
 pub mod settings;
 pub mod storage;
 
+pub use migration::{MigrationError, migrate_profiles, migrate_saved_queries, migrate_settings};
 pub use probability::{
     best_pack_for_desired, card_pull_rate, completion, completion_merged, desired_pull_rate,
     max_card_pull_rate,

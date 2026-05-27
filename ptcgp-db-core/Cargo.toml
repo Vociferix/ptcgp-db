@@ -9,3 +9,4 @@ workspace = true
 [dependencies]
 ptcgp-db-data = { path = "../ptcgp-db-data" }
 serde = { version = "1", features = ["derive"] }
+thiserror = "2"
