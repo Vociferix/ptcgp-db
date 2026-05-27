@@ -98,17 +98,6 @@ impl AppSettings {
     pub fn set_merge_duplicate_printings(&mut self, value: bool) {
         self.data.merge_duplicate_printings = value;
     }
-
-    /// Names of the currently active profiles.
-    pub fn active_profile_names(&self) -> &[String] {
-        &self.data.active_profile_names
-    }
-
-    /// Sets the active profile names. Should always be a non-empty subset of the known profile
-    /// names stored in `ProfilesSaveData`.
-    pub fn set_active_profile_names(&mut self, names: Vec<String>) {
-        self.data.active_profile_names = names;
-    }
 }
 
 impl Default for AppSettings {
@@ -121,7 +110,6 @@ impl Default for AppSettings {
                 ignore_premium_mission: false,
                 ignore_gold_shop: false,
                 merge_duplicate_printings: false,
-                active_profile_names: Vec::new(),
             },
         }
     }
@@ -139,7 +127,6 @@ mod tests {
         assert!(!s.ignore_premium_mission());
         assert!(!s.ignore_gold_shop());
         assert!(!s.merge_duplicate_printings());
-        assert!(s.active_profile_names().is_empty());
     }
 
     #[test]
@@ -150,14 +137,12 @@ mod tests {
         s.set_ignore_premium_mission(true);
         s.set_ignore_gold_shop(true);
         s.set_merge_duplicate_printings(true);
-        s.set_active_profile_names(vec!["Main".to_string(), "Alt".to_string()]);
 
         assert_eq!(s.theme(), Theme::Dark);
         assert!(s.ignore_unobtainable_sets());
         assert!(s.ignore_premium_mission());
         assert!(s.ignore_gold_shop());
         assert!(s.merge_duplicate_printings());
-        assert_eq!(s.active_profile_names(), &["Main", "Alt"]);
     }
 
     #[test]
