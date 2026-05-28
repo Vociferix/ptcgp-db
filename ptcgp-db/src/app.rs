@@ -160,8 +160,7 @@ pub fn App() -> Element {
 
     if let Some(ref err) = *load_error.read() {
         return rsx! {
-            div {
-                class: "flex items-center justify-center h-screen text-red-600 p-8",
+            div { class: "flex items-center justify-center h-screen text-red-600 p-8",
                 "Failed to open storage: {err}"
             }
         };
@@ -169,12 +168,13 @@ pub fn App() -> Element {
 
     match &*store.read() {
         None => rsx! {
-            div {
-                class: "flex items-center justify-center h-screen",
-                "Loading…"
-            }
+            div { class: "flex items-center justify-center h-screen", "Loading…" }
         },
-        Some(s) if s.is_first_run() => rsx! { OnboardingStub {} },
-        Some(_) => rsx! { Router::<Route> {} },
+        Some(s) if s.is_first_run() => rsx! {
+            OnboardingStub {}
+        },
+        Some(_) => rsx! {
+            Router::<Route> {}
+        },
     }
 }
