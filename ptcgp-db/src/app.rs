@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use dioxus::prelude::*;
 use futures_channel::mpsc::UnboundedReceiver;
 use futures_util::StreamExt as _;
@@ -32,15 +34,31 @@ async fn open_storage() -> Result<AppStorage, String> {
     ptcgp_db_core::FileStorage::open().map_err(|e| e.to_string())
 }
 
-/// Platform-appropriate 2-second sleep used by the auto-save debounce.
 #[cfg(target_arch = "wasm32")]
-async fn sleep_2s() {
-    gloo_timers::future::TimeoutFuture::new(2_000).await;
+pub(crate) async fn sleep(dur: Duration) {
+    let mut remaining = dur.as_millis();
+    while remaining > u128::from(u32::MAX) {
+        gloo_timers::future::TimeoutFuture::new(u32::MAX).await;
+        remaining -= u128::from(u32::MAX);
+    }
+    gloo_timers::future::TimeoutFuture::new(remaining as u32).await;
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-async fn sleep_2s() {
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+pub(crate) use tokio::time::sleep;
+
+// ---------------------------------------------------------------------------
+// Auto-save signal type and helper
+// ---------------------------------------------------------------------------
+
+/// Sent through the auto-save coroutine's channel to schedule a debounced save.
+pub(crate) struct ScheduleSave;
+
+/// Schedules a debounced `ProfileStore` save. Call this inside any component
+/// that mutates the store. The actual save fires 2 s after the last call.
+#[allow(dead_code)]
+pub(crate) fn schedule_save() {
+    use_coroutine_handle::<ScheduleSave>().send(ScheduleSave);
 }
 
 // ---------------------------------------------------------------------------
@@ -61,16 +79,14 @@ pub fn App() -> Element {
         use_context_provider(|| Signal::new(SavedQueries::default()));
     let mut load_error: Signal<Option<String>> = use_signal(|| None);
 
-    // Auto-save coroutine: waits for mutation signals, debounces 2 s, then
+    // Auto-save coroutine: waits for ScheduleSave signals, debounces 2 s, then
     // saves without holding a write lock across the await point.
-    //
-    // Child components that mutate ProfileStore call:
-    //   use_coroutine_handle::<()>().send(())
-    let _auto_save = use_coroutine(move |mut rx: UnboundedReceiver<()>| async move {
+    // Trigger from any component via schedule_save().
+    let _auto_save = use_coroutine(move |mut rx: UnboundedReceiver<ScheduleSave>| async move {
         while rx.next().await.is_some() {
             // Drain any immediately-queued signals before starting the timer.
             while rx.try_recv().is_ok() {}
-            sleep_2s().await;
+            sleep(Duration::from_secs(2)).await;
             // Drain signals that arrived during the sleep to coalesce rapid edits.
             while rx.try_recv().is_ok() {}
 
