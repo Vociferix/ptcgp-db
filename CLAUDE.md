@@ -72,6 +72,18 @@ store.write().as_mut().unwrap().set_owned_count(...)?;
 schedule_save();
 ```
 
+### Signal read guards — consolidate multiple reads
+
+When reading several values from the same signal in one render, use a single `.read()` guard
+rather than calling `.read()` once per value:
+
+```rust
+let (theme, ignore_unobtainable, merge_dupes) = {
+    let s = settings.read();
+    (s.theme(), s.ignore_unobtainable_sets(), s.merge_duplicate_printings())
+};
+```
+
 ### Signal write guards across await points
 
 **Never hold a `Signal::write()` guard across an `.await`.** The guard is backed by a `RefCell`;
@@ -87,6 +99,13 @@ auto-save coroutine is:
 `use_coroutine` in Dioxus 0.7 automatically inserts the coroutine handle into the context tree.
 Child components retrieve it with `use_coroutine_handle::<MessageType>()`. The `ScheduleSave`
 ZST and `schedule_save()` helper in `app.rs` wrap this so callers don't need to know the type.
+
+## Component placement
+
+Reusable, generic UI components (toggles, spinners, dropdowns, etc.) belong in
+`ptcgp-db/src/components/`. Page-specific compositions of those components can live in the page
+file. When in doubt: if a component could plausibly be used on more than one page, it goes in
+`components/`.
 
 ## Tailwind patterns
 
