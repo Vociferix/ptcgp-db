@@ -14,15 +14,43 @@ struct NavItem {
     short: &'static str,
 }
 
-fn nav_items() -> Vec<NavItem> {
-    vec![
-        NavItem { label: "Summary", route: Route::SummaryPage {}, short: "Home" },
-        NavItem { label: "Card Catalog", route: Route::CatalogPage {}, short: "Cards" },
-        NavItem { label: "Analysis", route: Route::AnalysisPage {}, short: "Analysis" },
-        NavItem { label: "Trade", route: Route::TradePage {}, short: "Trade" },
-        NavItem { label: "Profiles", route: Route::ProfileManagerPage {}, short: "Profiles" },
-        NavItem { label: "Import / Export", route: Route::ImportExportPage {}, short: "Import" },
-        NavItem { label: "Settings", route: Route::SettingsPage {}, short: "Settings" },
+fn nav_items() -> impl IntoIterator<Item = NavItem> {
+    [
+        NavItem {
+            label: "Summary",
+            route: Route::SummaryPage {},
+            short: "Home",
+        },
+        NavItem {
+            label: "Card Catalog",
+            route: Route::CatalogPage {},
+            short: "Cards",
+        },
+        NavItem {
+            label: "Analysis",
+            route: Route::AnalysisPage {},
+            short: "Analysis",
+        },
+        NavItem {
+            label: "Trade",
+            route: Route::TradePage {},
+            short: "Trade",
+        },
+        NavItem {
+            label: "Profiles",
+            route: Route::ProfileManagerPage {},
+            short: "Profiles",
+        },
+        NavItem {
+            label: "Import / Export",
+            route: Route::ImportExportPage {},
+            short: "Import",
+        },
+        NavItem {
+            label: "Settings",
+            route: Route::SettingsPage {},
+            short: "Settings",
+        },
     ]
 }
 
