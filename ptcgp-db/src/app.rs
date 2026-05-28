@@ -195,7 +195,7 @@ pub fn App() -> Element {
     };
 
     rsx! {
-        document::Stylesheet { href: asset!("/tailwind.css") }
+        document::Stylesheet { href: asset!("/public/tailwind.css") }
         {body}
     }
 }
