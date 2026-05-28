@@ -174,23 +174,28 @@ pub fn App() -> Element {
         });
     });
 
-    if let Some(ref err) = *load_error.read() {
-        return rsx! {
+    let body = if let Some(ref err) = *load_error.read() {
+        rsx! {
             div { class: "flex items-center justify-center h-screen text-red-600 p-8",
                 "Failed to open storage: {err}"
             }
-        };
-    }
+        }
+    } else {
+        match &*store.read() {
+            None => rsx! {
+                div { class: "flex items-center justify-center h-screen", "Loading…" }
+            },
+            Some(s) if s.is_first_run() && !skip_onboarding() => rsx! {
+                OnboardingStub {}
+            },
+            Some(_) => rsx! {
+                Router::<Route> {}
+            },
+        }
+    };
 
-    match &*store.read() {
-        None => rsx! {
-            div { class: "flex items-center justify-center h-screen", "Loading…" }
-        },
-        Some(s) if s.is_first_run() && !skip_onboarding() => rsx! {
-            OnboardingStub {}
-        },
-        Some(_) => rsx! {
-            Router::<Route> {}
-        },
+    rsx! {
+        document::Stylesheet { href: asset!("/tailwind.css") }
+        {body}
     }
 }

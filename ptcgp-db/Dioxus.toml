@@ -11,10 +11,3 @@ title = "PTCGP DB"
 reload_html = true
 watch_path = ["src", "public"]
 
-[web.resource]
-style = ["tailwind.css"]
-script = []
-
-[web.resource.dev]
-style = []
-script = []
