@@ -6,8 +6,11 @@ use crate::app::{AppStorage, schedule_save};
 ///
 /// Shows the active profile name(s) and opens a dropdown for switching profiles.
 /// Single-profile selection is the primary path (clicking a row); checkboxes enable multi-select.
+///
+/// Set `open_upward` when the selector sits near the bottom of the viewport so the dropdown
+/// expands above the trigger instead of below it.
 #[component]
-pub fn ProfileSelector() -> Element {
+pub fn ProfileSelector(#[props(default = false)] open_upward: bool) -> Element {
     let store = use_context::<Signal<Option<ptcgp_db_core::ProfileStore<AppStorage>>>>();
     let mut open = use_signal(|| false);
 
@@ -59,9 +62,9 @@ pub fn ProfileSelector() -> Element {
 
             // Dropdown
             if *open.read() {
-                div { class: "absolute left-0 z-20 mt-1 min-w-full w-48 rounded-md shadow-lg \
-                            bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 \
-                            py-1",
+                div { class: if open_upward { "absolute left-0 z-20 bottom-full mb-1 min-w-full w-48 rounded-md shadow-lg \
+                         bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 py-1" } else { "absolute left-0 z-20 mt-1 min-w-full w-48 rounded-md shadow-lg \
+                         bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 py-1" },
                     for name in profile_names {
                         ProfileRow {
                             key: "{name}",

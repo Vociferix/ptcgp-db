@@ -104,7 +104,7 @@ pub fn NavLayout() -> Element {
                 // Profile selector at the bottom of the sidebar
                 if show_selector {
                     div { class: "p-3 border-t border-gray-200 dark:border-gray-700",
-                        ProfileSelector {}
+                        ProfileSelector { open_upward: true }
                     }
                 }
             }
