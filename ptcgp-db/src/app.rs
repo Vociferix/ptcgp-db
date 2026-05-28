@@ -11,6 +11,22 @@ use crate::pages::OnboardingStub;
 use crate::routes::Route;
 
 // ---------------------------------------------------------------------------
+// Dev helpers
+// ---------------------------------------------------------------------------
+
+/// Returns true when the `PTCGP_SKIP_ONBOARDING` environment variable is set.
+/// Always false on WASM (env vars are unavailable there).
+#[cfg(not(target_arch = "wasm32"))]
+fn skip_onboarding() -> bool {
+    std::env::var("PTCGP_SKIP_ONBOARDING").is_ok()
+}
+
+#[cfg(target_arch = "wasm32")]
+fn skip_onboarding() -> bool {
+    false
+}
+
+// ---------------------------------------------------------------------------
 // Platform-specific storage type
 // ---------------------------------------------------------------------------
 
@@ -170,7 +186,7 @@ pub fn App() -> Element {
         None => rsx! {
             div { class: "flex items-center justify-center h-screen", "Loading…" }
         },
-        Some(s) if s.is_first_run() => rsx! {
+        Some(s) if s.is_first_run() && !skip_onboarding() => rsx! {
             OnboardingStub {}
         },
         Some(_) => rsx! {
