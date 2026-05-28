@@ -85,14 +85,43 @@ auto-save coroutine is:
 Child components retrieve it with `use_coroutine_handle::<MessageType>()`. The `ScheduleSave`
 ZST and `schedule_save()` helper in `app.rs` wrap this so callers don't need to know the type.
 
+## Tailwind patterns
+
+### Element colors
+
+Ten custom colors are defined in `ptcgp-db/tailwind.css` under `@theme`. Use them as standard
+Tailwind utility classes:
+
+| Element    | Class prefix example       |
+|------------|---------------------------|
+| Grass      | `bg-element-grass`        |
+| Fire       | `bg-element-fire`         |
+| Water      | `bg-element-water`        |
+| Lightning  | `bg-element-lightning`    |
+| Fighting   | `bg-element-fighting`     |
+| Psychic    | `bg-element-psychic`      |
+| Darkness   | `bg-element-darkness`     |
+| Metal      | `bg-element-metal`        |
+| Colorless  | `bg-element-colorless`    |
+| Dragon     | `bg-element-dragon`       |
+
+The same names work with any utility prefix: `text-element-fire`, `border-element-grass`, etc.
+
+### Dark mode
+
+Class-based dark mode is enabled. Use `dark:` variant classes normally; no extra setup needed
+in components. The `.dark` class on `<html>` is managed by `app.rs` based on `AppSettings.theme`.
+
 ## PR process
 
 Each task from the roadmap gets its own branch and pull request.
 
 1. **Branch** — name after the task ID in lowercase (e.g. T07 → `t07`)
 2. **Work** — implement the task, commit
-3. **Push and open a PR** — `git push -u origin t07`, then open a PR against `master`
-4. **CI** — all checks must pass before review
-5. **Review** — address any comments left on the PR; every comment gets a response, code changes
+3. **Format** — run `dx fmt -p ptcgp-db` before pushing. CI runs `dx fmt --check` and will fail
+   if RSX macros are not formatted. `cargo fmt` does not cover RSX.
+4. **Push and open a PR** — `git push -u origin t07`, then open a PR against `master`
+5. **CI** — all checks must pass before review
+6. **Review** — address any comments left on the PR; every comment gets a response, code changes
    only where the comment calls for them
-6. **Merge** — the user merges when satisfied; never merge yourself
+7. **Merge** — the user merges when satisfied; never merge yourself
