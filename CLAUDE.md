@@ -37,9 +37,12 @@ Run from the crate directory that contains `Dioxus.toml`:
 
 ```
 cd ptcgp-db/ptcgp-db
-dx serve            # web (default)
+dx serve --platform web
 dx serve --platform desktop
 ```
+
+The `--platform` flag is required; `dx serve` without it cannot detect the target and will exit with
+an error.
 
 ## Dioxus app patterns
 

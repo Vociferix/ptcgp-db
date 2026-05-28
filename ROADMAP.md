@@ -189,7 +189,7 @@ Implement the persistent navigation shell that wraps all pages. Per DESIGN.md §
 - Use Dioxus router `<Link>` components for navigation. Highlight the active route.
 - Embed the Profile Selector (T12) in the nav. On the Settings and Import/Export pages, hide or visually disable it since the active profile does not affect those pages (per DESIGN.md §Profile Selector).
 
-- [ ] **T11**
+- [x] **T11**
 
 ---
 
@@ -205,7 +205,7 @@ A reusable component embedded in the navigation for switching active profiles. P
 - Writes to `ProfileStore` context when the selection changes.
 - Must be usable at any viewport width.
 
-- [ ] **T12**
+- [x] **T12**
 
 ---
 
@@ -262,7 +262,7 @@ Implement the Settings page at the `/settings` route. Per DESIGN.md §Settings:
 
 All toggles read from and write to the `AppSettings` context. The Profile Selector is hidden on this page.
 
-- [ ] **T15**
+- [x] **T15**
 
 ---
 
