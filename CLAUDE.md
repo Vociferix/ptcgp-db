@@ -6,6 +6,11 @@ DESIGN.md is the primary reference for all requirements and design decisions. Re
 section before starting any task. When a requirement is unclear or a significant design decision is
 not covered there, stop and ask rather than making assumptions.
 
+After completing any task, update CLAUDE.md and/or memory with new patterns, API facts, or
+constraints discovered during the work — before opening the PR. Since Claude authors most of the
+code in this project, there is rarely a need to re-read files for orientation at the start of a
+session; rely on memory instead and only read files when about to edit them.
+
 ## Crate ownership
 
 `ptcgp-db-data` was written by the user. Claude's role in that crate is limited to doc comments and
