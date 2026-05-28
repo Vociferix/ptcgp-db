@@ -139,6 +139,26 @@ impl<S: Storage + Clone> ProfileStore<S> {
         self.dirty
     }
 
+    /// Returns a reference to the storage backend. Used by the Dioxus integration layer to
+    /// perform an async save without holding a write lock on the `Signal<ProfileStore>`.
+    pub fn storage(&self) -> &S {
+        &self.storage
+    }
+
+    /// Returns a snapshot of the current save data. Pair with [`mark_clean`] after a successful
+    /// external save to avoid holding a write lock across an await point.
+    ///
+    /// [`mark_clean`]: ProfileStore::mark_clean
+    pub fn save_data_snapshot(&self) -> &ProfilesSaveData {
+        &self.data
+    }
+
+    /// Clears the dirty flag without persisting. Called by the Dioxus integration layer after a
+    /// successful async save performed outside the write lock.
+    pub fn mark_clean(&mut self) {
+        self.dirty = false;
+    }
+
     // ------------------------------------------------------------------
     // Queries
     // ------------------------------------------------------------------
