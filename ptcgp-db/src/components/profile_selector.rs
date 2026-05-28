@@ -8,7 +8,7 @@ use crate::app::{AppStorage, schedule_save};
 /// Single-profile selection is the primary path (clicking a row); checkboxes enable multi-select.
 #[component]
 pub fn ProfileSelector() -> Element {
-    let mut store = use_context::<Signal<Option<ptcgp_db_core::ProfileStore<AppStorage>>>>();
+    let store = use_context::<Signal<Option<ptcgp_db_core::ProfileStore<AppStorage>>>>();
     let mut open = use_signal(|| false);
 
     let (profile_names, active_names): (Vec<String>, Vec<String>) = {
@@ -63,72 +63,80 @@ pub fn ProfileSelector() -> Element {
                             bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 \
                             py-1",
                     for name in profile_names {
-                        {
-                            let name = name.clone();
-                            let is_active = active_names.contains(&name);
-                            let only_active = active_names.len() == 1 && is_active;
-
-                            rsx! {
-                                div {
-                                    key: "{name}",
-                                    class: "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer \
-                                                                                                                                                                            hover:bg-gray-100 dark:hover:bg-gray-700 \
-                                                                                                                                                                            text-gray-800 dark:text-gray-100",
-
-                                    // Checkbox: toggles this profile in/out of the active set
-                                    input {
-                                        r#type: "checkbox",
-                                        class: "shrink-0 accent-blue-500",
-                                        checked: is_active,
-                                        disabled: only_active,
-                                        onchange: {
-                                            let name = name.clone();
-                                            move |_| {
-                                                let mut guard = store.write();
-                                                let Some(ref mut s) = *guard else { return };
-                                                if is_active {
-                                                    let _ = s.deactivate_profile(&name);
-                                                } else {
-                                                    let _ = s.activate_profile(&name);
-                                                }
-                                                drop(guard);
-                                                schedule_save();
-                                            }
-                                        },
-                                    }
-
-                                    // Name: single-click selects only this profile
-                                    span {
-                                        class: "flex-1 truncate select-none",
-                                        onclick: {
-                                            let name = name.clone();
-                                            move |e| {
-                                                e.stop_propagation();
-                                                let mut guard = store.write();
-                                                let Some(ref mut s) = *guard else { return };
-                                                // Activate only this profile by deactivating all others
-                                                let all: Vec<String> = s
-                                                    .active_profile_names()
-                                                    .iter()
-                                                    .filter(|n| n.as_str() != name)
-                                                    .cloned()
-                                                    .collect();
-                                                for other in &all {
-                                                    let _ = s.deactivate_profile(other);
-                                                }
-                                                let _ = s.activate_profile(&name);
-                                                drop(guard);
-                                                schedule_save();
-                                                open.set(false);
-                                            }
-                                        },
-                                        "{name}"
-                                    }
-                                }
-                            }
+                        ProfileRow {
+                            key: "{name}",
+                            name: name.clone(),
+                            is_active: active_names.contains(&name),
+                            only_active: active_names.len() == 1 && active_names.contains(&name),
+                            open,
+                            store,
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+#[component]
+fn ProfileRow(
+    name: String,
+    is_active: bool,
+    only_active: bool,
+    mut open: Signal<bool>,
+    mut store: Signal<Option<ptcgp_db_core::ProfileStore<AppStorage>>>,
+) -> Element {
+    rsx! {
+        div { class: "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer \
+                    hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-100",
+
+            // Checkbox: toggles this profile in/out of the active set
+            input {
+                r#type: "checkbox",
+                class: "shrink-0 accent-blue-500",
+                checked: is_active,
+                disabled: only_active,
+                onchange: {
+                    let name = name.clone();
+                    move |_| {
+                        let mut guard = store.write();
+                        let Some(ref mut s) = *guard else { return };
+                        if is_active {
+                            let _ = s.deactivate_profile(&name);
+                        } else {
+                            let _ = s.activate_profile(&name);
+                        }
+                        drop(guard);
+                        schedule_save();
+                    }
+                },
+            }
+
+            // Name: single-click selects only this profile
+            span {
+                class: "flex-1 truncate select-none",
+                onclick: {
+                    let name = name.clone();
+                    move |e| {
+                        e.stop_propagation();
+                        let mut guard = store.write();
+                        let Some(ref mut s) = *guard else { return };
+                        let others: Vec<String> = s
+                            .active_profile_names()
+                            .iter()
+                            .filter(|n| n.as_str() != name)
+                            .cloned()
+                            .collect();
+                        for other in &others {
+                            let _ = s.deactivate_profile(other);
+                        }
+                        let _ = s.activate_profile(&name);
+                        drop(guard);
+                        schedule_save();
+                        open.set(false);
+                    }
+                },
+                "{name}"
             }
         }
     }
