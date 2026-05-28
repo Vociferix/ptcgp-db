@@ -31,21 +31,24 @@ pub fn CountSpinner(
 
     let decrement_disabled = disabled || stored_count == 0;
 
-    let btn_base = "flex items-center justify-center w-7 h-7 rounded text-sm font-bold \
-                    select-none transition-colors";
-    let btn_on = format!(
-        "{btn_base} bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 \
-         text-gray-800 dark:text-gray-100 cursor-pointer"
-    );
-    let btn_off = format!(
-        "{btn_base} bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-default"
-    );
     let decrement_class = if decrement_disabled {
-        btn_off.clone()
+        "flex items-center justify-center w-7 h-7 rounded text-sm font-bold select-none \
+         transition-colors bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 \
+         cursor-default"
     } else {
-        btn_on.clone()
+        "flex items-center justify-center w-7 h-7 rounded text-sm font-bold select-none \
+         transition-colors bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 \
+         dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 cursor-pointer"
     };
-    let increment_class = if disabled { btn_off } else { btn_on };
+    let increment_class = if disabled {
+        "flex items-center justify-center w-7 h-7 rounded text-sm font-bold select-none \
+         transition-colors bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 \
+         cursor-default"
+    } else {
+        "flex items-center justify-center w-7 h-7 rounded text-sm font-bold select-none \
+         transition-colors bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 \
+         dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 cursor-pointer"
+    };
 
     let input_class = if disabled {
         "w-12 text-center text-sm border rounded px-1 py-0.5 \
@@ -100,8 +103,8 @@ pub fn CountSpinner(
                     }
                 },
                 onkeydown: move |evt| {
-                    match evt.key().to_string().as_str() {
-                        "Enter" => {
+                    match evt.key() {
+                        Key::Enter => {
                             let raw = { (*edit.read()).clone() };
                             if let Some(s) = raw {
                                 edit.set(None);
@@ -110,7 +113,7 @@ pub fn CountSpinner(
                                 }
                             }
                         }
-                        "Escape" => edit.set(None),
+                        Key::Escape => edit.set(None),
                         _ => {}
                     }
                 },
