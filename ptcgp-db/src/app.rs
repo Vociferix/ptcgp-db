@@ -3,6 +3,7 @@ use std::time::Duration;
 use dioxus::prelude::*;
 use futures_channel::mpsc::UnboundedReceiver;
 use futures_util::StreamExt as _;
+use ptcgp_db_core::save_data::Theme;
 use ptcgp_db_core::storage::Storage as _;
 use ptcgp_db_core::{AppSettings, ProfileStore, SavedQueries};
 
@@ -113,6 +114,21 @@ pub fn App() -> Element {
                 }
             }
         }
+    });
+
+    // Apply .dark class to <html> based on theme setting.
+    use_effect(move || {
+        let theme = settings.read().theme();
+        let js = match theme {
+            Theme::Dark => "document.documentElement.classList.add('dark')",
+            Theme::Light => "document.documentElement.classList.remove('dark')",
+            Theme::System => concat!(
+                "if(window.matchMedia('(prefers-color-scheme:dark)').matches)",
+                "{document.documentElement.classList.add('dark')}",
+                "else{document.documentElement.classList.remove('dark')}"
+            ),
+        };
+        let _ = document::eval(js);
     });
 
     // Async initialization: open storage, load all persisted state.

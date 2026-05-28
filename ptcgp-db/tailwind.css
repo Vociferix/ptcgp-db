@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+/* Class-based dark mode: applies when an ancestor has the `.dark` class */
+@variant dark (&:where(.dark, .dark *));
+
+/* Scan Rust source files for Tailwind utility classes */
+@source "./src/**/*.rs";
+
+/* Custom element type colors derived from ptcgp-images/elements/icons/ */
+@theme {
+    --color-element-grass: #4ade80;
+    --color-element-fire: #ef4444;
+    --color-element-water: #38bdf8;
+    --color-element-lightning: #fde047;
+    --color-element-fighting: #c2762c;
+    --color-element-psychic: #a855f7;
+    --color-element-darkness: #0d6977;
+    --color-element-metal: #94a3b8;
+    --color-element-colorless: #d1d5db;
+    --color-element-dragon: #ca8a04;
+}
