@@ -40,7 +40,11 @@ pub fn CountSpinner(
     let btn_off = format!(
         "{btn_base} bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-default"
     );
-    let decrement_class = if decrement_disabled { btn_off.clone() } else { btn_on.clone() };
+    let decrement_class = if decrement_disabled {
+        btn_off.clone()
+    } else {
+        btn_on.clone()
+    };
     let increment_class = if disabled { btn_off } else { btn_on };
 
     let input_class = if disabled {
