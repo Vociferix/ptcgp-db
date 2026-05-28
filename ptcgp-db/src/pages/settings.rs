@@ -34,7 +34,11 @@ fn Toggle(checked: bool, on_change: EventHandler<bool>) -> Element {
     } else {
         "bg-gray-300 dark:bg-gray-600"
     };
-    let thumb = if checked { "translate-x-5" } else { "translate-x-0" };
+    let thumb = if checked {
+        "translate-x-5"
+    } else {
+        "translate-x-0"
+    };
 
     rsx! {
         button {
