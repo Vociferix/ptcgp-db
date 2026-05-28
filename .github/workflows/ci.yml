@@ -8,6 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  DX_VERSION: 0.7.9
 
 jobs:
   fmt:
@@ -70,6 +71,55 @@ jobs:
         run: wasm-pack test --headless --chrome ptcgp-db-core
         env:
           RUSTFLAGS: -D warnings
+
+  dx-fmt:
+    name: RSX Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Cache dx binary
+        id: cache-dx
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/dx
+          key: dx-${{ runner.os }}-${{ env.DX_VERSION }}
+      - name: Install dx
+        if: steps.cache-dx.outputs.cache-hit != 'true'
+        run: cargo install dioxus-cli --version ${{ env.DX_VERSION }} --locked
+      - name: Check RSX formatting
+        run: dx fmt --check -p ptcgp-db
+
+  dx-build:
+    name: Web Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Cache dx binary
+        id: cache-dx
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/dx
+          key: dx-${{ runner.os }}-${{ env.DX_VERSION }}
+      - name: Install dx
+        if: steps.cache-dx.outputs.cache-hit != 'true'
+        run: cargo install dioxus-cli --version ${{ env.DX_VERSION }} --locked
+      - name: Cache dx tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/.dx/tools
+          key: dx-tools-${{ runner.os }}-${{ env.DX_VERSION }}
+      - name: Build web
+        run: dx build -p ptcgp-db --platform web
 
   audit:
     name: Security Audit

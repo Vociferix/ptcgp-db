@@ -1,6 +1,8 @@
 [application]
 name = "ptcgp-db"
 default_platform = "web"
+tailwind_input = "tailwind.css"
+tailwind_output = "public/tailwind.css"
 
 [web.app]
 title = "PTCGP DB"
@@ -10,7 +12,7 @@ reload_html = true
 watch_path = ["src", "public"]
 
 [web.resource]
-style = []
+style = ["tailwind.css"]
 script = []
 
 [web.resource.dev]

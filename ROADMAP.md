@@ -172,7 +172,7 @@ Wire Tailwind CSS into the `dx` build pipeline and configure the theme.
 - Enable dark mode support with Tailwind's `dark:` variant. Use class-based dark mode (`.dark` class on `<html>`) so the app can control it programmatically from `AppSettings`.
 - Verify a simple test component renders correctly in both light and dark mode before closing.
 
-- [ ] **T10**
+- [x] **T10**
 
 ---
 

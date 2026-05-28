@@ -3,6 +3,7 @@ use std::time::Duration;
 use dioxus::prelude::*;
 use futures_channel::mpsc::UnboundedReceiver;
 use futures_util::StreamExt as _;
+use ptcgp_db_core::save_data::Theme;
 use ptcgp_db_core::storage::Storage as _;
 use ptcgp_db_core::{AppSettings, ProfileStore, SavedQueries};
 
@@ -115,6 +116,21 @@ pub fn App() -> Element {
         }
     });
 
+    // Apply .dark class to <html> based on theme setting.
+    use_effect(move || {
+        let theme = settings.read().theme();
+        let js = match theme {
+            Theme::Dark => "document.documentElement.classList.add('dark')",
+            Theme::Light => "document.documentElement.classList.remove('dark')",
+            Theme::System => concat!(
+                "if(window.matchMedia('(prefers-color-scheme:dark)').matches)",
+                "{document.documentElement.classList.add('dark')}",
+                "else{document.documentElement.classList.remove('dark')}"
+            ),
+        };
+        let _ = document::eval(js);
+    });
+
     // Async initialization: open storage, load all persisted state.
     use_effect(move || {
         spawn(async move {
@@ -144,8 +160,7 @@ pub fn App() -> Element {
 
     if let Some(ref err) = *load_error.read() {
         return rsx! {
-            div {
-                class: "flex items-center justify-center h-screen text-red-600 p-8",
+            div { class: "flex items-center justify-center h-screen text-red-600 p-8",
                 "Failed to open storage: {err}"
             }
         };
@@ -153,12 +168,13 @@ pub fn App() -> Element {
 
     match &*store.read() {
         None => rsx! {
-            div {
-                class: "flex items-center justify-center h-screen",
-                "Loading…"
-            }
+            div { class: "flex items-center justify-center h-screen", "Loading…" }
         },
-        Some(s) if s.is_first_run() => rsx! { OnboardingStub {} },
-        Some(_) => rsx! { Router::<Route> {} },
+        Some(s) if s.is_first_run() => rsx! {
+            OnboardingStub {}
+        },
+        Some(_) => rsx! {
+            Router::<Route> {}
+        },
     }
 }
