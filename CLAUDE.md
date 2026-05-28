@@ -26,6 +26,60 @@ These override any general defaults:
 - **Panics**: No `.unwrap()` outside tests. Avoid `.expect()` unless the panic is genuinely
   impossible and self-evident from context.
 
+## Running the app
+
+Run from the crate directory that contains `Dioxus.toml`:
+
+```
+cd ptcgp-db/ptcgp-db
+dx serve            # web (default)
+dx serve --platform desktop
+```
+
+## Dioxus app patterns
+
+### Contexts
+
+The three root contexts are provided in `ptcgp-db/src/app.rs`:
+
+| Type | What it holds |
+|------|--------------|
+| `Signal<Option<ProfileStore<AppStorage>>>` | All profile/collection data. `None` while storage is loading. |
+| `Signal<AppSettings>` | Theme and filter settings. |
+| `Signal<SavedQueries>` | Named Analysis page filter configs. |
+
+Consume them with `use_context::<Signal<…>>()`. The `Option` on `ProfileStore` is only `None`
+during the initial load; by the time any page component renders, it is always `Some`.
+
+### Mutating ProfileStore
+
+After any write to `ProfileStore`, call `schedule_save()` (defined in `app.rs`) to trigger the
+2-second debounced auto-save coroutine:
+
+```rust
+use crate::app::schedule_save;
+
+let mut store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
+store.write().as_mut().unwrap().set_owned_count(...)?;
+schedule_save();
+```
+
+### Signal write guards across await points
+
+**Never hold a `Signal::write()` guard across an `.await`.** The guard is backed by a `RefCell`;
+if another component renders while the guard is live it will panic. The pattern used in the
+auto-save coroutine is:
+
+1. Acquire a read guard, clone the data needed, drop the guard.
+2. Perform the async I/O.
+3. Acquire a write guard briefly to update flags (e.g. `mark_clean()`).
+
+### `use_coroutine` is auto-provided as context
+
+`use_coroutine` in Dioxus 0.7 automatically inserts the coroutine handle into the context tree.
+Child components retrieve it with `use_coroutine_handle::<MessageType>()`. The `ScheduleSave`
+ZST and `schedule_save()` helper in `app.rs` wrap this so callers don't need to know the type.
+
 ## PR process
 
 Each task from the roadmap gets its own branch and pull request.
