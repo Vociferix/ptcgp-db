@@ -9,7 +9,7 @@ workspace = true
 [dependencies]
 dioxus = { version = "0.7", features = ["router"] }
 ptcgp-db-core = { path = "../ptcgp-db-core" }
-ptcgp-db-data = { path = "../ptcgp-db-data" }
+ptcgp-db-data = { path = "../ptcgp-db-data", features = ["images"] }
 futures-channel = "0.3"
 futures-util = "0.3"
 tracing = "0.1"
