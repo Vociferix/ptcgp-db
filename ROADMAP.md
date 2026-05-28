@@ -157,7 +157,7 @@ In `ptcgp-db`, build the full app skeleton:
 - First-run detection: on startup, if no save data exists, render the onboarding screen (T17) instead of routing to Summary.
 - Stub `fn ComponentName() -> Element` for each page route so the app compiles and navigation works end-to-end before any page is built.
 
-- [ ] **T09**
+- [x] **T09**
 
 ---
 
