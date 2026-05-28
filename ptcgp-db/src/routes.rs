@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 
+use crate::components::nav::NavLayout;
 use crate::pages::{
     AnalysisPage, CatalogPage, ImportExportPage, ProfileManagerPage, SettingsPage, SummaryPage,
     TradePage,
@@ -10,6 +11,7 @@ use crate::pages::{
 #[derive(Clone, Routable, Debug, PartialEq)]
 #[allow(clippy::enum_variant_names)]
 pub enum Route {
+    #[layout(NavLayout)]
     #[route("/")]
     SummaryPage {},
     #[route("/catalog")]
