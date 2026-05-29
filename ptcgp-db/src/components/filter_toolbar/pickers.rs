@@ -12,26 +12,20 @@ use super::seg_btn_cls;
 // ---------------------------------------------------------------------------
 
 #[component]
-pub fn RarityGroup(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+pub fn RarityGroup(config: Signal<FilterConfig>) -> Element {
+    let rarities = config.read().rarities.clone();
     rsx! {
         div { class: "flex flex-col gap-1",
             div { class: "flex items-center gap-2",
                 span { class: "text-xs font-medium text-gray-500 dark:text-gray-400",
                     "Rarity"
                 }
-                if !config.rarities.is_empty() {
+                if !rarities.is_empty() {
                     button {
                         r#type: "button",
                         class: "text-xs text-gray-400 dark:text-gray-500 \
                                 hover:text-gray-600 dark:hover:text-gray-300",
-                        onclick: {
-                            let config = config.clone();
-                            move |_| {
-                                let mut c = config.clone();
-                                c.rarities.clear();
-                                on_change.call(c);
-                            }
-                        },
+                        onclick: move |_| config.write().rarities.clear(),
                         "Clear"
                     }
                 }
@@ -41,9 +35,8 @@ pub fn RarityGroup(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                     RarityBtn {
                         key: "{rarity.id()}",
                         rarity,
-                        active: config.rarities.contains(&rarity.id()),
-                        config: config.clone(),
-                        on_change,
+                        active: rarities.contains(&rarity.id()),
+                        config,
                     }
                 }
             }
@@ -52,12 +45,7 @@ pub fn RarityGroup(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
 }
 
 #[component]
-fn RarityBtn(
-    rarity: &'static RarityClass,
-    active: bool,
-    config: FilterConfig,
-    on_change: EventHandler<FilterConfig>,
-) -> Element {
+fn RarityBtn(rarity: &'static RarityClass, active: bool, config: Signal<FilterConfig>) -> Element {
     let cls = seg_btn_cls(active);
     rsx! {
         button {
@@ -65,14 +53,13 @@ fn RarityBtn(
             title: "{rarity.group().name()} {rarity.count()}",
             class: "{cls} !px-1.5",
             onclick: move |_| {
-                let mut c = config.clone();
                 let id = rarity.id();
+                let mut cfg = config.write();
                 if active {
-                    c.rarities.retain(|&x| x != id);
-                } else if !c.rarities.contains(&id) {
-                    c.rarities.push(id);
+                    cfg.rarities.retain(|&x| x != id);
+                } else if !cfg.rarities.contains(&id) {
+                    cfg.rarities.push(id);
                 }
-                on_change.call(c);
             },
             img {
                 src: "{rarity.icon()}",
@@ -88,26 +75,20 @@ fn RarityBtn(
 // ---------------------------------------------------------------------------
 
 #[component]
-pub fn ElementGroup(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+pub fn ElementGroup(config: Signal<FilterConfig>) -> Element {
+    let elements = config.read().elements.clone();
     rsx! {
         div { class: "flex flex-col gap-1",
             div { class: "flex items-center gap-2",
                 span { class: "text-xs font-medium text-gray-500 dark:text-gray-400",
                     "Element"
                 }
-                if !config.elements.is_empty() {
+                if !elements.is_empty() {
                     button {
                         r#type: "button",
                         class: "text-xs text-gray-400 dark:text-gray-500 \
                                 hover:text-gray-600 dark:hover:text-gray-300",
-                        onclick: {
-                            let config = config.clone();
-                            move |_| {
-                                let mut c = config.clone();
-                                c.elements.clear();
-                                on_change.call(c);
-                            }
-                        },
+                        onclick: move |_| config.write().elements.clear(),
                         "Clear"
                     }
                 }
@@ -117,9 +98,8 @@ pub fn ElementGroup(config: FilterConfig, on_change: EventHandler<FilterConfig>)
                     ElementBtn {
                         key: "{element.id()}",
                         element,
-                        active: config.elements.contains(&element.id()),
-                        config: config.clone(),
-                        on_change,
+                        active: elements.contains(&element.id()),
+                        config,
                     }
                 }
             }
@@ -131,8 +111,7 @@ pub fn ElementGroup(config: FilterConfig, on_change: EventHandler<FilterConfig>)
 fn ElementBtn(
     element: &'static PtcgpElement,
     active: bool,
-    config: FilterConfig,
-    on_change: EventHandler<FilterConfig>,
+    config: Signal<FilterConfig>,
 ) -> Element {
     let cls = seg_btn_cls(active);
     rsx! {
@@ -141,14 +120,13 @@ fn ElementBtn(
             title: "{element.name()}",
             class: "{cls} !px-1.5",
             onclick: move |_| {
-                let mut c = config.clone();
                 let id = element.id();
+                let mut cfg = config.write();
                 if active {
-                    c.elements.retain(|&x| x != id);
-                } else if !c.elements.contains(&id) {
-                    c.elements.push(id);
+                    cfg.elements.retain(|&x| x != id);
+                } else if !cfg.elements.contains(&id) {
+                    cfg.elements.push(id);
                 }
-                on_change.call(c);
             },
             img {
                 src: "{element.icon()}",

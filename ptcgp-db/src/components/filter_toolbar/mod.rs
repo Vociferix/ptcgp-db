@@ -32,16 +32,17 @@ pub enum FilterMode {
 /// Advanced floating panel: Rarity, Element, Stage, Ex, Mega, Foil, Obtainable,
 /// Count (Catalog) / Any-version (Analysis) — plus primary filters on narrow.
 #[component]
-pub fn FilterToolbar(
-    config: FilterConfig,
-    on_change: EventHandler<FilterConfig>,
-    mode: FilterMode,
-) -> Element {
+pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element {
     let settings = use_context::<Signal<AppSettings>>();
     let ignore_unobtainable = settings.read().ignore_unobtainable_sets();
     let mut panel_open = use_signal(|| false);
 
-    let total_active = count_active(&config, ignore_unobtainable);
+    let total_active = count_active(&config.read(), ignore_unobtainable);
+
+    let (ex, mega, foil, obtainable) = {
+        let cfg = config.read();
+        (cfg.ex, cfg.mega, cfg.foil, cfg.obtainable)
+    };
 
     rsx! {
         div { class: "relative",
@@ -51,27 +52,27 @@ pub fn FilterToolbar(
             div { class: "flex flex-nowrap items-end gap-2",
                 // Name — always visible
                 div { class: "flex-shrink-0",
-                    NameFilter { config: config.clone(), on_change }
+                    NameFilter { config }
                 }
 
                 // Goal — Analysis mode only, always visible
                 if mode == FilterMode::Analysis {
                     div { class: "flex-shrink-0",
-                        GoalFilter { config: config.clone(), on_change }
+                        GoalFilter { config }
                     }
                 }
 
                 // Set + Pack + Source — visible at sm+ (640px); hidden items appear in panel
                 div { class: "hidden sm:flex items-end gap-2",
-                    SetDropdown { config: config.clone(), on_change }
-                    PackDropdown { config: config.clone(), on_change }
-                    SourceDropdown { config: config.clone(), on_change }
+                    SetDropdown { config }
+                    PackDropdown { config }
+                    SourceDropdown { config }
                 }
 
                 // Series + Kind — visible at lg+ (1024px); hidden items appear in panel
                 div { class: "hidden lg:flex items-end gap-2",
-                    SeriesFilter { config: config.clone(), on_change }
-                    KindFilter { config: config.clone(), on_change }
+                    SeriesFilter { config }
+                    KindFilter { config }
                 }
 
                 // Advanced button — always visible, badge shows total active filter count
@@ -109,84 +110,56 @@ pub fn FilterToolbar(
                     // ── Primary filters hidden from the row at narrow widths ──
                     // Set/Pack/Source: not in primary row below sm — show here instead
                     div { class: "flex flex-col gap-3 sm:hidden",
-                        SetDropdown { config: config.clone(), on_change }
-                        PackDropdown { config: config.clone(), on_change }
-                        SourceDropdown { config: config.clone(), on_change }
+                        SetDropdown { config }
+                        PackDropdown { config }
+                        SourceDropdown { config }
                     }
                     // Series/Kind: not in primary row below lg — show here instead
                     div { class: "flex flex-col gap-3 lg:hidden",
-                        SeriesFilter { config: config.clone(), on_change }
-                        KindFilter { config: config.clone(), on_change }
+                        SeriesFilter { config }
+                        KindFilter { config }
                     }
 
                     // ── Advanced filters (always in panel) ───────────────────
-                    RarityGroup { config: config.clone(), on_change }
-                    ElementGroup { config: config.clone(), on_change }
-                    StageFilter { config: config.clone(), on_change }
+                    RarityGroup { config }
+                    ElementGroup { config }
+                    StageFilter { config }
                     TriStateFilter {
                         filter_label: "Ex",
                         only_text: "Ex only",
                         exclude_text: "No ex",
-                        value: config.ex,
-                        on_change: {
-                            let config = config.clone();
-                            move |v: Option<bool>| {
-                                let mut c = config.clone();
-                                c.ex = v;
-                                on_change.call(c);
-                            }
-                        },
+                        value: ex,
+                        on_change: move |v: Option<bool>| config.write().ex = v,
                     }
                     TriStateFilter {
                         filter_label: "Mega",
                         only_text: "Mega only",
                         exclude_text: "No mega",
-                        value: config.mega,
-                        on_change: {
-                            let config = config.clone();
-                            move |v: Option<bool>| {
-                                let mut c = config.clone();
-                                c.mega = v;
-                                on_change.call(c);
-                            }
-                        },
+                        value: mega,
+                        on_change: move |v: Option<bool>| config.write().mega = v,
                     }
                     TriStateFilter {
                         filter_label: "Foil",
                         only_text: "Foil only",
                         exclude_text: "Non-foil",
-                        value: config.foil,
-                        on_change: {
-                            let config = config.clone();
-                            move |v: Option<bool>| {
-                                let mut c = config.clone();
-                                c.foil = v;
-                                on_change.call(c);
-                            }
-                        },
+                        value: foil,
+                        on_change: move |v: Option<bool>| config.write().foil = v,
                     }
                     if !ignore_unobtainable {
                         TriStateFilter {
                             filter_label: "Obtainable",
                             only_text: "Obtainable",
                             exclude_text: "Unobtainable",
-                            value: config.obtainable,
-                            on_change: {
-                                let config = config.clone();
-                                move |v: Option<bool>| {
-                                    let mut c = config.clone();
-                                    c.obtainable = v;
-                                    on_change.call(c);
-                                }
-                            },
+                            value: obtainable,
+                            on_change: move |v: Option<bool>| config.write().obtainable = v,
                         }
                     }
                     match &mode {
                         FilterMode::Catalog => rsx! {
-                            CountFilter { config: config.clone(), on_change }
+                            CountFilter { config }
                         },
                         FilterMode::Analysis => rsx! {
-                            AnyVersionFilter { config: config.clone(), on_change }
+                            AnyVersionFilter { config }
                         },
                     }
                 }
@@ -200,26 +173,25 @@ pub fn FilterToolbar(
 // ---------------------------------------------------------------------------
 
 #[component]
-fn SeriesFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+fn SeriesFilter(config: Signal<FilterConfig>) -> Element {
+    let series = config.read().series;
     rsx! {
         div { class: "flex flex-col gap-0.5",
             span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Series" }
             div { class: "flex",
                 SeriesBtn {
                     btn_label: "All",
-                    active: config.series.is_none(),
+                    active: series.is_none(),
                     target_id: None,
-                    config: config.clone(),
-                    on_change,
+                    config,
                 }
-                for series in Series::ALL {
+                for s in Series::ALL {
                     SeriesBtn {
-                        key: "{series.id()}",
-                        btn_label: series.code().to_string(),
-                        active: config.series == Some(series.id()),
-                        target_id: Some(series.id()),
-                        config: config.clone(),
-                        on_change,
+                        key: "{s.id()}",
+                        btn_label: s.code().to_string(),
+                        active: series == Some(s.id()),
+                        target_id: Some(s.id()),
+                        config,
                     }
                 }
             }
@@ -232,8 +204,7 @@ fn SeriesBtn(
     btn_label: String,
     active: bool,
     target_id: Option<usize>,
-    config: FilterConfig,
-    on_change: EventHandler<FilterConfig>,
+    config: Signal<FilterConfig>,
 ) -> Element {
     let cls = seg_btn_cls(active);
     rsx! {
@@ -241,13 +212,12 @@ fn SeriesBtn(
             r#type: "button",
             class: "{cls}",
             onclick: move |_| {
-                let mut c = config.clone();
-                if c.series != target_id {
-                    c.sets.clear();
-                    c.packs.clear();
+                let mut cfg = config.write();
+                if cfg.series != target_id {
+                    cfg.sets.clear();
+                    cfg.packs.clear();
                 }
-                c.series = target_id;
-                on_change.call(c);
+                cfg.series = target_id;
             },
             "{btn_label}"
         }
@@ -255,26 +225,25 @@ fn SeriesBtn(
 }
 
 #[component]
-fn StageFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+fn StageFilter(config: Signal<FilterConfig>) -> Element {
+    let stage = config.read().stage;
     rsx! {
         div { class: "flex flex-col gap-0.5",
             span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Stage" }
             div { class: "flex",
                 StageBtn {
                     btn_label: "All",
-                    active: config.stage.is_none(),
+                    active: stage.is_none(),
                     target_id: None,
-                    config: config.clone(),
-                    on_change,
+                    config,
                 }
-                for stage in Stage::ALL {
+                for s in Stage::ALL {
                     StageBtn {
-                        key: "{stage.id()}",
-                        btn_label: stage.name().to_string(),
-                        active: config.stage == Some(stage.id()),
-                        target_id: Some(stage.id()),
-                        config: config.clone(),
-                        on_change,
+                        key: "{s.id()}",
+                        btn_label: s.name().to_string(),
+                        active: stage == Some(s.id()),
+                        target_id: Some(s.id()),
+                        config,
                     }
                 }
             }
@@ -287,19 +256,14 @@ fn StageBtn(
     btn_label: String,
     active: bool,
     target_id: Option<usize>,
-    config: FilterConfig,
-    on_change: EventHandler<FilterConfig>,
+    config: Signal<FilterConfig>,
 ) -> Element {
     let cls = seg_btn_cls(active);
     rsx! {
         button {
             r#type: "button",
             class: "{cls}",
-            onclick: move |_| {
-                let mut c = config.clone();
-                c.stage = target_id;
-                on_change.call(c);
-            },
+            onclick: move |_| config.write().stage = target_id,
             "{btn_label}"
         }
     }

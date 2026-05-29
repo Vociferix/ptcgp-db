@@ -36,18 +36,20 @@ fn DropdownPanel(open: Signal<bool>, extra_cls: &'static str, children: Element)
 // ---------------------------------------------------------------------------
 
 #[component]
-pub fn SetDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
     let mut open = use_signal(|| false);
 
-    let visible_sets: Vec<&Set> = Set::ALL
+    let (sets, series) = {
+        let cfg = config.read();
+        (cfg.sets.clone(), cfg.series)
+    };
+    let visible_sets: Vec<&'static Set> = Set::ALL
         .iter()
-        .filter(|s| config.series.is_none_or(|sid| s.series().id() == sid))
+        .filter(|s| series.is_none_or(|sid| s.series().id() == sid))
         .collect();
-    let count = config.sets.len();
-
-    // When exactly 1 set is selected, show its icon in the trigger.
+    let count = sets.len();
     let single_icon_src: Option<String> = if count == 1 {
-        Set::from_id(config.sets[0]).map(|s| s.icon().to_string())
+        Set::from_id(sets[0]).map(|s| s.icon().to_string())
     } else {
         None
     };
@@ -86,15 +88,16 @@ pub fn SetDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                     SetItem {
                         key: "{set.id()}",
                         set,
-                        config: config.clone(),
-                        on_change,
+                        checked: sets.contains(&set.id()),
+                        config,
                     }
                 }
-                if !config.sets.is_empty() {
+                if !sets.is_empty() {
                     DropdownClearBtn {
-                        on_clear: {
-                            let c = config.clone();
-                            move |_| on_change.call(clear_sets(c.clone()))
+                        on_clear: move |_| {
+                            let mut cfg = config.write();
+                            cfg.sets.clear();
+                            cfg.packs.clear();
                         },
                     }
                 }
@@ -105,19 +108,14 @@ pub fn SetDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
 
 /// One set row: compact icon on the left, full logo on the right.
 #[component]
-fn SetItem(
-    set: &'static Set,
-    config: FilterConfig,
-    on_change: EventHandler<FilterConfig>,
-) -> Element {
+fn SetItem(set: &'static Set, checked: bool, config: Signal<FilterConfig>) -> Element {
     let id = set.id();
-    let checked = config.sets.contains(&id);
     let row_cls = dropdown_row_cls(checked);
 
     rsx! {
         div {
             class: "{row_cls}",
-            onclick: move |_| on_change.call(toggle_set(config.clone(), id, checked)),
+            onclick: move |_| toggle_set(&mut config.write(), id, checked),
             img {
                 src: "{set.icon()}",
                 alt: "{set.code()}",
@@ -142,15 +140,20 @@ fn SetItem(
 // ---------------------------------------------------------------------------
 
 #[component]
-pub fn PackDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+pub fn PackDropdown(config: Signal<FilterConfig>) -> Element {
     let mut open = use_signal(|| false);
-    let count = config.packs.len();
+
+    let (packs, sets, series) = {
+        let cfg = config.read();
+        (cfg.packs.clone(), cfg.sets.clone(), cfg.series)
+    };
+    let count = packs.len();
 
     // Build (set_id, [pack_ids]) groups preserving canonical order.
     let mut groups: Vec<(usize, Vec<usize>)> = Vec::new();
     for pack in Pack::ALL {
-        let series_ok = config.series.is_none_or(|sid| pack.series().id() == sid);
-        let set_ok = config.sets.is_empty() || config.sets.contains(&pack.set().id());
+        let series_ok = series.is_none_or(|sid| pack.series().id() == sid);
+        let set_ok = sets.is_empty() || sets.contains(&pack.set().id());
         if !series_ok || !set_ok {
             continue;
         }
@@ -189,17 +192,12 @@ pub fn PackDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>)
                         key: "{set_id}",
                         set_id: *set_id,
                         pack_ids: pack_ids.clone(),
-                        config: config.clone(),
-                        on_change,
+                        checked_packs: packs.clone(),
+                        config,
                     }
                 }
-                if !config.packs.is_empty() {
-                    DropdownClearBtn {
-                        on_clear: {
-                            let c = config.clone();
-                            move |_| on_change.call(clear_packs(c.clone()))
-                        },
-                    }
+                if !packs.is_empty() {
+                    DropdownClearBtn { on_clear: move |_| config.write().packs.clear() }
                 }
             }
         }
@@ -211,8 +209,8 @@ pub fn PackDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>)
 fn PackGroup(
     set_id: usize,
     pack_ids: Vec<usize>,
-    config: FilterConfig,
-    on_change: EventHandler<FilterConfig>,
+    checked_packs: Vec<usize>,
+    config: Signal<FilterConfig>,
 ) -> Element {
     rsx! {
         if let Some(set) = Set::from_id(set_id) {
@@ -230,8 +228,8 @@ fn PackGroup(
                 PackItem {
                     key: "{pack_id}",
                     pack,
-                    config: config.clone(),
-                    on_change,
+                    checked: checked_packs.contains(&pack_id),
+                    config,
                 }
             }
         }
@@ -239,19 +237,14 @@ fn PackGroup(
 }
 
 #[component]
-fn PackItem(
-    pack: &'static Pack,
-    config: FilterConfig,
-    on_change: EventHandler<FilterConfig>,
-) -> Element {
+fn PackItem(pack: &'static Pack, checked: bool, config: Signal<FilterConfig>) -> Element {
     let id = pack.id();
-    let checked = config.packs.contains(&id);
     let row_cls = dropdown_row_cls(checked);
 
     rsx! {
         div {
             class: "{row_cls}",
-            onclick: move |_| on_change.call(toggle_pack(config.clone(), id, checked)),
+            onclick: move |_| toggle_pack(&mut config.write(), id, checked),
             img {
                 src: "{pack.logo()}",
                 alt: "{pack.title()}",
@@ -272,9 +265,10 @@ fn PackItem(
 // ---------------------------------------------------------------------------
 
 #[component]
-pub fn SourceDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+pub fn SourceDropdown(config: Signal<FilterConfig>) -> Element {
     let mut open = use_signal(|| false);
-    let count = config.sources.len();
+    let sources = config.read().sources.clone();
+    let count = sources.len();
 
     rsx! {
         div { class: "relative",
@@ -302,17 +296,12 @@ pub fn SourceDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig
                     SourceItem {
                         key: "{source.id()}",
                         source,
-                        config: config.clone(),
-                        on_change,
+                        checked: sources.contains(&source.id()),
+                        config,
                     }
                 }
-                if !config.sources.is_empty() {
-                    DropdownClearBtn {
-                        on_clear: {
-                            let c = config.clone();
-                            move |_| on_change.call(clear_sources(c.clone()))
-                        },
-                    }
+                if !sources.is_empty() {
+                    DropdownClearBtn { on_clear: move |_| config.write().sources.clear() }
                 }
             }
         }
@@ -320,19 +309,14 @@ pub fn SourceDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig
 }
 
 #[component]
-fn SourceItem(
-    source: &'static CardSource,
-    config: FilterConfig,
-    on_change: EventHandler<FilterConfig>,
-) -> Element {
+fn SourceItem(source: &'static CardSource, checked: bool, config: Signal<FilterConfig>) -> Element {
     let id = source.id();
-    let checked = config.sources.contains(&id);
     let row_cls = dropdown_row_cls(checked);
 
     rsx! {
         div {
             class: "{row_cls}",
-            onclick: move |_| on_change.call(toggle_source(config.clone(), id, checked)),
+            onclick: move |_| toggle_source(&mut config.write(), id, checked),
             img {
                 src: "{source.icon()}",
                 alt: "{source.name()}",
@@ -378,10 +362,10 @@ fn DropdownClearBtn(on_clear: EventHandler<MouseEvent>) -> Element {
 }
 
 // ---------------------------------------------------------------------------
-// State mutation helpers — outside RSX to avoid dx fmt corruption.
+// State mutation helpers — operate in-place to avoid cloning FilterConfig.
 // ---------------------------------------------------------------------------
 
-fn toggle_set(mut config: FilterConfig, id: usize, was_checked: bool) -> FilterConfig {
+fn toggle_set(config: &mut FilterConfig, id: usize, was_checked: bool) {
     if was_checked {
         config.sets.retain(|&x| x != id);
         let sets = config.sets.clone();
@@ -391,39 +375,20 @@ fn toggle_set(mut config: FilterConfig, id: usize, was_checked: bool) -> FilterC
     } else {
         config.sets.push(id);
     }
-    config
 }
 
-fn toggle_pack(mut config: FilterConfig, id: usize, was_checked: bool) -> FilterConfig {
+fn toggle_pack(config: &mut FilterConfig, id: usize, was_checked: bool) {
     if was_checked {
         config.packs.retain(|&x| x != id);
     } else {
         config.packs.push(id);
     }
-    config
 }
 
-fn toggle_source(mut config: FilterConfig, id: usize, was_checked: bool) -> FilterConfig {
+fn toggle_source(config: &mut FilterConfig, id: usize, was_checked: bool) {
     if was_checked {
         config.sources.retain(|&x| x != id);
     } else {
         config.sources.push(id);
     }
-    config
-}
-
-fn clear_sets(mut config: FilterConfig) -> FilterConfig {
-    config.sets.clear();
-    config.packs.clear();
-    config
-}
-
-fn clear_packs(mut config: FilterConfig) -> FilterConfig {
-    config.packs.clear();
-    config
-}
-
-fn clear_sources(mut config: FilterConfig) -> FilterConfig {
-    config.sources.clear();
-    config
 }

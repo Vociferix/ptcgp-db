@@ -10,8 +10,8 @@ use super::seg_btn_cls;
 // ---------------------------------------------------------------------------
 
 #[component]
-pub fn NameFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
-    let value = config.name_query.clone().unwrap_or_default();
+pub fn NameFilter(config: Signal<FilterConfig>) -> Element {
+    let value = config.read().name_query.clone().unwrap_or_default();
     rsx! {
         div { class: "flex flex-col gap-0.5",
             span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Name" }
@@ -24,10 +24,8 @@ pub fn NameFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -
                         placeholder:text-gray-400 dark:placeholder:text-gray-500 \
                         focus:outline-none focus:ring-2 focus:ring-blue-500 w-44",
                 oninput: move |evt| {
-                    let mut c = config.clone();
                     let v = evt.value();
-                    c.name_query = if v.is_empty() { None } else { Some(v) };
-                    on_change.call(c);
+                    config.write().name_query = if v.is_empty() { None } else { Some(v) };
                 },
             }
         }
@@ -39,31 +37,29 @@ pub fn NameFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -
 // ---------------------------------------------------------------------------
 
 #[component]
-pub fn KindFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+pub fn KindFilter(config: Signal<FilterConfig>) -> Element {
+    let card_kind = config.read().card_kind;
     rsx! {
         div { class: "flex flex-col gap-0.5",
             span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Kind" }
             div { class: "flex",
                 KindBtn {
                     btn_label: "All",
-                    active: config.card_kind.is_none(),
+                    active: card_kind.is_none(),
                     target: None,
-                    config: config.clone(),
-                    on_change,
+                    config,
                 }
                 KindBtn {
                     btn_label: "Pokémon",
-                    active: config.card_kind == Some(CardKindFilter::Pokemon),
+                    active: card_kind == Some(CardKindFilter::Pokemon),
                     target: Some(CardKindFilter::Pokemon),
-                    config: config.clone(),
-                    on_change,
+                    config,
                 }
                 KindBtn {
                     btn_label: "Trainer",
-                    active: config.card_kind == Some(CardKindFilter::Trainer),
+                    active: card_kind == Some(CardKindFilter::Trainer),
                     target: Some(CardKindFilter::Trainer),
-                    config: config.clone(),
-                    on_change,
+                    config,
                 }
             }
         }
@@ -75,19 +71,14 @@ fn KindBtn(
     btn_label: &'static str,
     active: bool,
     target: Option<CardKindFilter>,
-    config: FilterConfig,
-    on_change: EventHandler<FilterConfig>,
+    config: Signal<FilterConfig>,
 ) -> Element {
     let cls = seg_btn_cls(active);
     rsx! {
         button {
             r#type: "button",
             class: "{cls}",
-            onclick: move |_| {
-                let mut c = config.clone();
-                c.card_kind = target;
-                on_change.call(c);
-            },
+            onclick: move |_| config.write().card_kind = target,
             "{btn_label}"
         }
     }
@@ -155,15 +146,14 @@ fn TriBtn(
 // ---------------------------------------------------------------------------
 
 #[component]
-pub fn CountFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
-    let (op_str, n) = match config.owned_count {
-        None => ("", 0u32),
-        Some(CountThreshold::Equal(n)) => ("eq", n),
-        Some(CountThreshold::LessThan(n)) => ("lt", n),
-        Some(CountThreshold::AtLeast(n)) => ("gte", n),
+pub fn CountFilter(config: Signal<FilterConfig>) -> Element {
+    let owned_count = config.read().owned_count;
+    let n = match owned_count {
+        None => 0u32,
+        Some(
+            CountThreshold::Equal(n) | CountThreshold::LessThan(n) | CountThreshold::AtLeast(n),
+        ) => n,
     };
-    let has_count = config.owned_count.is_some();
-    let config_for_op = config.clone();
 
     rsx! {
         div { class: "flex flex-col gap-0.5",
@@ -172,38 +162,30 @@ pub fn CountFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                 div { class: "flex",
                     CountOpBtn {
                         btn_label: "Any",
-                        active: !has_count,
-                        op: "",
-                        n,
-                        config: config_for_op.clone(),
-                        on_change,
+                        active: owned_count.is_none(),
+                        threshold: None,
+                        config,
                     }
                     CountOpBtn {
                         btn_label: "= N",
-                        active: op_str == "eq",
-                        op: "eq",
-                        n,
-                        config: config_for_op.clone(),
-                        on_change,
+                        active: matches!(owned_count, Some(CountThreshold::Equal(_))),
+                        threshold: Some(CountThreshold::Equal(n)),
+                        config,
                     }
                     CountOpBtn {
                         btn_label: "< N",
-                        active: op_str == "lt",
-                        op: "lt",
-                        n,
-                        config: config_for_op.clone(),
-                        on_change,
+                        active: matches!(owned_count, Some(CountThreshold::LessThan(_))),
+                        threshold: Some(CountThreshold::LessThan(n)),
+                        config,
                     }
                     CountOpBtn {
                         btn_label: "≥ N",
-                        active: op_str == "gte",
-                        op: "gte",
-                        n,
-                        config: config_for_op,
-                        on_change,
+                        active: matches!(owned_count, Some(CountThreshold::AtLeast(_))),
+                        threshold: Some(CountThreshold::AtLeast(n)),
+                        config,
                     }
                 }
-                if has_count {
+                if let Some(oc) = owned_count {
                     input {
                         r#type: "text",
                         value: "{n}",
@@ -213,15 +195,13 @@ pub fn CountFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                                 focus:outline-none focus:ring-2 focus:ring-blue-500",
                         oninput: move |evt| {
                             if let Ok(val) = evt.value().trim().parse::<u32>() {
-                                let mut c = config.clone();
-                                c.owned_count = Some(
-                                    match op_str {
-                                        "eq" => CountThreshold::Equal(val),
-                                        "lt" => CountThreshold::LessThan(val),
-                                        _ => CountThreshold::AtLeast(val),
+                                config.write().owned_count = Some(
+                                    match oc {
+                                        CountThreshold::Equal(_) => CountThreshold::Equal(val),
+                                        CountThreshold::LessThan(_) => CountThreshold::LessThan(val),
+                                        CountThreshold::AtLeast(_) => CountThreshold::AtLeast(val),
                                     },
                                 );
-                                on_change.call(c);
                             }
                         },
                     }
@@ -235,26 +215,15 @@ pub fn CountFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
 fn CountOpBtn(
     btn_label: &'static str,
     active: bool,
-    op: &'static str,
-    n: u32,
-    config: FilterConfig,
-    on_change: EventHandler<FilterConfig>,
+    threshold: Option<CountThreshold>,
+    config: Signal<FilterConfig>,
 ) -> Element {
     let cls = seg_btn_cls(active);
     rsx! {
         button {
             r#type: "button",
             class: "{cls}",
-            onclick: move |_| {
-                let mut c = config.clone();
-                c.owned_count = match op {
-                    "eq" => Some(CountThreshold::Equal(n)),
-                    "lt" => Some(CountThreshold::LessThan(n)),
-                    "gte" => Some(CountThreshold::AtLeast(n)),
-                    _ => None,
-                };
-                on_change.call(c);
-            },
+            onclick: move |_| config.write().owned_count = threshold,
             "{btn_label}"
         }
     }
@@ -265,22 +234,21 @@ fn CountOpBtn(
 // ---------------------------------------------------------------------------
 
 #[component]
-pub fn GoalFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+pub fn GoalFilter(config: Signal<FilterConfig>) -> Element {
+    let goal = config.read().goal;
     rsx! {
         div { class: "flex flex-col gap-0.5",
             span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Goal" }
             input {
                 r#type: "text",
-                value: "{config.goal}",
+                value: "{goal}",
                 class: "w-14 px-2 py-1 text-sm text-center rounded-md border \
                         border-gray-300 dark:border-gray-600 \
                         bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 \
                         focus:outline-none focus:ring-2 focus:ring-blue-500",
                 oninput: move |evt| {
                     if let Ok(n) = evt.value().trim().parse::<u32>() {
-                        let mut c = config.clone();
-                        c.goal = n.max(1);
-                        on_change.call(c);
+                        config.write().goal = n.max(1);
                     }
                 },
             }
@@ -289,18 +257,15 @@ pub fn GoalFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -
 }
 
 #[component]
-pub fn AnyVersionFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+pub fn AnyVersionFilter(config: Signal<FilterConfig>) -> Element {
+    let any_version_owned = config.read().any_version_owned;
     rsx! {
         div { class: "flex flex-col gap-1",
             span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Any Version" }
             div { class: "flex items-center gap-2",
                 Toggle {
-                    checked: config.any_version_owned,
-                    on_change: move |v: bool| {
-                        let mut c = config.clone();
-                        c.any_version_owned = v;
-                        on_change.call(c);
-                    },
+                    checked: any_version_owned,
+                    on_change: move |v: bool| config.write().any_version_owned = v,
                 }
                 span { class: "text-sm text-gray-700 dark:text-gray-300", "Any version owned" }
             }
