@@ -13,11 +13,9 @@ fn do_submit(
         error.set(Some("Profile name is required.".into()));
         return;
     }
-    if let Some(s) = store.write().as_mut() {
-        if let Err(e) = s.create_profile(trimmed) {
-            error.set(Some(e.to_string()));
-            return;
-        }
+    if let Some(Err(e)) = store.write().as_mut().map(|s| s.create_profile(trimmed)) {
+        error.set(Some(e.to_string()));
+        return;
     }
     schedule_save();
 }
