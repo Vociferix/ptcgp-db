@@ -74,7 +74,7 @@ async fn apply_import_text(
 fn do_import(
     evt: Event<FormData>,
     store: Signal<Option<ProfileStore<AppStorage>>>,
-    import_error: Signal<Option<String>>,
+    mut import_error: Signal<Option<String>>,
 ) {
     let Some(file) = evt.files().into_iter().next() else {
         return;
