@@ -1,5 +1,5 @@
 use dioxus::prelude::*;
-use ptcgp_db_core::ProfileStore;
+use ptcgp_db_core::{ProfileStore, ProfilesSaveData, migrate_profiles, storage::Storage as _};
 
 use crate::app::{AppStorage, schedule_save};
 
@@ -20,6 +20,60 @@ fn do_submit(
     schedule_save();
 }
 
+fn do_import(
+    evt: Event<FormData>,
+    mut store: Signal<Option<ProfileStore<AppStorage>>>,
+    mut import_error: Signal<Option<String>>,
+) {
+    let Some(file) = evt.files().into_iter().next() else {
+        return;
+    };
+    spawn(async move {
+        let text = match file.read_string().await {
+            Ok(t) => t,
+            Err(e) => {
+                import_error.set(Some(format!("Could not read file: {e}")));
+                return;
+            }
+        };
+        let raw: ProfilesSaveData = match serde_json::from_str(&text) {
+            Ok(d) => d,
+            Err(e) => {
+                import_error.set(Some(format!("Invalid JSON: {e}")));
+                return;
+            }
+        };
+        let data = match migrate_profiles(raw) {
+            Ok(d) => d,
+            Err(e) => {
+                import_error.set(Some(format!("Incompatible format: {e}")));
+                return;
+            }
+        };
+        if data.profiles.is_empty() {
+            import_error.set(Some("The file contains no profiles.".into()));
+            return;
+        }
+        let (snapshot, storage) = {
+            let mut guard = store.write();
+            let Some(s) = guard.as_mut() else { return };
+            for profile in data.profiles {
+                let pname = profile.name.clone();
+                let _ = s.create_profile(pname.clone());
+                let _ = s.replace_profile_counts(&pname, profile.owned_counts);
+            }
+            let snapshot = s.save_data_snapshot().clone();
+            let storage = s.storage().clone();
+            s.mark_clean();
+            (snapshot, storage)
+        };
+        if let Err(e) = storage.save_profiles(&snapshot).await {
+            tracing::error!("onboarding import save: {e}");
+        }
+        // Store now has profiles → App re-renders → OnboardingPage is replaced by Router
+    });
+}
+
 fn do_dismiss(mut store: Signal<Option<ProfileStore<AppStorage>>>) {
     if let Some(s) = store.write().as_mut() {
         let _ = s.create_profile("Main".to_string());
@@ -32,6 +86,7 @@ pub fn OnboardingPage() -> Element {
     let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
     let mut name = use_signal(String::new);
     let mut error = use_signal(|| None::<String>);
+    let import_error = use_signal(|| None::<String>);
 
     rsx! {
         div { class: "min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4",
@@ -95,18 +150,27 @@ pub fn OnboardingPage() -> Element {
                     div { class: "flex-1 border-t border-gray-200 dark:border-gray-700" }
                 }
 
-                // Import stub
+                // Import from file
                 div { class: "space-y-1.5",
-                    button {
-                        r#type: "button",
-                        disabled: true,
-                        class: "w-full rounded-lg border border-gray-200 dark:border-gray-700 \
-                                text-gray-400 dark:text-gray-500 font-medium py-2 text-sm \
-                                cursor-not-allowed",
-                        "Import existing data"
+                    label { class: "block cursor-pointer",
+                        input {
+                            r#type: "file",
+                            accept: ".json",
+                            class: "sr-only",
+                            onchange: move |evt| do_import(evt, store, import_error),
+                        }
+                        span { class: "flex w-full items-center justify-center rounded-lg \
+                                       border border-gray-200 dark:border-gray-700 \
+                                       text-gray-700 dark:text-gray-300 font-medium py-2 \
+                                       text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 \
+                                       transition-colors select-none",
+                            "Import existing data"
+                        }
                     }
-                    p { class: "text-xs text-center text-gray-400 dark:text-gray-500",
-                        "Import support coming soon"
+                    if let Some(err) = import_error.read().as_deref() {
+                        p { class: "text-xs text-center text-red-600 dark:text-red-400",
+                            "{err}"
+                        }
                     }
                 }
 

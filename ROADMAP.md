@@ -318,7 +318,7 @@ Implement the Import/Export page at its route. Per DESIGN.md §Import / Export:
 
 The export format must include `format_version` per DESIGN.md §Data Format and Versioning. The Profile Selector is hidden on this page.
 
-- [ ] **T18**
+- [x] **T18**
 
 ---
 

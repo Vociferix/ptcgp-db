@@ -4035,6 +4035,7 @@ dependencies = [
  "gloo-timers",
  "ptcgp-db-core",
  "ptcgp-db-data",
+ "serde_json",
  "tokio",
  "tracing",
 ]
