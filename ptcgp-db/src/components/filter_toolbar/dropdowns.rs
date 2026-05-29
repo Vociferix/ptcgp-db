@@ -8,7 +8,7 @@ use ptcgp_db_core::save_data::FilterConfig;
 // The `open` signal is owned by the caller so each dropdown manages its own state.
 // ---------------------------------------------------------------------------
 
-const TRIGGER_CLS: &str = "flex items-center gap-1 px-2 h-10 rounded-md text-sm font-medium \
+const TRIGGER_CLS: &str = "flex items-center gap-1 px-2 h-8 rounded-md text-sm font-medium \
     bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 \
     text-gray-800 dark:text-gray-100";
 
@@ -61,7 +61,7 @@ pub fn SetDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                 if let Some(ref src) = single_icon_src {
                     img {
                         src: "{src}",
-                        class: "h-8 w-auto max-w-20 object-contain",
+                        class: "h-5 w-auto max-w-14 object-contain",
                         alt: "Set",
                     }
                 } else {
@@ -117,7 +117,7 @@ fn SetItem(set: &'static Set, config: FilterConfig, on_change: EventHandler<Filt
             img {
                 src: "{set.icon()}",
                 alt: "{set.code()}",
-                class: "h-8 w-auto max-w-20 object-contain shrink-0",
+                class: "h-5 w-auto max-w-14 object-contain shrink-0",
             }
             img {
                 src: "{set.logo()}",
@@ -212,15 +212,12 @@ fn PackGroup(
 ) -> Element {
     rsx! {
         if let Some(set) = Set::from_id(set_id) {
-            div { class: "flex items-center gap-1.5 px-3 py-1 \
+            div { class: "flex items-center px-3 py-1 \
                           bg-gray-50 dark:bg-gray-900",
                 img {
                     src: "{set.icon()}",
                     alt: "{set.code()}",
                     class: "h-6 w-auto max-w-14 object-contain",
-                }
-                span { class: "text-xs font-semibold text-gray-400 dark:text-gray-500",
-                    "{set.code()}"
                 }
             }
         }
