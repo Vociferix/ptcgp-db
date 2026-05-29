@@ -296,7 +296,7 @@ Implement the first-run onboarding flow. Per DESIGN.md §First Run:
 
 This task depends on T18 for the import action. It is acceptable to stub the import action in T17 as a placeholder and wire it up once T18 is done.
 
-- [ ] **T17**
+- [x] **T17**
 
 ---
 
