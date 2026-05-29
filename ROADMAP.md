@@ -277,7 +277,7 @@ Implement the Profile Manager at its route (page, modal, or collapsible panel â€
 - **Delete** a profile: show a confirmation dialog before proceeding. The deletion policy (auto-promote primary, auto-activate if active) is enforced in `ProfileStore` (T06), not here â€” just call the method.
 - **Change the primary** profile: radio-style or explicit button selection.
 
-- [ ] **T16**
+- [x] **T16**
 
 ---
 
