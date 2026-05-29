@@ -72,17 +72,37 @@ store.write().as_mut().unwrap().set_owned_count(...)?;
 schedule_save();
 ```
 
-### Signal read guards — consolidate multiple reads
+### Signal read guards — consolidate and hold across RSX
 
-When reading several values from the same signal in one render, use a single `.read()` guard
-rather than calling `.read()` once per value:
+When reading several values from the same signal in one render, use a single `.read()` guard.
+More importantly, hold the guard across the RSX block to borrow `Vec` fields as slices instead
+of cloning them:
 
 ```rust
-let (theme, ignore_unobtainable, merge_dupes) = {
-    let s = settings.read();
-    (s.theme(), s.ignore_unobtainable_sets(), s.merge_duplicate_printings())
+// Good — one guard, no heap allocations
+let cfg = config.read();
+let sets = cfg.sets.as_slice();   // &[usize], zero allocation
+let series = cfg.series;          // Copy
+// sets and series are valid through the entire rsx! call below
+
+// Avoid — clones allocate new Vecs just to read them
+let (sets, series) = {
+    let cfg = config.read();
+    (cfg.sets.clone(), cfg.series)
 };
 ```
+
+This is safe because:
+- `Signal::read()` borrows from the signal's internal arena, not from the `Signal<T>` handle.
+  The `Signal` variable can be freely copied into closures while a read guard is held.
+- RSX construction is synchronous — the guard lives through the entire `rsx!` call.
+- Props computed from the slice (e.g. `checked: sets.contains(&id)`) are scalar values copied
+  into child component props before the function returns.
+- Event handler closures capture `config: Signal<FilterConfig>` (Copy), not the slice.
+
+When a child component already receives `Signal<FilterConfig>`, do not also pass a `Vec<usize>`
+snapshot of one of its fields as a separate prop. Let the child read from the signal directly
+and hold its own guard. This eliminates the parent-side `field.clone()` entirely.
 
 ### Signal write guards across await points
 
@@ -99,6 +119,27 @@ auto-save coroutine is:
 `use_coroutine` in Dioxus 0.7 automatically inserts the coroutine handle into the context tree.
 Child components retrieve it with `use_coroutine_handle::<MessageType>()`. The `ScheduleSave`
 ZST and `schedule_save()` helper in `app.rs` wrap this so callers don't need to know the type.
+
+### Avoiding allocations in render
+
+Render functions run on every state change. Avoid unnecessary heap allocations:
+
+- **`Asset` is `Copy`** — do not call `.to_string()` on an `Asset` value. Use it directly or
+  format it in RSX: `src: "{asset}"`.
+- **RSX string formatting over `.to_string()`** — when a prop type is `String` and the value
+  comes from a static method returning `&str`, prefer `"{s.code()}"` over `s.code().to_string()`.
+  Both allocate the same way but the former is shorter.
+- **Consuming RSX for loops** — when the items in a `Vec` are about to be moved into child
+  component props anyway, iterate by value to avoid a clone per item:
+  ```rust
+  for (key, items) in owned_vec {   // moves items, no clone
+      ChildComponent { key: "{key}", items, config }
+  }
+  ```
+- **Vec vs HashSet for small collections** — for collections with n < ~30 elements (filter
+  selections, rarity lists, element lists, etc.), `Vec` with `contains()` is faster than
+  `HashSet` or `BTreeSet` due to cache locality. Do not reach for a set type unless the
+  collection can grow unbounded or the lookup is in a hot inner loop.
 
 ## Component placement
 
