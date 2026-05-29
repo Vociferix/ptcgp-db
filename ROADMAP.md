@@ -222,7 +222,7 @@ A reusable owned-count editor used in Card Catalog rows and Card Details. Per DE
 - Text input: clamp to `[0, MAX]` on blur or Enter. Reject (reset to previous) on non-numeric input.
 - **Disabled state**: when multiple profiles are active, render the component as read-only and visually distinct; display the aggregate sum.
 
-- [ ] **T13**
+- [x] **T13**
 
 ---
 

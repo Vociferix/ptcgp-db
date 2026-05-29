@@ -28,11 +28,16 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+      - name: Compute submodule hash
+        run: echo "SUBMODULE_HASH=$(git submodule status | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ env.SUBMODULE_HASH }}
+          cache-all-crates: "true"
       - name: Create Tailwind CSS stub
         run: touch ptcgp-db/public/tailwind.css
       - name: Clippy (native)
@@ -47,8 +52,13 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+      - name: Compute submodule hash
+        run: echo "SUBMODULE_HASH=$(git submodule status | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ env.SUBMODULE_HASH }}
+          cache-all-crates: "true"
       - name: Create Tailwind CSS stub
         run: touch ptcgp-db/public/tailwind.css
       - name: Test
@@ -63,10 +73,15 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+      - name: Compute submodule hash
+        run: echo "SUBMODULE_HASH=$(git submodule status | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ env.SUBMODULE_HASH }}
+          cache-all-crates: "true"
       - uses: browser-actions/setup-chrome@v1
       - uses: taiki-e/install-action@v2
         with:
@@ -83,8 +98,13 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+      - name: Compute submodule hash
+        run: echo "SUBMODULE_HASH=$(git submodule status | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ env.SUBMODULE_HASH }}
+          cache-all-crates: "true"
       - name: Cache dx binary
         id: cache-dx
         uses: actions/cache@v4
@@ -104,10 +124,15 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+      - name: Compute submodule hash
+        run: echo "SUBMODULE_HASH=$(git submodule status | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ env.SUBMODULE_HASH }}
+          cache-all-crates: "true"
       - name: Cache dx binary
         id: cache-dx
         uses: actions/cache@v4

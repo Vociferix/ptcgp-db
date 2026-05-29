@@ -134,6 +134,51 @@ The same names work with any utility prefix: `text-element-fire`, `border-elemen
 Class-based dark mode is enabled. Use `dark:` variant classes normally; no extra setup needed
 in components. The `.dark` class on `<html>` is managed by `app.rs` based on `AppSettings.theme`.
 
+### Class string safety
+
+Every Tailwind class name must appear as a complete, unbroken string in the source so the
+scanner can detect it. Never build class strings with `format!()` or string interpolation that
+splits a class name across fragments. Conditional classes are fine as branch literals:
+
+```rust
+// Good — each branch is a complete literal; scanner sees every class
+let cls = if active { "bg-blue-600 text-white" } else { "bg-gray-200 text-gray-800" };
+
+// Bad — "bg-{color}-600" is never a known class in source
+let cls = format!("bg-{color}-600");
+```
+
+## Keyboard events
+
+`Key` is re-exported in `dioxus::prelude` (already in scope via the glob import). Match on
+`Key::Enter`, `Key::Escape`, etc. directly — do not call `.to_string()` and compare strings:
+
+```rust
+onkeydown: move |evt| {
+    match evt.key() {
+        Key::Enter => { /* commit */ }
+        Key::Escape => { /* cancel */ }
+        _ => {}
+    }
+},
+```
+
+## Shared components
+
+### CountSpinner (`components/count_spinner.rs`)
+
+Owned-card count editor. Props:
+
+| Prop | Type | Purpose |
+|------|------|---------|
+| `value` | `u32` | Displayed value (may be merged sum when "Merge duplicate printings" is on) |
+| `stored_count` | `u32` | Individual version's stored count; guards the decrement button |
+| `disabled` | `bool` | `true` when multiple profiles are active → read-only |
+| `on_change` | `EventHandler<u32>` | Called with the new *individual* stored count |
+
+Increment/decrement call `on_change(stored_count ± 1)`. Text input commits on blur or Enter,
+reverts on Escape or non-numeric input.
+
 ## PR process
 
 Each task from the roadmap gets its own branch and pull request.
