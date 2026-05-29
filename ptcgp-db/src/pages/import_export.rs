@@ -41,25 +41,14 @@ fn do_export(store: Signal<Option<ProfileStore<AppStorage>>>) {
             }
         };
         // Pass JSON via dioxus.recv() so no special characters can break the JS literal.
-        // showSaveFilePicker (Chrome/Edge/Safari) gives a real Save As dialog; fall back to
-        // a Blob download on Firefox which does not support the File System Access API.
         let eval = document::eval(
             "const j=await dioxus.recv();\
-             if(window.showSaveFilePicker){\
-               try{\
-                 const h=await window.showSaveFilePicker({suggestedName:'ptcgp-backup.json',types:[{description:'JSON',accept:{'application/json':['.json']}}]});\
-                 const w=await h.createWritable();\
-                 await w.write(j);\
-                 await w.close();\
-               }catch(e){if(e.name!=='AbortError')throw e;}\
-             }else{\
-               const b=new Blob([j],{type:'application/json'});\
-               const u=URL.createObjectURL(b);\
-               const a=document.createElement('a');\
-               a.href=u;a.download='ptcgp-backup.json';\
-               document.body.appendChild(a);a.click();\
-               document.body.removeChild(a);URL.revokeObjectURL(u);\
-             }",
+             const b=new Blob([j],{type:'application/json'});\
+             const u=URL.createObjectURL(b);\
+             const a=document.createElement('a');\
+             a.href=u;a.download='ptcgp-backup.json';\
+             document.body.appendChild(a);a.click();\
+             document.body.removeChild(a);URL.revokeObjectURL(u);",
         );
         if let Err(e) = eval.send(json) {
             tracing::error!("export eval send: {e}");
