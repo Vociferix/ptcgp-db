@@ -109,6 +109,10 @@ fn ProfileRow(
                         schedule_save();
                     } else {
                         // Regular click: switch to only this profile.
+                        // Activate first so there is always ≥1 active profile
+                        // when deactivating the others (deactivate_profile rejects
+                        // attempts to leave the active set empty).
+                        let _ = s.activate_profile(&name);
                         let others: Vec<String> = s
                             .active_profile_names()
                             .iter()
@@ -118,7 +122,6 @@ fn ProfileRow(
                         for other in &others {
                             let _ = s.deactivate_profile(other);
                         }
-                        let _ = s.activate_profile(&name);
                         drop(guard);
                         schedule_save();
                         open.set(false);
