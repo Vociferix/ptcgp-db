@@ -15,20 +15,22 @@ use ptcgp_db_data::{Series, Stage};
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Controls which filter dimensions are visible and what mode-specific behavior applies.
 #[derive(Clone, PartialEq)]
 pub enum FilterMode {
-    /// Card Catalog mode: shows owned-count threshold, no goal or any-version-owned.
+    /// Card Catalog mode: owned-count threshold in advanced view.
     Catalog,
-    /// Analysis / Trade mode: shows goal input + any-version-owned toggle; hides owned-count.
+    /// Analysis / Trade mode: goal input always in primary row; no owned-count.
     /// Callers should initialize `FilterConfig::obtainable = Some(true)`.
     Analysis,
 }
 
-/// Configurable filter toolbar used by the Card Catalog, Analysis, and Trade pages.
+/// Single-row filter toolbar with a floating advanced panel.
 ///
-/// The parent owns the [`FilterConfig`] state; every interaction calls `on_change` with an
-/// updated clone. Reads `Signal<AppSettings>` from context.
+/// Primary row (sm+): Name, [Goal if Analysis], Set, Pack, Source, Series, Kind.
+/// Narrow (< sm): Name, [Goal if Analysis] + "Filters" button that opens the panel
+/// with all filters including the primary ones.
+/// Advanced floating panel: Rarity, Element, Stage, Ex, Mega, Foil, Obtainable,
+/// Count (Catalog) / Any-version (Analysis) — plus primary filters on narrow.
 #[component]
 pub fn FilterToolbar(
     config: FilterConfig,
@@ -37,156 +39,181 @@ pub fn FilterToolbar(
 ) -> Element {
     let settings = use_context::<Signal<AppSettings>>();
     let ignore_unobtainable = settings.read().ignore_unobtainable_sets();
-    let mut filters_open = use_signal(|| false);
-    let mut advanced_open = use_signal(|| false);
+    let mut panel_open = use_signal(|| false);
 
-    let active = count_active(&config, ignore_unobtainable);
-    let panel_class = if *filters_open.read() {
-        "block"
-    } else {
-        "hidden sm:block"
-    };
+    let total_active = count_active(&config, ignore_unobtainable);
+    let adv_active = count_advanced_active(&config, ignore_unobtainable);
 
     rsx! {
-        div { class: "space-y-2",
-            // ── Always-visible bar: name input + narrow "Filters" button ────────
-            div { class: "flex items-center gap-2",
+        div { class: "relative",
+            // ── Primary row ─────────────────────────────────────────────────
+            div { class: "flex flex-wrap items-center gap-2",
+                // Name — always visible
                 NameFilter { config: config.clone(), on_change: on_change.clone() }
+
+                // Goal — Analysis mode only, always primary
+                if mode == FilterMode::Analysis {
+                    GoalFilter { config: config.clone(), on_change: on_change.clone() }
+                }
+
+                // Dropdowns + Series + Kind — hidden on narrow, inline on sm+
+                div { class: "hidden sm:contents",
+                    SetDropdown { config: config.clone(), on_change: on_change.clone() }
+                    PackDropdown { config: config.clone(), on_change: on_change.clone() }
+                    SourceDropdown { config: config.clone(), on_change: on_change.clone() }
+                    SeriesFilter { config: config.clone(), on_change: on_change.clone() }
+                    KindFilter { config: config.clone(), on_change: on_change.clone() }
+                }
+
+                // Advanced button — sm+ only
+                button {
+                    r#type: "button",
+                    class: "hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-md \
+                            text-xs font-medium text-gray-600 dark:text-gray-300 \
+                            bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600",
+                    onclick: move |_| panel_open.toggle(),
+                    "Advanced"
+                    if adv_active > 0 {
+                        span { class: "px-1.5 py-0.5 text-xs rounded-full bg-blue-600 text-white",
+                            "{adv_active}"
+                        }
+                    }
+                    if *panel_open.read() {
+                        "▲"
+                    } else {
+                        "▼"
+                    }
+                }
+
+                // Filters button — narrow only
                 button {
                     r#type: "button",
                     class: "sm:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-md border \
                             border-gray-300 dark:border-gray-600 text-sm \
                             bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 \
                             hover:bg-gray-50 dark:hover:bg-gray-700",
-                    onclick: move |_| filters_open.toggle(),
+                    onclick: move |_| panel_open.toggle(),
                     "Filters"
-                    if active > 0 {
+                    if total_active > 0 {
                         span { class: "px-1.5 py-0.5 text-xs rounded-full bg-blue-600 text-white",
-                            "{active}"
+                            "{total_active}"
                         }
                     }
                 }
             }
 
-            // ── Primary filter panel ─────────────────────────────────────────────
-            div { class: "{panel_class} flex flex-col gap-3",
-                // Row 1 — image dropdowns
-                div { class: "flex flex-wrap gap-2 items-center",
-                    SetDropdown { config: config.clone(), on_change: on_change.clone() }
-                    PackDropdown { config: config.clone(), on_change: on_change.clone() }
-                    SourceDropdown { config: config.clone(), on_change: on_change.clone() }
+            // ── Floating panel ───────────────────────────────────────────────
+            if *panel_open.read() {
+                // Dismiss backdrop
+                div {
+                    class: "fixed inset-0 z-40",
+                    onclick: move |_| panel_open.set(false),
                 }
 
-                // Row 2 — series + kind segmented groups
-                div { class: "flex flex-wrap gap-x-5 gap-y-2 items-center",
-                    SeriesFilter { config: config.clone(), on_change: on_change.clone() }
-                    KindFilter { config: config.clone(), on_change: on_change.clone() }
-                }
+                // Panel box — floating below the primary row
+                div { class: "absolute left-0 top-full mt-1 z-50 \
+                            rounded-lg border border-gray-200 dark:border-gray-700 \
+                            bg-gray-50 dark:bg-gray-900 shadow-lg \
+                            p-4 flex flex-col gap-3 \
+                            min-w-64 max-w-[min(640px,calc(100vw-1rem))]",
 
-                // Row 3 — rarity
-                RarityGroup { config: config.clone(), on_change: on_change.clone() }
-
-                // Row 4 — element
-                ElementGroup { config: config.clone(), on_change: on_change.clone() }
-
-                // ── Advanced toggle ──────────────────────────────────────────────
-                button {
-                    r#type: "button",
-                    class: "self-start flex items-center gap-1 text-xs \
-                            text-gray-400 dark:text-gray-500 \
-                            hover:text-gray-600 dark:hover:text-gray-300",
-                    onclick: move |_| advanced_open.toggle(),
-                    if *advanced_open.read() {
-                        "▲"
-                    } else {
-                        "▼"
-                    }
-                    "Advanced filters"
-                }
-
-                // ── Advanced section ─────────────────────────────────────────────
-                if *advanced_open.read() {
-                    // Row A — per-property tri-state toggles + stage
-                    div { class: "flex flex-wrap gap-x-5 gap-y-2 items-center",
-                        StageFilter {
+                    // ── Narrow-only: primary filters that aren't in the row ──
+                    div { class: "contents sm:hidden",
+                        SetDropdown {
                             config: config.clone(),
                             on_change: on_change.clone(),
                         }
-                        TriStateFilter {
-                            filter_label: "Ex",
-                            only_text: "Ex only",
-                            exclude_text: "No ex",
-                            value: config.ex,
-                            on_change: {
-                                let config = config.clone();
-                                let on_change = on_change.clone();
-                                move |v: Option<bool>| {
-                                    let mut c = config.clone();
-                                    c.ex = v;
-                                    on_change.call(c);
-                                }
-                            },
+                        PackDropdown {
+                            config: config.clone(),
+                            on_change: on_change.clone(),
                         }
-                        TriStateFilter {
-                            filter_label: "Mega",
-                            only_text: "Mega only",
-                            exclude_text: "No mega",
-                            value: config.mega,
-                            on_change: {
-                                let config = config.clone();
-                                let on_change = on_change.clone();
-                                move |v: Option<bool>| {
-                                    let mut c = config.clone();
-                                    c.mega = v;
-                                    on_change.call(c);
-                                }
-                            },
+                        SourceDropdown {
+                            config: config.clone(),
+                            on_change: on_change.clone(),
                         }
-                        TriStateFilter {
-                            filter_label: "Foil",
-                            only_text: "Foil only",
-                            exclude_text: "Non-foil",
-                            value: config.foil,
-                            on_change: {
-                                let config = config.clone();
-                                let on_change = on_change.clone();
-                                move |v: Option<bool>| {
-                                    let mut c = config.clone();
-                                    c.foil = v;
-                                    on_change.call(c);
-                                }
-                            },
+                        SeriesFilter {
+                            config: config.clone(),
+                            on_change: on_change.clone(),
                         }
-                        if !ignore_unobtainable {
-                            TriStateFilter {
-                                filter_label: "Obtainable",
-                                only_text: "Obtainable",
-                                exclude_text: "Unobtainable",
-                                value: config.obtainable,
-                                on_change: {
-                                    let config = config.clone();
-                                    let on_change = on_change.clone();
-                                    move |v: Option<bool>| {
-                                        let mut c = config.clone();
-                                        c.obtainable = v;
-                                        on_change.call(c);
-                                    }
-                                },
-                            }
+                        KindFilter {
+                            config: config.clone(),
+                            on_change: on_change.clone(),
                         }
                     }
 
-                    // Row B — count / goal
-                    div { class: "flex flex-wrap gap-x-5 gap-y-2 items-center",
-                        match &mode {
-                            FilterMode::Catalog => rsx! {
-                                CountFilter { config: config.clone(), on_change: on_change.clone() }
-                            },
-                            FilterMode::Analysis => rsx! {
-                                GoalFilter { config: config.clone(), on_change: on_change.clone() }
-                                AnyVersionFilter { config: config.clone(), on_change: on_change.clone() }
+                    // ── Advanced filters (always in panel) ───────────────────
+                    RarityGroup { config: config.clone(), on_change: on_change.clone() }
+                    ElementGroup { config: config.clone(), on_change: on_change.clone() }
+                    StageFilter { config: config.clone(), on_change: on_change.clone() }
+                    TriStateFilter {
+                        filter_label: "Ex",
+                        only_text: "Ex only",
+                        exclude_text: "No ex",
+                        value: config.ex,
+                        on_change: {
+                            let config = config.clone();
+                            let on_change = on_change.clone();
+                            move |v: Option<bool>| {
+                                let mut c = config.clone();
+                                c.ex = v;
+                                on_change.call(c);
+                            }
+                        },
+                    }
+                    TriStateFilter {
+                        filter_label: "Mega",
+                        only_text: "Mega only",
+                        exclude_text: "No mega",
+                        value: config.mega,
+                        on_change: {
+                            let config = config.clone();
+                            let on_change = on_change.clone();
+                            move |v: Option<bool>| {
+                                let mut c = config.clone();
+                                c.mega = v;
+                                on_change.call(c);
+                            }
+                        },
+                    }
+                    TriStateFilter {
+                        filter_label: "Foil",
+                        only_text: "Foil only",
+                        exclude_text: "Non-foil",
+                        value: config.foil,
+                        on_change: {
+                            let config = config.clone();
+                            let on_change = on_change.clone();
+                            move |v: Option<bool>| {
+                                let mut c = config.clone();
+                                c.foil = v;
+                                on_change.call(c);
+                            }
+                        },
+                    }
+                    if !ignore_unobtainable {
+                        TriStateFilter {
+                            filter_label: "Obtainable",
+                            only_text: "Obtainable",
+                            exclude_text: "Unobtainable",
+                            value: config.obtainable,
+                            on_change: {
+                                let config = config.clone();
+                                let on_change = on_change.clone();
+                                move |v: Option<bool>| {
+                                    let mut c = config.clone();
+                                    c.obtainable = v;
+                                    on_change.call(c);
+                                }
                             },
                         }
+                    }
+                    match &mode {
+                        FilterMode::Catalog => rsx! {
+                            CountFilter { config: config.clone(), on_change: on_change.clone() }
+                        },
+                        FilterMode::Analysis => rsx! {
+                            AnyVersionFilter { config: config.clone(), on_change: on_change.clone() }
+                        },
                     }
                 }
             }
@@ -195,8 +222,7 @@ pub fn FilterToolbar(
 }
 
 // ---------------------------------------------------------------------------
-// Series and Stage — kept here because they reference ptcgp_db_data types
-// that would clutter controls.rs's import list unnecessarily.
+// Series and Stage — live here to avoid importing data types in controls.rs
 // ---------------------------------------------------------------------------
 
 #[component]
@@ -244,7 +270,6 @@ fn SeriesBtn(
             class: "{cls}",
             onclick: move |_| {
                 let mut c = config.clone();
-                // Changing series invalidates set/pack selections
                 if c.series != target_id {
                     c.sets.clear();
                     c.packs.clear();
@@ -314,7 +339,6 @@ fn StageBtn(
 // Shared visual helpers
 // ---------------------------------------------------------------------------
 
-/// CSS classes for a segmented button group entry (active / inactive variant).
 pub(super) fn seg_btn_cls(active: bool) -> &'static str {
     if active {
         "relative px-2.5 py-1 text-xs font-medium border border-blue-600 dark:border-blue-500 \
@@ -328,8 +352,13 @@ pub(super) fn seg_btn_cls(active: bool) -> &'static str {
     }
 }
 
-/// Count of non-default active filters for the badge.
-pub(super) fn count_active(config: &FilterConfig, ignore_unobtainable: bool) -> usize {
+fn count_active(config: &FilterConfig, ignore_unobtainable: bool) -> usize {
+    let mut n = count_primary_active(config);
+    n += count_advanced_active(config, ignore_unobtainable);
+    n
+}
+
+fn count_primary_active(config: &FilterConfig) -> usize {
     let mut n = 0;
     if config.name_query.as_deref().is_some_and(|s| !s.is_empty()) {
         n += 1;
@@ -343,10 +372,24 @@ pub(super) fn count_active(config: &FilterConfig, ignore_unobtainable: bool) -> 
     if !config.packs.is_empty() {
         n += 1;
     }
-    if !config.rarities.is_empty() {
+    if !config.sources.is_empty() {
         n += 1;
     }
     if config.card_kind.is_some() {
+        n += 1;
+    }
+    n
+}
+
+fn count_advanced_active(config: &FilterConfig, ignore_unobtainable: bool) -> usize {
+    let mut n = 0;
+    if !config.rarities.is_empty() {
+        n += 1;
+    }
+    if !config.elements.is_empty() {
+        n += 1;
+    }
+    if config.stage.is_some() {
         n += 1;
     }
     if config.ex.is_some() {
@@ -355,16 +398,7 @@ pub(super) fn count_active(config: &FilterConfig, ignore_unobtainable: bool) -> 
     if config.mega.is_some() {
         n += 1;
     }
-    if config.stage.is_some() {
-        n += 1;
-    }
-    if !config.elements.is_empty() {
-        n += 1;
-    }
     if config.foil.is_some() {
-        n += 1;
-    }
-    if !config.sources.is_empty() {
         n += 1;
     }
     if !ignore_unobtainable && config.obtainable.is_some() {
