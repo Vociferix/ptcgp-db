@@ -7,7 +7,7 @@ use ptcgp_db_core::save_data::Theme;
 use ptcgp_db_core::storage::Storage as _;
 use ptcgp_db_core::{AppSettings, ProfileStore, SavedQueries};
 
-use crate::pages::OnboardingStub;
+use crate::pages::OnboardingPage;
 use crate::routes::Route;
 
 // ---------------------------------------------------------------------------
@@ -186,7 +186,7 @@ pub fn App() -> Element {
                 div { class: "flex items-center justify-center h-screen", "Loading…" }
             },
             Some(s) if s.is_first_run() && !skip_onboarding() => rsx! {
-                OnboardingStub {}
+                OnboardingPage {}
             },
             Some(_) => rsx! {
                 Router::<Route> {}
