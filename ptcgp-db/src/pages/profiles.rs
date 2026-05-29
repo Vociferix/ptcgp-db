@@ -159,10 +159,10 @@ fn DisplayRow(
                     onclick: {
                         let prof_name = prof_name.clone();
                         move |_| {
-                            if let Some(s) = store.write().as_mut() {
-                                if let Err(e) = s.set_primary(&prof_name) {
-                                    tracing::error!("set_primary failed: {e}");
-                                }
+                            if let Some(s) = store.write().as_mut()
+                                && let Err(e) = s.set_primary(&prof_name)
+                            {
+                                tracing::error!("set_primary failed: {e}");
                             }
                             schedule_save();
                         }
@@ -237,10 +237,10 @@ fn DeleteConfirmDialog(
                         onclick: {
                             let name = name.clone();
                             move |_| {
-                                if let Some(s) = store.write().as_mut() {
-                                    if let Err(e) = s.delete_profile(&name) {
-                                        tracing::error!("delete_profile failed: {e}");
-                                    }
+                                if let Some(s) = store.write().as_mut()
+                                    && let Err(e) = s.delete_profile(&name)
+                                {
+                                    tracing::error!("delete_profile failed: {e}");
                                 }
                                 delete_target.set(None);
                                 schedule_save();
