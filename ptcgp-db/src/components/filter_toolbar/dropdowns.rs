@@ -60,7 +60,7 @@ pub fn SetDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                 if let Some(ref src) = single_icon_src {
                     img {
                         src: "{src}",
-                        class: "h-5 w-5 object-contain",
+                        class: "h-7 w-7 object-contain",
                         alt: "Set",
                     }
                 } else {
@@ -116,7 +116,7 @@ fn SetItem(set: &'static Set, config: FilterConfig, on_change: EventHandler<Filt
             img {
                 src: "{set.icon()}",
                 alt: "{set.code()}",
-                class: "h-6 w-6 object-contain shrink-0",
+                class: "h-8 w-8 object-contain shrink-0",
             }
             img {
                 src: "{set.logo()}",
@@ -216,7 +216,7 @@ fn PackGroup(
                 img {
                     src: "{set.icon()}",
                     alt: "{set.code()}",
-                    class: "h-4 w-4 object-contain",
+                    class: "h-6 w-6 object-contain",
                 }
                 span { class: "text-xs font-semibold text-gray-400 dark:text-gray-500",
                     "{set.code()}"

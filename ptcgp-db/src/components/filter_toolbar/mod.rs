@@ -42,58 +42,50 @@ pub fn FilterToolbar(
     let mut panel_open = use_signal(|| false);
 
     let total_active = count_active(&config, ignore_unobtainable);
-    let adv_active = count_advanced_active(&config, ignore_unobtainable);
 
     rsx! {
         div { class: "relative",
             // ── Primary row ─────────────────────────────────────────────────
-            div { class: "flex flex-wrap items-center gap-2",
+            // flex-nowrap prevents wrapping; filters that don't fit at a given
+            // breakpoint are hidden here and surfaced in the floating panel.
+            div { class: "flex flex-nowrap items-end gap-2",
                 // Name — always visible
-                NameFilter { config: config.clone(), on_change: on_change.clone() }
-
-                // Goal — Analysis mode only, always primary
-                if mode == FilterMode::Analysis {
-                    GoalFilter { config: config.clone(), on_change: on_change.clone() }
+                div { class: "flex-shrink-0",
+                    NameFilter { config: config.clone(), on_change: on_change.clone() }
                 }
 
-                // Dropdowns + Series + Kind — hidden on narrow, inline on sm+
-                div { class: "hidden sm:contents",
+                // Goal — Analysis mode only, always visible
+                if mode == FilterMode::Analysis {
+                    div { class: "flex-shrink-0",
+                        GoalFilter {
+                            config: config.clone(),
+                            on_change: on_change.clone(),
+                        }
+                    }
+                }
+
+                // Set + Pack + Source — visible at sm+ (640px); hidden items appear in panel
+                div { class: "hidden sm:flex items-end gap-2",
                     SetDropdown { config: config.clone(), on_change: on_change.clone() }
                     PackDropdown { config: config.clone(), on_change: on_change.clone() }
                     SourceDropdown { config: config.clone(), on_change: on_change.clone() }
+                }
+
+                // Series + Kind — visible at lg+ (1024px); hidden items appear in panel
+                div { class: "hidden lg:flex items-end gap-2",
                     SeriesFilter { config: config.clone(), on_change: on_change.clone() }
                     KindFilter { config: config.clone(), on_change: on_change.clone() }
                 }
 
-                // Advanced button — sm+ only
+                // Advanced button — always visible, badge shows total active filter count
                 button {
                     r#type: "button",
-                    class: "hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-md \
+                    title: "Advanced Filters",
+                    class: "flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md \
                             text-xs font-medium text-gray-600 dark:text-gray-300 \
                             bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600",
                     onclick: move |_| panel_open.toggle(),
-                    "Advanced"
-                    if adv_active > 0 {
-                        span { class: "px-1.5 py-0.5 text-xs rounded-full bg-blue-600 text-white",
-                            "{adv_active}"
-                        }
-                    }
-                    if *panel_open.read() {
-                        "▲"
-                    } else {
-                        "▼"
-                    }
-                }
-
-                // Filters button — narrow only
-                button {
-                    r#type: "button",
-                    class: "sm:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-md border \
-                            border-gray-300 dark:border-gray-600 text-sm \
-                            bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 \
-                            hover:bg-gray-50 dark:hover:bg-gray-700",
-                    onclick: move |_| panel_open.toggle(),
-                    "Filters"
+                    "☰"
                     if total_active > 0 {
                         span { class: "px-1.5 py-0.5 text-xs rounded-full bg-blue-600 text-white",
                             "{total_active}"
@@ -117,8 +109,9 @@ pub fn FilterToolbar(
                             p-4 flex flex-col gap-3 \
                             min-w-64 max-w-[min(640px,calc(100vw-1rem))]",
 
-                    // ── Narrow-only: primary filters that aren't in the row ──
-                    div { class: "contents sm:hidden",
+                    // ── Primary filters hidden from the row at narrow widths ──
+                    // Set/Pack/Source: not in primary row below sm — show here instead
+                    div { class: "flex flex-col gap-3 sm:hidden",
                         SetDropdown {
                             config: config.clone(),
                             on_change: on_change.clone(),
@@ -131,6 +124,9 @@ pub fn FilterToolbar(
                             config: config.clone(),
                             on_change: on_change.clone(),
                         }
+                    }
+                    // Series/Kind: not in primary row below lg — show here instead
+                    div { class: "flex flex-col gap-3 lg:hidden",
                         SeriesFilter {
                             config: config.clone(),
                             on_change: on_change.clone(),
@@ -228,10 +224,8 @@ pub fn FilterToolbar(
 #[component]
 fn SeriesFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
     rsx! {
-        div { class: "flex items-center gap-1.5",
-            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400 shrink-0",
-                "Series"
-            }
+        div { class: "flex flex-col gap-0.5",
+            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Series" }
             div { class: "flex",
                 SeriesBtn {
                     btn_label: "All",
@@ -285,10 +279,8 @@ fn SeriesBtn(
 #[component]
 fn StageFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
     rsx! {
-        div { class: "flex items-center gap-1.5",
-            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400 shrink-0",
-                "Stage"
-            }
+        div { class: "flex flex-col gap-0.5",
+            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Stage" }
             div { class: "flex",
                 StageBtn {
                     btn_label: "All",

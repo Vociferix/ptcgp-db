@@ -14,9 +14,27 @@ use super::seg_btn_cls;
 #[component]
 pub fn RarityGroup(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
     rsx! {
-        div { class: "flex flex-wrap items-center gap-y-1 gap-x-2",
-            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400 shrink-0",
-                "Rarity"
+        div { class: "flex flex-col gap-1",
+            div { class: "flex items-center gap-2",
+                span { class: "text-xs font-medium text-gray-500 dark:text-gray-400",
+                    "Rarity"
+                }
+                if !config.rarities.is_empty() {
+                    button {
+                        r#type: "button",
+                        class: "text-xs text-gray-400 dark:text-gray-500 \
+                                hover:text-gray-600 dark:hover:text-gray-300",
+                        onclick: {
+                            let config = config.clone();
+                            move |_| {
+                                let mut c = config.clone();
+                                c.rarities.clear();
+                                on_change.call(c);
+                            }
+                        },
+                        "Clear"
+                    }
+                }
             }
             div { class: "flex flex-wrap gap-y-px",
                 for rarity in RarityClass::ALL {
@@ -27,22 +45,6 @@ pub fn RarityGroup(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                         config: config.clone(),
                         on_change: on_change.clone(),
                     }
-                }
-            }
-            if !config.rarities.is_empty() {
-                button {
-                    r#type: "button",
-                    class: "text-xs text-gray-400 dark:text-gray-500 \
-                            hover:text-gray-600 dark:hover:text-gray-300",
-                    onclick: {
-                        let config = config.clone();
-                        move |_| {
-                            let mut c = config.clone();
-                            c.rarities.clear();
-                            on_change.call(c);
-                        }
-                    },
-                    "Clear"
                 }
             }
         }
@@ -88,9 +90,27 @@ fn RarityBtn(
 #[component]
 pub fn ElementGroup(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
     rsx! {
-        div { class: "flex flex-wrap items-center gap-y-1 gap-x-2",
-            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400 shrink-0",
-                "Element"
+        div { class: "flex flex-col gap-1",
+            div { class: "flex items-center gap-2",
+                span { class: "text-xs font-medium text-gray-500 dark:text-gray-400",
+                    "Element"
+                }
+                if !config.elements.is_empty() {
+                    button {
+                        r#type: "button",
+                        class: "text-xs text-gray-400 dark:text-gray-500 \
+                                hover:text-gray-600 dark:hover:text-gray-300",
+                        onclick: {
+                            let config = config.clone();
+                            move |_| {
+                                let mut c = config.clone();
+                                c.elements.clear();
+                                on_change.call(c);
+                            }
+                        },
+                        "Clear"
+                    }
+                }
             }
             div { class: "flex flex-wrap gap-y-px",
                 for element in PtcgpElement::ALL {
@@ -101,22 +121,6 @@ pub fn ElementGroup(config: FilterConfig, on_change: EventHandler<FilterConfig>)
                         config: config.clone(),
                         on_change: on_change.clone(),
                     }
-                }
-            }
-            if !config.elements.is_empty() {
-                button {
-                    r#type: "button",
-                    class: "text-xs text-gray-400 dark:text-gray-500 \
-                            hover:text-gray-600 dark:hover:text-gray-300",
-                    onclick: {
-                        let config = config.clone();
-                        move |_| {
-                            let mut c = config.clone();
-                            c.elements.clear();
-                            on_change.call(c);
-                        }
-                    },
-                    "Clear"
                 }
             }
         }
