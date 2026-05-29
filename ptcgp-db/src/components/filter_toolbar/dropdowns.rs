@@ -39,17 +39,16 @@ fn DropdownPanel(open: Signal<bool>, extra_cls: &'static str, children: Element)
 pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
     let mut open = use_signal(|| false);
 
-    let (sets, series) = {
-        let cfg = config.read();
-        (cfg.sets.clone(), cfg.series)
-    };
+    let cfg = config.read();
+    let sets = cfg.sets.as_slice();
+    let series = cfg.series;
     let visible_sets: Vec<&'static Set> = Set::ALL
         .iter()
         .filter(|s| series.is_none_or(|sid| s.series().id() == sid))
         .collect();
     let count = sets.len();
-    let single_icon_src: Option<String> = if count == 1 {
-        Set::from_id(sets[0]).map(|s| s.icon().to_string())
+    let single_icon = if count == 1 {
+        Set::from_id(sets[0]).map(|s| s.icon())
     } else {
         None
     };
@@ -60,7 +59,7 @@ pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
                 r#type: "button",
                 class: "{TRIGGER_CLS}",
                 onclick: move |_| open.toggle(),
-                if let Some(ref src) = single_icon_src {
+                if let Some(src) = single_icon {
                     img {
                         src: "{src}",
                         class: "h-5 w-auto max-w-14 object-contain",
@@ -143,10 +142,10 @@ fn SetItem(set: &'static Set, checked: bool, config: Signal<FilterConfig>) -> El
 pub fn PackDropdown(config: Signal<FilterConfig>) -> Element {
     let mut open = use_signal(|| false);
 
-    let (packs, sets, series) = {
-        let cfg = config.read();
-        (cfg.packs.clone(), cfg.sets.clone(), cfg.series)
-    };
+    let cfg = config.read();
+    let packs = cfg.packs.as_slice();
+    let sets = cfg.sets.as_slice();
+    let series = cfg.series;
     let count = packs.len();
 
     // Build (set_id, [pack_ids]) groups preserving canonical order.
@@ -187,12 +186,11 @@ pub fn PackDropdown(config: Signal<FilterConfig>) -> Element {
             }
 
             DropdownPanel { open, extra_cls: "w-60",
-                for (set_id, pack_ids) in &groups {
+                for (set_id, pack_ids) in groups {
                     PackGroup {
                         key: "{set_id}",
-                        set_id: *set_id,
-                        pack_ids: pack_ids.clone(),
-                        checked_packs: packs.clone(),
+                        set_id,
+                        pack_ids,
                         config,
                     }
                 }
@@ -206,12 +204,9 @@ pub fn PackDropdown(config: Signal<FilterConfig>) -> Element {
 
 /// One set-group: header with set icon, then each pack in the group.
 #[component]
-fn PackGroup(
-    set_id: usize,
-    pack_ids: Vec<usize>,
-    checked_packs: Vec<usize>,
-    config: Signal<FilterConfig>,
-) -> Element {
+fn PackGroup(set_id: usize, pack_ids: Vec<usize>, config: Signal<FilterConfig>) -> Element {
+    let cfg = config.read();
+    let checked_packs = cfg.packs.as_slice();
     rsx! {
         if let Some(set) = Set::from_id(set_id) {
             div { class: "flex items-center px-3 py-1 \
@@ -267,7 +262,8 @@ fn PackItem(pack: &'static Pack, checked: bool, config: Signal<FilterConfig>) ->
 #[component]
 pub fn SourceDropdown(config: Signal<FilterConfig>) -> Element {
     let mut open = use_signal(|| false);
-    let sources = config.read().sources.clone();
+    let cfg = config.read();
+    let sources = cfg.sources.as_slice();
     let count = sources.len();
 
     rsx! {

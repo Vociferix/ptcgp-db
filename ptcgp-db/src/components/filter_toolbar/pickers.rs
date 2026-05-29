@@ -13,7 +13,8 @@ use super::seg_btn_cls;
 
 #[component]
 pub fn RarityGroup(config: Signal<FilterConfig>) -> Element {
-    let rarities = config.read().rarities.clone();
+    let cfg = config.read();
+    let rarities = cfg.rarities.as_slice();
     rsx! {
         div { class: "flex flex-col gap-1",
             div { class: "flex items-center gap-2",
@@ -76,7 +77,8 @@ fn RarityBtn(rarity: &'static RarityClass, active: bool, config: Signal<FilterCo
 
 #[component]
 pub fn ElementGroup(config: Signal<FilterConfig>) -> Element {
-    let elements = config.read().elements.clone();
+    let cfg = config.read();
+    let elements = cfg.elements.as_slice();
     rsx! {
         div { class: "flex flex-col gap-1",
             div { class: "flex items-center gap-2",

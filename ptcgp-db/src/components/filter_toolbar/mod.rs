@@ -37,11 +37,15 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
     let ignore_unobtainable = settings.read().ignore_unobtainable_sets();
     let mut panel_open = use_signal(|| false);
 
-    let total_active = count_active(&config.read(), ignore_unobtainable);
-
-    let (ex, mega, foil, obtainable) = {
+    let (total_active, ex, mega, foil, obtainable) = {
         let cfg = config.read();
-        (cfg.ex, cfg.mega, cfg.foil, cfg.obtainable)
+        (
+            count_active(&cfg, ignore_unobtainable),
+            cfg.ex,
+            cfg.mega,
+            cfg.foil,
+            cfg.obtainable,
+        )
     };
 
     rsx! {
@@ -188,7 +192,7 @@ fn SeriesFilter(config: Signal<FilterConfig>) -> Element {
                 for s in Series::ALL {
                     SeriesBtn {
                         key: "{s.id()}",
-                        btn_label: s.code().to_string(),
+                        btn_label: "{s.code()}",
                         active: series == Some(s.id()),
                         target_id: Some(s.id()),
                         config,
@@ -240,7 +244,7 @@ fn StageFilter(config: Signal<FilterConfig>) -> Element {
                 for s in Stage::ALL {
                     StageBtn {
                         key: "{s.id()}",
-                        btn_label: s.name().to_string(),
+                        btn_label: "{s.name()}",
                         active: stage == Some(s.id()),
                         target_id: Some(s.id()),
                         config,
