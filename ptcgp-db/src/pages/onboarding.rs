@@ -20,10 +20,61 @@ fn do_submit(
     schedule_save();
 }
 
-fn do_import(
-    evt: Event<FormData>,
+// ---------------------------------------------------------------------------
+// Import — shared text processing
+// ---------------------------------------------------------------------------
+
+async fn apply_import_text(
+    text: String,
     mut store: Signal<Option<ProfileStore<AppStorage>>>,
     mut import_error: Signal<Option<String>>,
+) {
+    let raw: ProfilesSaveData = match serde_json::from_str(&text) {
+        Ok(d) => d,
+        Err(e) => {
+            import_error.set(Some(format!("Invalid JSON: {e}")));
+            return;
+        }
+    };
+    let data = match migrate_profiles(raw) {
+        Ok(d) => d,
+        Err(e) => {
+            import_error.set(Some(format!("Incompatible format: {e}")));
+            return;
+        }
+    };
+    if data.profiles.is_empty() {
+        import_error.set(Some("The file contains no profiles.".into()));
+        return;
+    }
+    let (snapshot, storage) = {
+        let mut guard = store.write();
+        let Some(s) = guard.as_mut() else { return };
+        for profile in data.profiles {
+            let pname = profile.name.clone();
+            let _ = s.create_profile(pname.clone());
+            let _ = s.replace_profile_counts(&pname, profile.owned_counts);
+        }
+        let snapshot = s.save_data_snapshot().clone();
+        let storage = s.storage().clone();
+        s.mark_clean();
+        (snapshot, storage)
+    };
+    if let Err(e) = storage.save_profiles(&snapshot).await {
+        tracing::error!("onboarding import save: {e}");
+    }
+    // Store now has profiles → App re-renders → OnboardingPage is replaced by Router
+}
+
+// ---------------------------------------------------------------------------
+// Import — platform-specific file reading
+// ---------------------------------------------------------------------------
+
+#[cfg(target_arch = "wasm32")]
+fn do_import(
+    evt: Event<FormData>,
+    store: Signal<Option<ProfileStore<AppStorage>>>,
+    import_error: Signal<Option<String>>,
 ) {
     let Some(file) = evt.files().into_iter().next() else {
         return;
@@ -36,43 +87,77 @@ fn do_import(
                 return;
             }
         };
-        let raw: ProfilesSaveData = match serde_json::from_str(&text) {
-            Ok(d) => d,
-            Err(e) => {
-                import_error.set(Some(format!("Invalid JSON: {e}")));
-                return;
-            }
-        };
-        let data = match migrate_profiles(raw) {
-            Ok(d) => d,
-            Err(e) => {
-                import_error.set(Some(format!("Incompatible format: {e}")));
-                return;
-            }
-        };
-        if data.profiles.is_empty() {
-            import_error.set(Some("The file contains no profiles.".into()));
-            return;
-        }
-        let (snapshot, storage) = {
-            let mut guard = store.write();
-            let Some(s) = guard.as_mut() else { return };
-            for profile in data.profiles {
-                let pname = profile.name.clone();
-                let _ = s.create_profile(pname.clone());
-                let _ = s.replace_profile_counts(&pname, profile.owned_counts);
-            }
-            let snapshot = s.save_data_snapshot().clone();
-            let storage = s.storage().clone();
-            s.mark_clean();
-            (snapshot, storage)
-        };
-        if let Err(e) = storage.save_profiles(&snapshot).await {
-            tracing::error!("onboarding import save: {e}");
-        }
-        // Store now has profiles → App re-renders → OnboardingPage is replaced by Router
+        apply_import_text(text, store, import_error).await;
     });
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+fn do_import(
+    store: Signal<Option<ProfileStore<AppStorage>>>,
+    mut import_error: Signal<Option<String>>,
+) {
+    spawn(async move {
+        let Some(handle) = rfd::AsyncFileDialog::new()
+            .add_filter("JSON", &["json"])
+            .pick_file()
+            .await
+        else {
+            return;
+        };
+        let bytes = handle.read().await;
+        let text = match String::from_utf8(bytes) {
+            Ok(t) => t,
+            Err(e) => {
+                import_error.set(Some(format!("File is not valid UTF-8: {e}")));
+                return;
+            }
+        };
+        apply_import_text(text, store, import_error).await;
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Import button element (platform-specific)
+// ---------------------------------------------------------------------------
+
+#[cfg(target_arch = "wasm32")]
+fn import_button(
+    store: Signal<Option<ProfileStore<AppStorage>>>,
+    import_error: Signal<Option<String>>,
+) -> Element {
+    rsx! {
+        label { class: "block cursor-pointer",
+            input {
+                r#type: "file",
+                accept: ".json",
+                class: "sr-only",
+                onchange: move |evt| do_import(evt, store, import_error),
+            }
+            span { class: "flex w-full items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors select-none",
+                "Import existing data"
+            }
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn import_button(
+    store: Signal<Option<ProfileStore<AppStorage>>>,
+    import_error: Signal<Option<String>>,
+) -> Element {
+    rsx! {
+        button {
+            r#type: "button",
+            class: "flex w-full items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors",
+            onclick: move |_| do_import(store, import_error),
+            "Import existing data"
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dismiss (skip onboarding)
+// ---------------------------------------------------------------------------
 
 fn do_dismiss(mut store: Signal<Option<ProfileStore<AppStorage>>>) {
     if let Some(s) = store.write().as_mut() {
@@ -80,6 +165,10 @@ fn do_dismiss(mut store: Signal<Option<ProfileStore<AppStorage>>>) {
     }
     schedule_save();
 }
+
+// ---------------------------------------------------------------------------
+// Onboarding page
+// ---------------------------------------------------------------------------
 
 #[component]
 pub fn OnboardingPage() -> Element {
@@ -152,21 +241,7 @@ pub fn OnboardingPage() -> Element {
 
                 // Import from file
                 div { class: "space-y-1.5",
-                    label { class: "block cursor-pointer",
-                        input {
-                            r#type: "file",
-                            accept: ".json",
-                            class: "sr-only",
-                            onchange: move |evt| do_import(evt, store, import_error),
-                        }
-                        span { class: "flex w-full items-center justify-center rounded-lg \
-                                       border border-gray-200 dark:border-gray-700 \
-                                       text-gray-700 dark:text-gray-300 font-medium py-2 \
-                                       text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 \
-                                       transition-colors select-none",
-                            "Import existing data"
-                        }
-                    }
+                    {import_button(store, import_error)}
                     if let Some(err) = import_error.read().as_deref() {
                         p { class: "text-xs text-center text-red-600 dark:text-red-400",
                             "{err}"

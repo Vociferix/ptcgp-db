@@ -22,9 +22,10 @@ enum ImportStep {
 }
 
 // ---------------------------------------------------------------------------
-// Export
+// Export — platform-specific
 // ---------------------------------------------------------------------------
 
+#[cfg(target_arch = "wasm32")]
 fn do_export(store: Signal<Option<ProfileStore<AppStorage>>>) {
     let snapshot = store
         .read()
@@ -39,8 +40,7 @@ fn do_export(store: Signal<Option<ProfileStore<AppStorage>>>) {
                 return;
             }
         };
-        // Pass the JSON to JS and trigger a Blob download; no string interpolation of JSON
-        // so special characters can't break the JS literal.
+        // Pass JSON via dioxus.recv() so no special characters can break the JS literal.
         let eval = document::eval(
             "const j=await dioxus.recv();\
              const b=new Blob([j],{type:'application/json'});\
@@ -56,8 +56,37 @@ fn do_export(store: Signal<Option<ProfileStore<AppStorage>>>) {
     });
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn do_export(store: Signal<Option<ProfileStore<AppStorage>>>) {
+    let snapshot = store
+        .read()
+        .as_ref()
+        .map(|s| s.save_data_snapshot().clone());
+    let Some(data) = snapshot else { return };
+    spawn(async move {
+        let json = match serde_json::to_string_pretty(&data) {
+            Ok(j) => j,
+            Err(e) => {
+                tracing::error!("export serialize: {e}");
+                return;
+            }
+        };
+        let Some(handle) = rfd::AsyncFileDialog::new()
+            .add_filter("JSON", &["json"])
+            .set_file_name("ptcgp-backup.json")
+            .save_file()
+            .await
+        else {
+            return;
+        };
+        if let Err(e) = handle.write(json.as_bytes()).await {
+            tracing::error!("export write: {e}");
+        }
+    });
+}
+
 // ---------------------------------------------------------------------------
-// Import — parsing
+// Import — shared parsing and application logic
 // ---------------------------------------------------------------------------
 
 fn parse_import(text: &str) -> Result<ProfilesSaveData, String> {
@@ -66,12 +95,6 @@ fn parse_import(text: &str) -> Result<ProfilesSaveData, String> {
     migrate_profiles(raw).map_err(|e| format!("Incompatible format version: {e}"))
 }
 
-// ---------------------------------------------------------------------------
-// Import — applying mutations and saving
-// ---------------------------------------------------------------------------
-
-/// Applies the resolved import mutations to the store and persists immediately.
-/// Called from async spawn tasks (both no-conflict and post-resolution paths).
 async fn do_apply_import(
     new_profiles: Vec<ProfileData>,
     overwrite_profiles: Vec<ProfileData>,
@@ -79,7 +102,6 @@ async fn do_apply_import(
     mut import_step: Signal<ImportStep>,
 ) {
     let mut count = 0usize;
-
     let (snapshot, storage) = {
         let mut guard = store.write();
         let Some(s) = guard.as_mut() else {
@@ -105,18 +127,53 @@ async fn do_apply_import(
         s.mark_clean();
         (snapshot, storage)
     };
-
     if let Err(e) = storage.save_profiles(&snapshot).await {
         tracing::error!("import save: {e}");
     }
-
     import_step.set(ImportStep::Success(count));
 }
 
+async fn process_import_text(
+    text: String,
+    store: Signal<Option<ProfileStore<AppStorage>>>,
+    mut import_step: Signal<ImportStep>,
+) {
+    let data = match parse_import(&text) {
+        Ok(d) => d,
+        Err(e) => {
+            import_step.set(ImportStep::Error(e));
+            return;
+        }
+    };
+    let existing_names: Vec<String> = store
+        .read()
+        .as_ref()
+        .map(|s| s.profiles().iter().map(|p| p.name.clone()).collect())
+        .unwrap_or_default();
+    let mut new_profiles = Vec::new();
+    let mut conflicts = Vec::new();
+    for profile in data.profiles {
+        if existing_names.iter().any(|n| n == &profile.name) {
+            conflicts.push((profile, true)); // default: overwrite
+        } else {
+            new_profiles.push(profile);
+        }
+    }
+    if conflicts.is_empty() {
+        do_apply_import(new_profiles, Vec::new(), store, import_step).await;
+    } else {
+        import_step.set(ImportStep::Resolving {
+            new_profiles,
+            conflicts,
+        });
+    }
+}
+
 // ---------------------------------------------------------------------------
-// Import — file event handler
+// Import — file reading (platform-specific)
 // ---------------------------------------------------------------------------
 
+#[cfg(target_arch = "wasm32")]
 fn handle_file_change(
     evt: Event<FormData>,
     store: Signal<Option<ProfileStore<AppStorage>>>,
@@ -133,39 +190,72 @@ fn handle_file_change(
                 return;
             }
         };
-        let data = match parse_import(&text) {
-            Ok(d) => d,
+        process_import_text(text, store, import_step).await;
+    });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn handle_file_pick(
+    store: Signal<Option<ProfileStore<AppStorage>>>,
+    mut import_step: Signal<ImportStep>,
+) {
+    spawn(async move {
+        let Some(handle) = rfd::AsyncFileDialog::new()
+            .add_filter("JSON", &["json"])
+            .pick_file()
+            .await
+        else {
+            return;
+        };
+        let bytes = handle.read().await;
+        let text = match String::from_utf8(bytes) {
+            Ok(t) => t,
             Err(e) => {
-                import_step.set(ImportStep::Error(e));
+                import_step.set(ImportStep::Error(format!("File is not valid UTF-8: {e}")));
                 return;
             }
         };
+        process_import_text(text, store, import_step).await;
+    });
+}
 
-        let existing_names: Vec<String> = store
-            .read()
-            .as_ref()
-            .map(|s| s.profiles().iter().map(|p| p.name.clone()).collect())
-            .unwrap_or_default();
+// ---------------------------------------------------------------------------
+// Import trigger element (platform-specific)
+// ---------------------------------------------------------------------------
 
-        let mut new_profiles = Vec::new();
-        let mut conflicts = Vec::new();
-        for profile in data.profiles {
-            if existing_names.iter().any(|n| n == &profile.name) {
-                conflicts.push((profile, true)); // default: overwrite
-            } else {
-                new_profiles.push(profile);
+#[cfg(target_arch = "wasm32")]
+fn import_trigger(
+    store: Signal<Option<ProfileStore<AppStorage>>>,
+    import_step: Signal<ImportStep>,
+) -> Element {
+    rsx! {
+        label { class: "inline-flex cursor-pointer",
+            input {
+                r#type: "file",
+                accept: ".json",
+                class: "sr-only",
+                onchange: move |evt| handle_file_change(evt, store, import_step),
+            }
+            span { class: "rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium px-4 py-2 text-sm transition-colors select-none",
+                "Choose JSON file…"
             }
         }
+    }
+}
 
-        if conflicts.is_empty() {
-            do_apply_import(new_profiles, Vec::new(), store, import_step).await;
-        } else {
-            import_step.set(ImportStep::Resolving {
-                new_profiles,
-                conflicts,
-            });
+#[cfg(not(target_arch = "wasm32"))]
+fn import_trigger(
+    store: Signal<Option<ProfileStore<AppStorage>>>,
+    import_step: Signal<ImportStep>,
+) -> Element {
+    rsx! {
+        button {
+            r#type: "button",
+            class: "rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium px-4 py-2 text-sm transition-colors",
+            onclick: move |_| handle_file_pick(store, import_step),
+            "Choose JSON file…"
         }
-    });
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -286,17 +376,7 @@ pub fn ImportExportPage() -> Element {
                         p { class: "text-sm text-gray-500 dark:text-gray-400",
                             "Load profiles from a previously exported JSON file. Existing profiles not present in the file are unaffected."
                         }
-                        label { class: "inline-flex cursor-pointer",
-                            input {
-                                r#type: "file",
-                                accept: ".json",
-                                class: "sr-only",
-                                onchange: move |evt| handle_file_change(evt, store, import_step),
-                            }
-                            span { class: "rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium px-4 py-2 text-sm transition-colors select-none",
-                                "Choose JSON file…"
-                            }
-                        }
+                        {import_trigger(store, import_step)}
                     },
 
                     ImportStep::Resolving { new_profiles, conflicts } => rsx! {
