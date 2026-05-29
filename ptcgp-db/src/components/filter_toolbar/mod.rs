@@ -7,8 +7,8 @@ use dropdowns::{PackDropdown, SetDropdown, SourceDropdown};
 use pickers::{ElementGroup, RarityGroup};
 
 use dioxus::prelude::*;
-use ptcgp_db_core::save_data::FilterConfig;
 use ptcgp_db_core::AppSettings;
+use ptcgp_db_core::save_data::FilterConfig;
 use ptcgp_db_data::{Series, Stage};
 
 // ---------------------------------------------------------------------------

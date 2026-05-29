@@ -105,7 +105,11 @@ pub fn SetDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
 
 /// One set row: compact icon on the left, full logo on the right.
 #[component]
-fn SetItem(set: &'static Set, config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+fn SetItem(
+    set: &'static Set,
+    config: FilterConfig,
+    on_change: EventHandler<FilterConfig>,
+) -> Element {
     let id = set.id();
     let checked = config.sets.contains(&id);
     let row_cls = dropdown_row_cls(checked);
@@ -235,7 +239,11 @@ fn PackGroup(
 }
 
 #[component]
-fn PackItem(pack: &'static Pack, config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+fn PackItem(
+    pack: &'static Pack,
+    config: FilterConfig,
+    on_change: EventHandler<FilterConfig>,
+) -> Element {
     let id = pack.id();
     let checked = config.packs.contains(&id);
     let row_cls = dropdown_row_cls(checked);
@@ -377,7 +385,9 @@ fn toggle_set(mut config: FilterConfig, id: usize, was_checked: bool) -> FilterC
     if was_checked {
         config.sets.retain(|&x| x != id);
         let sets = config.sets.clone();
-        config.packs.retain(|&pid| Pack::from_id(pid).map_or(false, |p| sets.contains(&p.set().id())));
+        config
+            .packs
+            .retain(|&pid| Pack::from_id(pid).map_or(false, |p| sets.contains(&p.set().id())));
     } else {
         config.sets.push(id);
     }
