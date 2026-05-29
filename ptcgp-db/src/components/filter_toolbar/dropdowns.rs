@@ -61,7 +61,7 @@ pub fn SetDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                 if let Some(ref src) = single_icon_src {
                     img {
                         src: "{src}",
-                        class: "h-8 w-8 object-contain",
+                        class: "h-8 w-auto max-w-20 object-contain",
                         alt: "Set",
                     }
                 } else {
@@ -81,7 +81,7 @@ pub fn SetDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                 }
             }
 
-            DropdownPanel { open, extra_cls: "w-64",
+            DropdownPanel { open, extra_cls: "w-72",
                 for set in &visible_sets {
                     SetItem {
                         key: "{set.id()}",
@@ -117,12 +117,12 @@ fn SetItem(set: &'static Set, config: FilterConfig, on_change: EventHandler<Filt
             img {
                 src: "{set.icon()}",
                 alt: "{set.code()}",
-                class: "h-8 w-8 object-contain shrink-0",
+                class: "h-8 w-auto max-w-20 object-contain shrink-0",
             }
             img {
                 src: "{set.logo()}",
                 alt: "{set.name()}",
-                class: "h-10 w-auto max-w-36 object-contain",
+                class: "h-10 w-auto max-w-32 object-contain",
             }
             if checked {
                 span { class: "ml-auto pl-2 shrink-0 text-blue-500 dark:text-blue-400 font-bold",
@@ -217,7 +217,7 @@ fn PackGroup(
                 img {
                     src: "{set.icon()}",
                     alt: "{set.code()}",
-                    class: "h-8 w-8 object-contain",
+                    class: "h-6 w-auto max-w-14 object-contain",
                 }
                 span { class: "text-xs font-semibold text-gray-400 dark:text-gray-500",
                     "{set.code()}"
