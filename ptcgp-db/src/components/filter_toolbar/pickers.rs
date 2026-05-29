@@ -1,32 +1,39 @@
-// Alias to avoid shadowing dioxus::prelude::Element (the VNode return type).
+// Alias to avoid shadowing dioxus::prelude::Element (VNode return type).
 use ptcgp_db_data::Element as PtcgpElement;
 use ptcgp_db_data::RarityClass;
 
 use dioxus::prelude::*;
 use ptcgp_db_core::save_data::FilterConfig;
 
+use super::seg_btn_cls;
+
 // ---------------------------------------------------------------------------
-// Rarity class picker
+// Rarity — segmented icon button group (multi-select)
 // ---------------------------------------------------------------------------
 
 #[component]
-pub fn RarityPicker(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+pub fn RarityGroup(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
     rsx! {
-        div { class: "flex flex-wrap items-center gap-1.5",
-            span { class: "text-sm text-gray-600 dark:text-gray-400", "Rarity" }
-            for rarity in RarityClass::ALL {
-                RarityChip {
-                    key: "{rarity.id()}",
-                    rarity,
-                    config: config.clone(),
-                    on_change: on_change.clone(),
+        div { class: "flex flex-wrap items-center gap-y-1 gap-x-2",
+            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400 shrink-0",
+                "Rarity"
+            }
+            div { class: "flex flex-wrap gap-y-px",
+                for rarity in RarityClass::ALL {
+                    RarityBtn {
+                        key: "{rarity.id()}",
+                        rarity,
+                        active: config.rarities.contains(&rarity.id()),
+                        config: config.clone(),
+                        on_change: on_change.clone(),
+                    }
                 }
             }
             if !config.rarities.is_empty() {
                 button {
                     r#type: "button",
-                    class: "text-xs text-gray-500 dark:text-gray-400 \
-                            hover:text-gray-700 dark:hover:text-gray-200 underline",
+                    class: "text-xs text-gray-400 dark:text-gray-500 \
+                            hover:text-gray-600 dark:hover:text-gray-300",
                     onclick: {
                         let config = config.clone();
                         move |_| {
@@ -43,27 +50,22 @@ pub fn RarityPicker(config: FilterConfig, on_change: EventHandler<FilterConfig>)
 }
 
 #[component]
-fn RarityChip(
+fn RarityBtn(
     rarity: &'static RarityClass,
+    active: bool,
     config: FilterConfig,
     on_change: EventHandler<FilterConfig>,
 ) -> Element {
-    let selected = config.rarities.contains(&rarity.id());
-    let ring = if selected {
-        "ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-gray-900"
-    } else {
-        "ring-1 ring-gray-300 dark:ring-gray-600"
-    };
-
+    let cls = seg_btn_cls(active);
     rsx! {
         button {
             r#type: "button",
             title: "{rarity.group().name()} {rarity.count()}",
-            class: "rounded p-0.5 hover:opacity-80 transition-opacity {ring}",
+            class: "{cls} !px-1.5",
             onclick: move |_| {
                 let mut c = config.clone();
                 let id = rarity.id();
-                if selected {
+                if active {
                     c.rarities.retain(|&x| x != id);
                 } else if !c.rarities.contains(&id) {
                     c.rarities.push(id);
@@ -80,27 +82,32 @@ fn RarityChip(
 }
 
 // ---------------------------------------------------------------------------
-// Element picker
+// Element — segmented icon button group (multi-select)
 // ---------------------------------------------------------------------------
 
 #[component]
-pub fn ElementPicker(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+pub fn ElementGroup(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
     rsx! {
-        div { class: "flex flex-wrap items-center gap-1.5",
-            span { class: "text-sm text-gray-600 dark:text-gray-400", "Element" }
-            for element in PtcgpElement::ALL {
-                ElementChip {
-                    key: "{element.id()}",
-                    element,
-                    config: config.clone(),
-                    on_change: on_change.clone(),
+        div { class: "flex flex-wrap items-center gap-y-1 gap-x-2",
+            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400 shrink-0",
+                "Element"
+            }
+            div { class: "flex flex-wrap gap-y-px",
+                for element in PtcgpElement::ALL {
+                    ElementBtn {
+                        key: "{element.id()}",
+                        element,
+                        active: config.elements.contains(&element.id()),
+                        config: config.clone(),
+                        on_change: on_change.clone(),
+                    }
                 }
             }
             if !config.elements.is_empty() {
                 button {
                     r#type: "button",
-                    class: "text-xs text-gray-500 dark:text-gray-400 \
-                            hover:text-gray-700 dark:hover:text-gray-200 underline",
+                    class: "text-xs text-gray-400 dark:text-gray-500 \
+                            hover:text-gray-600 dark:hover:text-gray-300",
                     onclick: {
                         let config = config.clone();
                         move |_| {
@@ -117,27 +124,22 @@ pub fn ElementPicker(config: FilterConfig, on_change: EventHandler<FilterConfig>
 }
 
 #[component]
-fn ElementChip(
+fn ElementBtn(
     element: &'static PtcgpElement,
+    active: bool,
     config: FilterConfig,
     on_change: EventHandler<FilterConfig>,
 ) -> Element {
-    let selected = config.elements.contains(&element.id());
-    let ring = if selected {
-        "ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-gray-900"
-    } else {
-        "ring-1 ring-gray-300 dark:ring-gray-600"
-    };
-
+    let cls = seg_btn_cls(active);
     rsx! {
         button {
             r#type: "button",
             title: "{element.name()}",
-            class: "rounded p-0.5 hover:opacity-80 transition-opacity {ring}",
+            class: "{cls} !px-1.5",
             onclick: move |_| {
                 let mut c = config.clone();
                 let id = element.id();
-                if selected {
+                if active {
                     c.elements.retain(|&x| x != id);
                 } else if !c.elements.contains(&id) {
                     c.elements.push(id);
@@ -147,7 +149,7 @@ fn ElementChip(
             img {
                 src: "{element.icon()}",
                 alt: "{element.name()}",
-                class: "h-6 w-6",
+                class: "h-5 w-5",
             }
         }
     }

@@ -2,16 +2,14 @@ mod controls;
 mod dropdowns;
 mod pickers;
 
-use controls::{
-    AnyVersionFilter, CountFilter, GoalFilter, KindFilter, NameFilter, SeriesFilter, StageFilter,
-    ThreeWayFilter,
-};
+use controls::{AnyVersionFilter, CountFilter, GoalFilter, KindFilter, NameFilter, TriStateFilter};
 use dropdowns::{PackDropdown, SetDropdown, SourceDropdown};
-use pickers::{ElementPicker, RarityPicker};
+use pickers::{ElementGroup, RarityGroup};
 
 use dioxus::prelude::*;
 use ptcgp_db_core::save_data::FilterConfig;
 use ptcgp_db_core::AppSettings;
+use ptcgp_db_data::{Series, Stage};
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -23,15 +21,14 @@ pub enum FilterMode {
     /// Card Catalog mode: shows owned-count threshold, no goal or any-version-owned.
     Catalog,
     /// Analysis / Trade mode: shows goal input + any-version-owned toggle; hides owned-count.
-    /// Callers are responsible for initializing `FilterConfig::obtainable = Some(true)`.
+    /// Callers should initialize `FilterConfig::obtainable = Some(true)`.
     Analysis,
 }
 
 /// Configurable filter toolbar used by the Card Catalog, Analysis, and Trade pages.
 ///
-/// The parent owns the [`FilterConfig`] state. Every interaction calls `on_change` with an
-/// updated clone of the config. Reads `Signal<AppSettings>` from context to conditionally
-/// hide the Obtainable filter when `ignore_unobtainable_sets` is on.
+/// The parent owns the [`FilterConfig`] state; every interaction calls `on_change` with an
+/// updated clone. Reads `Signal<AppSettings>` from context.
 #[component]
 pub fn FilterToolbar(
     config: FilterConfig,
@@ -40,10 +37,11 @@ pub fn FilterToolbar(
 ) -> Element {
     let settings = use_context::<Signal<AppSettings>>();
     let ignore_unobtainable = settings.read().ignore_unobtainable_sets();
-    let mut expanded = use_signal(|| false);
+    let mut filters_open = use_signal(|| false);
+    let mut advanced_open = use_signal(|| false);
 
     let active = count_active(&config, ignore_unobtainable);
-    let panel_class = if *expanded.read() {
+    let panel_class = if *filters_open.read() {
         "block"
     } else {
         "hidden sm:block"
@@ -51,121 +49,144 @@ pub fn FilterToolbar(
 
     rsx! {
         div { class: "space-y-2",
-            // Narrow-viewport toggle button
-            button {
-                r#type: "button",
-                class: "sm:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-md border \
-                        border-gray-300 dark:border-gray-600 text-sm \
-                        bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 \
-                        hover:bg-gray-50 dark:hover:bg-gray-700",
-                onclick: move |_| expanded.toggle(),
-                "Filters"
-                if active > 0 {
-                    span { class: "px-1.5 py-0.5 text-xs rounded-full bg-blue-600 text-white",
-                        "{active}"
+            // ── Always-visible bar: name input + narrow "Filters" button ────────
+            div { class: "flex items-center gap-2",
+                NameFilter { config: config.clone(), on_change: on_change.clone() }
+                button {
+                    r#type: "button",
+                    class: "sm:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-md border \
+                            border-gray-300 dark:border-gray-600 text-sm \
+                            bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 \
+                            hover:bg-gray-50 dark:hover:bg-gray-700",
+                    onclick: move |_| filters_open.toggle(),
+                    "Filters"
+                    if active > 0 {
+                        span { class: "px-1.5 py-0.5 text-xs rounded-full bg-blue-600 text-white",
+                            "{active}"
+                        }
                     }
                 }
             }
 
-            // Filter panel (always visible on sm:+, toggleable on narrow)
+            // ── Primary filter panel ─────────────────────────────────────────────
             div { class: "{panel_class} flex flex-col gap-3",
-                // Row 1: text search + taxonomy selects
-                div { class: "flex flex-wrap gap-2 items-center",
-                    NameFilter { config: config.clone(), on_change: on_change.clone() }
-                    SeriesFilter { config: config.clone(), on_change: on_change.clone() }
-                    KindFilter { config: config.clone(), on_change: on_change.clone() }
-                    StageFilter { config: config.clone(), on_change: on_change.clone() }
-                }
-
-                // Row 2: multi-select dropdowns
+                // Row 1 — image dropdowns
                 div { class: "flex flex-wrap gap-2 items-center",
                     SetDropdown { config: config.clone(), on_change: on_change.clone() }
                     PackDropdown { config: config.clone(), on_change: on_change.clone() }
                     SourceDropdown { config: config.clone(), on_change: on_change.clone() }
                 }
 
-                // Row 3: rarity icon toggles
-                RarityPicker { config: config.clone(), on_change: on_change.clone() }
+                // Row 2 — series + kind segmented groups
+                div { class: "flex flex-wrap gap-x-5 gap-y-2 items-center",
+                    SeriesFilter { config: config.clone(), on_change: on_change.clone() }
+                    KindFilter { config: config.clone(), on_change: on_change.clone() }
+                }
 
-                // Row 4: element icon toggles
-                ElementPicker { config: config.clone(), on_change: on_change.clone() }
+                // Row 3 — rarity
+                RarityGroup { config: config.clone(), on_change: on_change.clone() }
 
-                // Row 5: property toggles
-                div { class: "flex flex-wrap gap-x-4 gap-y-2 items-center",
-                    ThreeWayFilter {
-                        label: "Ex",
-                        only_text: "Ex only",
-                        exclude_text: "No ex",
-                        value: config.ex,
-                        on_change: {
-                            let config = config.clone();
-                            let on_change = on_change.clone();
-                            move |v: Option<bool>| {
-                                let mut c = config.clone();
-                                c.ex = v;
-                                on_change.call(c);
-                            }
-                        },
+                // Row 4 — element
+                ElementGroup { config: config.clone(), on_change: on_change.clone() }
+
+                // ── Advanced toggle ──────────────────────────────────────────────
+                button {
+                    r#type: "button",
+                    class: "self-start flex items-center gap-1 text-xs \
+                            text-gray-400 dark:text-gray-500 \
+                            hover:text-gray-600 dark:hover:text-gray-300",
+                    onclick: move |_| advanced_open.toggle(),
+                    if *advanced_open.read() {
+                        "▲"
+                    } else {
+                        "▼"
                     }
-                    ThreeWayFilter {
-                        label: "Mega",
-                        only_text: "Mega only",
-                        exclude_text: "No mega",
-                        value: config.mega,
-                        on_change: {
-                            let config = config.clone();
-                            let on_change = on_change.clone();
-                            move |v: Option<bool>| {
-                                let mut c = config.clone();
-                                c.mega = v;
-                                on_change.call(c);
-                            }
-                        },
-                    }
-                    ThreeWayFilter {
-                        label: "Foil",
-                        only_text: "Foil only",
-                        exclude_text: "Non-foil",
-                        value: config.foil,
-                        on_change: {
-                            let config = config.clone();
-                            let on_change = on_change.clone();
-                            move |v: Option<bool>| {
-                                let mut c = config.clone();
-                                c.foil = v;
-                                on_change.call(c);
-                            }
-                        },
-                    }
-                    if !ignore_unobtainable {
-                        ThreeWayFilter {
-                            label: "Obtainable",
-                            only_text: "Obtainable",
-                            exclude_text: "Unobtainable",
-                            value: config.obtainable,
+                    "Advanced filters"
+                }
+
+                // ── Advanced section ─────────────────────────────────────────────
+                if *advanced_open.read() {
+                    // Row A — per-property tri-state toggles + stage
+                    div { class: "flex flex-wrap gap-x-5 gap-y-2 items-center",
+                        StageFilter {
+                            config: config.clone(),
+                            on_change: on_change.clone(),
+                        }
+                        TriStateFilter {
+                            filter_label: "Ex",
+                            only_text: "Ex only",
+                            exclude_text: "No ex",
+                            value: config.ex,
                             on_change: {
                                 let config = config.clone();
                                 let on_change = on_change.clone();
                                 move |v: Option<bool>| {
                                     let mut c = config.clone();
-                                    c.obtainable = v;
+                                    c.ex = v;
                                     on_change.call(c);
                                 }
                             },
                         }
+                        TriStateFilter {
+                            filter_label: "Mega",
+                            only_text: "Mega only",
+                            exclude_text: "No mega",
+                            value: config.mega,
+                            on_change: {
+                                let config = config.clone();
+                                let on_change = on_change.clone();
+                                move |v: Option<bool>| {
+                                    let mut c = config.clone();
+                                    c.mega = v;
+                                    on_change.call(c);
+                                }
+                            },
+                        }
+                        TriStateFilter {
+                            filter_label: "Foil",
+                            only_text: "Foil only",
+                            exclude_text: "Non-foil",
+                            value: config.foil,
+                            on_change: {
+                                let config = config.clone();
+                                let on_change = on_change.clone();
+                                move |v: Option<bool>| {
+                                    let mut c = config.clone();
+                                    c.foil = v;
+                                    on_change.call(c);
+                                }
+                            },
+                        }
+                        if !ignore_unobtainable {
+                            TriStateFilter {
+                                filter_label: "Obtainable",
+                                only_text: "Obtainable",
+                                exclude_text: "Unobtainable",
+                                value: config.obtainable,
+                                on_change: {
+                                    let config = config.clone();
+                                    let on_change = on_change.clone();
+                                    move |v: Option<bool>| {
+                                        let mut c = config.clone();
+                                        c.obtainable = v;
+                                        on_change.call(c);
+                                    }
+                                },
+                            }
+                        }
                     }
-                }
 
-                // Row 6: count / goal
-                div { class: "flex flex-wrap gap-x-4 gap-y-2 items-center",
-                    match &mode {
-                        FilterMode::Catalog => rsx! {
-                            CountFilter { config: config.clone(), on_change: on_change.clone() }
-                        },
-                        FilterMode::Analysis => rsx! {
-                            GoalFilter { config: config.clone(), on_change: on_change.clone() }
-                            AnyVersionFilter { config: config.clone(), on_change: on_change.clone() }
-                        },
+                    // Row B — count / goal
+                    div { class: "flex flex-wrap gap-x-5 gap-y-2 items-center",
+                        match &mode {
+                            FilterMode::Catalog => rsx! {
+                                CountFilter { config: config.clone(), on_change: on_change.clone() }
+                            },
+                            FilterMode::Analysis => rsx! {
+                                GoalFilter { config: config.clone(), on_change: on_change.clone() }
+                                AnyVersionFilter { config: config.clone(), on_change: on_change.clone() }
+                            },
+                        }
                     }
                 }
             }
@@ -174,9 +195,140 @@ pub fn FilterToolbar(
 }
 
 // ---------------------------------------------------------------------------
-// Utility
+// Series and Stage — kept here because they reference ptcgp_db_data types
+// that would clutter controls.rs's import list unnecessarily.
 // ---------------------------------------------------------------------------
 
+#[component]
+fn SeriesFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+    rsx! {
+        div { class: "flex items-center gap-1.5",
+            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400 shrink-0",
+                "Series"
+            }
+            div { class: "flex",
+                SeriesBtn {
+                    btn_label: "All",
+                    active: config.series.is_none(),
+                    target_id: None,
+                    config: config.clone(),
+                    on_change: on_change.clone(),
+                }
+                for series in Series::ALL {
+                    SeriesBtn {
+                        key: "{series.id()}",
+                        btn_label: series.code().to_string(),
+                        active: config.series == Some(series.id()),
+                        target_id: Some(series.id()),
+                        config: config.clone(),
+                        on_change: on_change.clone(),
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn SeriesBtn(
+    btn_label: String,
+    active: bool,
+    target_id: Option<usize>,
+    config: FilterConfig,
+    on_change: EventHandler<FilterConfig>,
+) -> Element {
+    let cls = seg_btn_cls(active);
+    rsx! {
+        button {
+            r#type: "button",
+            class: "{cls}",
+            onclick: move |_| {
+                let mut c = config.clone();
+                // Changing series invalidates set/pack selections
+                if c.series != target_id {
+                    c.sets.clear();
+                    c.packs.clear();
+                }
+                c.series = target_id;
+                on_change.call(c);
+            },
+            "{btn_label}"
+        }
+    }
+}
+
+#[component]
+fn StageFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+    rsx! {
+        div { class: "flex items-center gap-1.5",
+            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400 shrink-0",
+                "Stage"
+            }
+            div { class: "flex",
+                StageBtn {
+                    btn_label: "All",
+                    active: config.stage.is_none(),
+                    target_id: None,
+                    config: config.clone(),
+                    on_change: on_change.clone(),
+                }
+                for stage in Stage::ALL {
+                    StageBtn {
+                        key: "{stage.id()}",
+                        btn_label: stage.name().to_string(),
+                        active: config.stage == Some(stage.id()),
+                        target_id: Some(stage.id()),
+                        config: config.clone(),
+                        on_change: on_change.clone(),
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn StageBtn(
+    btn_label: String,
+    active: bool,
+    target_id: Option<usize>,
+    config: FilterConfig,
+    on_change: EventHandler<FilterConfig>,
+) -> Element {
+    let cls = seg_btn_cls(active);
+    rsx! {
+        button {
+            r#type: "button",
+            class: "{cls}",
+            onclick: move |_| {
+                let mut c = config.clone();
+                c.stage = target_id;
+                on_change.call(c);
+            },
+            "{btn_label}"
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Shared visual helpers
+// ---------------------------------------------------------------------------
+
+/// CSS classes for a segmented button group entry (active / inactive variant).
+pub(super) fn seg_btn_cls(active: bool) -> &'static str {
+    if active {
+        "relative px-2.5 py-1 text-xs font-medium border border-blue-600 dark:border-blue-500 \
+         bg-blue-600 text-white z-10 -ml-px first:ml-0 first:rounded-l-md last:rounded-r-md \
+         focus:outline-none"
+    } else {
+        "relative px-2.5 py-1 text-xs font-medium border border-gray-300 dark:border-gray-600 \
+         bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 -ml-px first:ml-0 \
+         first:rounded-l-md last:rounded-r-md hover:bg-gray-50 dark:hover:bg-gray-700 \
+         focus:outline-none"
+    }
+}
+
+/// Count of non-default active filters for the badge.
 pub(super) fn count_active(config: &FilterConfig, ignore_unobtainable: bool) -> usize {
     let mut n = 0;
     if config.name_query.as_deref().is_some_and(|s| !s.is_empty()) {

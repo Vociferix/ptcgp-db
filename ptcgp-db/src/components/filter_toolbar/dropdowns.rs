@@ -4,136 +4,37 @@ use ptcgp_db_data::{CardSource, Pack, Set};
 use ptcgp_db_core::save_data::FilterConfig;
 
 // ---------------------------------------------------------------------------
-// Set / Pack / Source dropdowns
+// Generic dropdown shell — ProfileSelector-style open/close with backdrop.
+//
+// Row sizing is left entirely to the caller: size images in item sub-components.
 // ---------------------------------------------------------------------------
 
 #[component]
-pub fn SetDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
-    let ids: Vec<usize> = Set::ALL
-        .iter()
-        .filter(|set| {
-            config
-                .series
-                .map_or(true, |sid| set.series().id() == sid)
-        })
-        .map(|set| set.id())
-        .collect();
-    let labels: Vec<String> = Set::ALL
-        .iter()
-        .filter(|set| {
-            config
-                .series
-                .map_or(true, |sid| set.series().id() == sid)
-        })
-        .map(|set| format!("{} ({})", set.name().as_str(), set.code().as_str()))
-        .collect();
-
-    rsx! {
-        CheckboxDropdown {
-            picker_label: "Set",
-            option_ids: ids,
-            option_labels: labels,
-            selected: config.sets.clone(),
-            on_change: move |sets: Vec<usize>| {
-                let mut c = config.clone();
-                c.packs
-                    .retain(|&pid| {
-                        Pack::from_id(pid).is_some_and(|p| sets.contains(&p.set().id()))
-                    });
-                c.sets = sets;
-                on_change.call(c);
-            },
-        }
-    }
-}
-
-#[component]
-pub fn PackDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
-    let visible_packs: Vec<&Pack> = Pack::ALL
-        .iter()
-        .filter(|pack| {
-            let series_ok = config
-                .series
-                .map_or(true, |sid| pack.series().id() == sid);
-            let set_ok =
-                config.sets.is_empty() || config.sets.contains(&pack.set().id());
-            series_ok && set_ok
-        })
-        .collect();
-    let ids: Vec<usize> = visible_packs.iter().map(|p| p.id()).collect();
-    let labels: Vec<String> = visible_packs.iter().map(|p| p.title().to_string()).collect();
-
-    rsx! {
-        CheckboxDropdown {
-            picker_label: "Pack",
-            option_ids: ids,
-            option_labels: labels,
-            selected: config.packs.clone(),
-            on_change: move |packs: Vec<usize>| {
-                let mut c = config.clone();
-                c.packs = packs;
-                on_change.call(c);
-            },
-        }
-    }
-}
-
-#[component]
-pub fn SourceDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
-    let ids: Vec<usize> = CardSource::ALL.iter().map(|src| src.id()).collect();
-    let labels: Vec<String> = CardSource::ALL
-        .iter()
-        .map(|src| src.name().as_str().to_string())
-        .collect();
-
-    rsx! {
-        CheckboxDropdown {
-            picker_label: "Source",
-            option_ids: ids,
-            option_labels: labels,
-            selected: config.sources.clone(),
-            on_change: move |sources: Vec<usize>| {
-                let mut c = config.clone();
-                c.sources = sources;
-                on_change.call(c);
-            },
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Generic multi-select dropdown with checkboxes
-// ---------------------------------------------------------------------------
-
-/// A labelled dropdown button that opens a checkbox list for multi-select filtering.
-///
-/// `option_ids` and `option_labels` are parallel vecs; indices must align.
-#[component]
-pub fn CheckboxDropdown(
+pub fn FilterDropdown(
     picker_label: &'static str,
-    option_ids: Vec<usize>,
-    option_labels: Vec<String>,
-    selected: Vec<usize>,
-    on_change: EventHandler<Vec<usize>>,
+    /// Number of selected items — shown as a badge on the trigger button.
+    count: usize,
+    children: Element,
 ) -> Element {
     let mut open = use_signal(|| false);
-    let count = selected.len();
 
     rsx! {
         div { class: "relative",
             button {
                 r#type: "button",
-                class: "flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border \
-                        border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 \
-                        text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700",
+                class: "flex items-center gap-1 px-2 py-1.5 rounded-md text-sm font-medium \
+                        bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 \
+                        text-gray-800 dark:text-gray-100",
                 onclick: move |_| open.toggle(),
-                "{picker_label}"
-                if count > 0 {
-                    span { class: "px-1.5 py-0.5 text-xs rounded-full bg-blue-600 text-white",
-                        "{count}"
+                span { class: "flex items-center gap-1",
+                    "{picker_label}"
+                    if count > 0 {
+                        span { class: "px-1.5 py-0.5 text-xs rounded-full bg-blue-600 text-white",
+                            "{count}"
+                        }
                     }
                 }
-                span { class: "text-gray-400 dark:text-gray-500",
+                span { class: "ml-1 text-gray-500 dark:text-gray-400 shrink-0",
                     if *open.read() {
                         "▲"
                     } else {
@@ -143,44 +44,48 @@ pub fn CheckboxDropdown(
             }
 
             if *open.read() {
-                // Dismiss backdrop
                 div {
                     class: "fixed inset-0 z-10",
                     onclick: move |_| open.set(false),
                 }
-
-                // Dropdown panel
-                div { class: "absolute left-0 top-full mt-1 z-20 max-h-64 overflow-y-auto \
+                div { class: "absolute left-0 top-full mt-1 z-20 max-h-80 overflow-y-auto \
                             rounded-md border border-gray-200 dark:border-gray-700 \
-                            bg-white dark:bg-gray-800 shadow-lg min-w-40",
-                    if option_ids.is_empty() {
-                        p { class: "px-3 py-2 text-sm text-gray-500 dark:text-gray-400",
-                            "No options"
-                        }
-                    } else {
-                        for i in 0..option_ids.len() {
-                            CheckboxRow {
-                                key: "{option_ids[i]}",
-                                id: option_ids[i],
-                                row_label: option_labels[i].clone(),
-                                checked: selected.contains(&option_ids[i]),
-                                all_selected: selected.clone(),
-                                on_change: on_change.clone(),
-                            }
-                        }
-                        if !selected.is_empty() {
-                            div { class: "border-t border-gray-100 dark:border-gray-700 p-1",
-                                button {
-                                    r#type: "button",
-                                    class: "w-full text-left px-2 py-1 text-xs rounded \
-                                            text-gray-500 dark:text-gray-400 \
-                                            hover:text-gray-700 dark:hover:text-gray-200",
-                                    onclick: move |_| on_change.call(Vec::new()),
-                                    "Clear all"
-                                }
-                            }
-                        }
-                    }
+                            bg-white dark:bg-gray-800 shadow-lg min-w-48 py-1",
+                    {children}
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Set dropdown — logo images, multi-select
+// ---------------------------------------------------------------------------
+
+#[component]
+pub fn SetDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+    let visible_sets: Vec<&Set> = Set::ALL
+        .iter()
+        .filter(|s| config.series.map_or(true, |sid| s.series().id() == sid))
+        .collect();
+    let count = config.sets.len();
+
+    rsx! {
+        FilterDropdown { picker_label: "Set", count,
+            for set in &visible_sets {
+                SetItem {
+                    key: "{set.id()}",
+                    set,
+                    config: config.clone(),
+                    on_change: on_change.clone(),
+                }
+            }
+            if !config.sets.is_empty() {
+                DropdownClearBtn {
+                    on_clear: {
+                        let c = config.clone();
+                        move |_| on_change.call(clear_sets(c.clone()))
+                    },
                 }
             }
         }
@@ -188,34 +93,228 @@ pub fn CheckboxDropdown(
 }
 
 #[component]
-pub fn CheckboxRow(
-    id: usize,
-    row_label: String,
-    checked: bool,
-    all_selected: Vec<usize>,
-    on_change: EventHandler<Vec<usize>>,
-) -> Element {
+fn SetItem(set: &'static Set, config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+    let id = set.id();
+    let checked = config.sets.contains(&id);
+    let row_cls = dropdown_row_cls(checked);
+
     rsx! {
-        label { class: "flex items-center gap-2 px-3 py-1.5 cursor-pointer \
-                    hover:bg-gray-50 dark:hover:bg-gray-700",
-            input {
-                r#type: "checkbox",
-                checked,
-                class: "rounded border-gray-300 dark:border-gray-600 text-blue-600 \
-                        focus:ring-blue-500",
-                onchange: move |evt| {
-                    let mut sel = all_selected.clone();
-                    if evt.checked() {
-                        if !sel.contains(&id) {
-                            sel.push(id);
-                        }
-                    } else {
-                        sel.retain(|&x| x != id);
-                    }
-                    on_change.call(sel);
-                },
+        div {
+            class: "{row_cls}",
+            onclick: move |_| on_change.call(toggle_set(config.clone(), id, checked)),
+            img {
+                src: "{set.logo()}",
+                alt: "{set.name()}",
+                class: "h-10 w-auto max-w-36 object-contain",
             }
-            span { class: "text-sm text-gray-700 dark:text-gray-300 select-none", "{row_label}" }
+            if checked {
+                span { class: "ml-auto pl-2 shrink-0 text-blue-500 dark:text-blue-400 font-bold",
+                    "✓"
+                }
+            }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Pack dropdown — logo images, multi-select
+// ---------------------------------------------------------------------------
+
+#[component]
+pub fn PackDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+    let visible_packs: Vec<&Pack> = Pack::ALL
+        .iter()
+        .filter(|p| {
+            let series_ok = config.series.map_or(true, |sid| p.series().id() == sid);
+            let set_ok = config.sets.is_empty() || config.sets.contains(&p.set().id());
+            series_ok && set_ok
+        })
+        .collect();
+    let count = config.packs.len();
+
+    rsx! {
+        FilterDropdown { picker_label: "Pack", count,
+            for pack in &visible_packs {
+                PackItem {
+                    key: "{pack.id()}",
+                    pack,
+                    config: config.clone(),
+                    on_change: on_change.clone(),
+                }
+            }
+            if !config.packs.is_empty() {
+                DropdownClearBtn {
+                    on_clear: {
+                        let c = config.clone();
+                        move |_| on_change.call(clear_packs(c.clone()))
+                    },
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn PackItem(
+    pack: &'static Pack,
+    config: FilterConfig,
+    on_change: EventHandler<FilterConfig>,
+) -> Element {
+    let id = pack.id();
+    let checked = config.packs.contains(&id);
+    let row_cls = dropdown_row_cls(checked);
+
+    rsx! {
+        div {
+            class: "{row_cls}",
+            onclick: move |_| on_change.call(toggle_pack(config.clone(), id, checked)),
+            img {
+                src: "{pack.logo()}",
+                alt: "{pack.title()}",
+                class: "h-10 w-auto max-w-36 object-contain",
+            }
+            if checked {
+                span { class: "ml-auto pl-2 shrink-0 text-blue-500 dark:text-blue-400 font-bold",
+                    "✓"
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Source dropdown — icon + name, multi-select
+// ---------------------------------------------------------------------------
+
+#[component]
+pub fn SourceDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> Element {
+    let count = config.sources.len();
+
+    rsx! {
+        FilterDropdown { picker_label: "Source", count,
+            for source in CardSource::ALL {
+                SourceItem {
+                    key: "{source.id()}",
+                    source,
+                    config: config.clone(),
+                    on_change: on_change.clone(),
+                }
+            }
+            if !config.sources.is_empty() {
+                DropdownClearBtn {
+                    on_clear: {
+                        let c = config.clone();
+                        move |_| on_change.call(clear_sources(c.clone()))
+                    },
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn SourceItem(
+    source: &'static CardSource,
+    config: FilterConfig,
+    on_change: EventHandler<FilterConfig>,
+) -> Element {
+    let id = source.id();
+    let checked = config.sources.contains(&id);
+    let row_cls = dropdown_row_cls(checked);
+
+    rsx! {
+        div {
+            class: "{row_cls}",
+            onclick: move |_| on_change.call(toggle_source(config.clone(), id, checked)),
+            img {
+                src: "{source.icon()}",
+                alt: "{source.name()}",
+                class: "h-5 w-5 object-contain shrink-0",
+            }
+            span { class: "text-sm text-gray-700 dark:text-gray-300", "{source.name()}" }
+            if checked {
+                span { class: "ml-auto pl-2 shrink-0 text-blue-500 dark:text-blue-400 font-bold",
+                    "✓"
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Shared row helpers
+// ---------------------------------------------------------------------------
+
+fn dropdown_row_cls(checked: bool) -> &'static str {
+    if checked {
+        "flex items-center gap-2 px-3 py-2 cursor-pointer select-none \
+         bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900"
+    } else {
+        "flex items-center gap-2 px-3 py-2 cursor-pointer select-none \
+         hover:bg-gray-50 dark:hover:bg-gray-700"
+    }
+}
+
+#[component]
+fn DropdownClearBtn(on_clear: EventHandler<MouseEvent>) -> Element {
+    rsx! {
+        div { class: "border-t border-gray-100 dark:border-gray-700 px-3 py-1.5",
+            button {
+                r#type: "button",
+                class: "text-xs text-gray-400 dark:text-gray-500 \
+                        hover:text-gray-600 dark:hover:text-gray-300",
+                onclick: move |e| on_clear.call(e),
+                "Clear"
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// State mutation helpers — kept outside RSX so dx fmt cannot corrupt them.
+// ---------------------------------------------------------------------------
+
+fn toggle_set(mut config: FilterConfig, id: usize, was_checked: bool) -> FilterConfig {
+    if was_checked {
+        config.sets.retain(|&x| x != id);
+        let sets = config.sets.clone();
+        config.packs.retain(|&pid| Pack::from_id(pid).map_or(false, |p| sets.contains(&p.set().id())));
+    } else {
+        config.sets.push(id);
+    }
+    config
+}
+
+fn toggle_pack(mut config: FilterConfig, id: usize, was_checked: bool) -> FilterConfig {
+    if was_checked {
+        config.packs.retain(|&x| x != id);
+    } else {
+        config.packs.push(id);
+    }
+    config
+}
+
+fn toggle_source(mut config: FilterConfig, id: usize, was_checked: bool) -> FilterConfig {
+    if was_checked {
+        config.sources.retain(|&x| x != id);
+    } else {
+        config.sources.push(id);
+    }
+    config
+}
+
+fn clear_sets(mut config: FilterConfig) -> FilterConfig {
+    config.sets.clear();
+    config.packs.clear();
+    config
+}
+
+fn clear_packs(mut config: FilterConfig) -> FilterConfig {
+    config.packs.clear();
+    config
+}
+
+fn clear_sources(mut config: FilterConfig) -> FilterConfig {
+    config.sources.clear();
+    config
 }
