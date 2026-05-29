@@ -242,7 +242,7 @@ All filters default to unset (no effect) unless the configuration overrides them
 
 The `SavedQueries` type in `ptcgp-db-core` (T07) must store a serializable representation of a filter configuration — coordinate the data shape between this component and T07.
 
-- [ ] **T14**
+- [x] **T14**
 
 ---
 
