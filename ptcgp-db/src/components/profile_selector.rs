@@ -75,6 +75,10 @@ pub fn ProfileSelector(#[props(default = false)] open_upward: bool) -> Element {
                             store,
                         }
                     }
+                    div { class: "px-3 pt-1 pb-0.5 border-t border-gray-100 dark:border-gray-700 \
+                                  text-xs text-gray-400 dark:text-gray-500",
+                        "Ctrl+Click to select multiple"
+                    }
                 }
             }
         }
