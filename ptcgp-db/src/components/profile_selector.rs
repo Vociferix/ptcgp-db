@@ -4,11 +4,12 @@ use crate::app::{AppStorage, schedule_save};
 
 /// Profile selector embedded in the navigation bar.
 ///
-/// Shows the active profile name(s) and opens a dropdown for switching profiles.
-/// Single-profile selection is the primary path (clicking a row); checkboxes enable multi-select.
+/// Regular click on a profile switches to only that profile and closes the menu.
+/// Ctrl+Click toggles a profile in or out of the active set for multi-profile
+/// aggregation.
 ///
-/// Set `open_upward` when the selector sits near the bottom of the viewport so the dropdown
-/// expands above the trigger instead of below it.
+/// Set `open_upward` when the selector sits near the bottom of the viewport so
+/// the dropdown expands above the trigger instead of below it.
 #[component]
 pub fn ProfileSelector(#[props(default = false)] open_upward: bool) -> Element {
     let store = use_context::<Signal<Option<ptcgp_db_core::ProfileStore<AppStorage>>>>();
@@ -52,7 +53,7 @@ pub fn ProfileSelector(#[props(default = false)] open_upward: bool) -> Element {
                 }
             }
 
-            // Dismiss overlay
+            // Dismiss backdrop
             if *open.read() {
                 div {
                     class: "fixed inset-0 z-10",
@@ -70,7 +71,6 @@ pub fn ProfileSelector(#[props(default = false)] open_upward: bool) -> Element {
                             key: "{name}",
                             name: name.clone(),
                             is_active: active_names.contains(&name),
-                            only_active: active_names.len() == 1 && active_names.contains(&name),
                             open,
                             store,
                         }
@@ -85,25 +85,21 @@ pub fn ProfileSelector(#[props(default = false)] open_upward: bool) -> Element {
 fn ProfileRow(
     name: String,
     is_active: bool,
-    only_active: bool,
     mut open: Signal<bool>,
     mut store: Signal<Option<ptcgp_db_core::ProfileStore<AppStorage>>>,
 ) -> Element {
     rsx! {
-        div { class: "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer \
+        div {
+            class: "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer \
                     hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-100",
-
-            // Checkbox: toggles this profile in/out of the active set
-            input {
-                r#type: "checkbox",
-                class: "shrink-0 accent-blue-500",
-                checked: is_active,
-                disabled: only_active,
-                onchange: {
-                    let name = name.clone();
-                    move |_| {
-                        let mut guard = store.write();
-                        let Some(ref mut s) = *guard else { return };
+            onclick: {
+                let name = name.clone();
+                move |e: MouseEvent| {
+                    let mut guard = store.write();
+                    let Some(ref mut s) = *guard else { return };
+                    if e.modifiers().ctrl() {
+                        // Ctrl+Click: toggle this profile in the multi-select set.
+                        // deactivate_profile is a no-op when it would leave the set empty.
                         if is_active {
                             let _ = s.deactivate_profile(&name);
                         } else {
@@ -111,19 +107,8 @@ fn ProfileRow(
                         }
                         drop(guard);
                         schedule_save();
-                    }
-                },
-            }
-
-            // Name: single-click selects only this profile
-            span {
-                class: "flex-1 truncate select-none",
-                onclick: {
-                    let name = name.clone();
-                    move |e| {
-                        e.stop_propagation();
-                        let mut guard = store.write();
-                        let Some(ref mut s) = *guard else { return };
+                    } else {
+                        // Regular click: switch to only this profile.
                         let others: Vec<String> = s
                             .active_profile_names()
                             .iter()
@@ -138,9 +123,17 @@ fn ProfileRow(
                         schedule_save();
                         open.set(false);
                     }
-                },
-                "{name}"
+                }
+            },
+            // Active indicator — checkmark for active profiles, blank space otherwise
+            span { class: "shrink-0 w-4 text-blue-500 dark:text-blue-400 font-bold",
+                if is_active {
+                    "✓"
+                } else {
+                    ""
+                }
             }
+            span { class: "flex-1 truncate select-none", "{name}" }
         }
     }
 }
