@@ -8,21 +8,22 @@ use ptcgp_db_core::save_data::FilterConfig;
 // The `open` signal is owned by the caller so each dropdown manages its own state.
 // ---------------------------------------------------------------------------
 
-const TRIGGER_CLS: &str = "flex items-center gap-1 px-2 py-1.5 rounded-md text-sm font-medium \
+const TRIGGER_CLS: &str = "flex items-center gap-1 px-2 h-10 rounded-md text-sm font-medium \
     bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 \
     text-gray-800 dark:text-gray-100";
 
 #[component]
-fn DropdownPanel(open: Signal<bool>, children: Element) -> Element {
+fn DropdownPanel(open: Signal<bool>, extra_cls: &'static str, children: Element) -> Element {
     rsx! {
         if *open.read() {
             div {
                 class: "fixed inset-0 z-10",
                 onclick: move |_| open.set(false),
             }
-            div { class: "absolute left-0 top-full mt-1 z-20 max-h-80 overflow-y-auto \
+            div { class: "absolute left-0 top-full mt-1 z-20 max-h-80 \
+                        overflow-y-auto overflow-x-hidden \
                         rounded-md border border-gray-200 dark:border-gray-700 \
-                        bg-white dark:bg-gray-800 shadow-lg min-w-48 py-1",
+                        bg-white dark:bg-gray-800 shadow-lg py-1 {extra_cls}",
                 {children}
             }
         }
@@ -60,7 +61,7 @@ pub fn SetDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                 if let Some(ref src) = single_icon_src {
                     img {
                         src: "{src}",
-                        class: "h-7 w-7 object-contain",
+                        class: "h-8 w-8 object-contain",
                         alt: "Set",
                     }
                 } else {
@@ -80,7 +81,7 @@ pub fn SetDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                 }
             }
 
-            DropdownPanel { open,
+            DropdownPanel { open, extra_cls: "w-64",
                 for set in &visible_sets {
                     SetItem {
                         key: "{set.id()}",
@@ -178,7 +179,7 @@ pub fn PackDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>)
                 }
             }
 
-            DropdownPanel { open,
+            DropdownPanel { open, extra_cls: "w-60",
                 for (set_id, pack_ids) in &groups {
                     PackGroup {
                         key: "{set_id}",
@@ -212,11 +213,11 @@ fn PackGroup(
     rsx! {
         if let Some(set) = Set::from_id(set_id) {
             div { class: "flex items-center gap-1.5 px-3 py-1 \
-                          bg-gray-50 dark:bg-gray-900 sticky top-0",
+                          bg-gray-50 dark:bg-gray-900",
                 img {
                     src: "{set.icon()}",
                     alt: "{set.code()}",
-                    class: "h-6 w-6 object-contain",
+                    class: "h-8 w-8 object-contain",
                 }
                 span { class: "text-xs font-semibold text-gray-400 dark:text-gray-500",
                     "{set.code()}"
@@ -291,7 +292,7 @@ pub fn SourceDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig
                 }
             }
 
-            DropdownPanel { open,
+            DropdownPanel { open, extra_cls: "min-w-48",
                 for source in CardSource::ALL {
                     SourceItem {
                         key: "{source.id()}",
