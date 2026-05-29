@@ -43,7 +43,7 @@ pub fn RarityGroup(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                         rarity,
                         active: config.rarities.contains(&rarity.id()),
                         config: config.clone(),
-                        on_change: on_change.clone(),
+                        on_change,
                     }
                 }
             }
@@ -119,7 +119,7 @@ pub fn ElementGroup(config: FilterConfig, on_change: EventHandler<FilterConfig>)
                         element,
                         active: config.elements.contains(&element.id()),
                         config: config.clone(),
-                        on_change: on_change.clone(),
+                        on_change,
                     }
                 }
             }

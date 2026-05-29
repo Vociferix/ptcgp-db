@@ -51,30 +51,27 @@ pub fn FilterToolbar(
             div { class: "flex flex-nowrap items-end gap-2",
                 // Name — always visible
                 div { class: "flex-shrink-0",
-                    NameFilter { config: config.clone(), on_change: on_change.clone() }
+                    NameFilter { config: config.clone(), on_change }
                 }
 
                 // Goal — Analysis mode only, always visible
                 if mode == FilterMode::Analysis {
                     div { class: "flex-shrink-0",
-                        GoalFilter {
-                            config: config.clone(),
-                            on_change: on_change.clone(),
-                        }
+                        GoalFilter { config: config.clone(), on_change }
                     }
                 }
 
                 // Set + Pack + Source — visible at sm+ (640px); hidden items appear in panel
                 div { class: "hidden sm:flex items-end gap-2",
-                    SetDropdown { config: config.clone(), on_change: on_change.clone() }
-                    PackDropdown { config: config.clone(), on_change: on_change.clone() }
-                    SourceDropdown { config: config.clone(), on_change: on_change.clone() }
+                    SetDropdown { config: config.clone(), on_change }
+                    PackDropdown { config: config.clone(), on_change }
+                    SourceDropdown { config: config.clone(), on_change }
                 }
 
                 // Series + Kind — visible at lg+ (1024px); hidden items appear in panel
                 div { class: "hidden lg:flex items-end gap-2",
-                    SeriesFilter { config: config.clone(), on_change: on_change.clone() }
-                    KindFilter { config: config.clone(), on_change: on_change.clone() }
+                    SeriesFilter { config: config.clone(), on_change }
+                    KindFilter { config: config.clone(), on_change }
                 }
 
                 // Advanced button — always visible, badge shows total active filter count
@@ -112,35 +109,20 @@ pub fn FilterToolbar(
                     // ── Primary filters hidden from the row at narrow widths ──
                     // Set/Pack/Source: not in primary row below sm — show here instead
                     div { class: "flex flex-col gap-3 sm:hidden",
-                        SetDropdown {
-                            config: config.clone(),
-                            on_change: on_change.clone(),
-                        }
-                        PackDropdown {
-                            config: config.clone(),
-                            on_change: on_change.clone(),
-                        }
-                        SourceDropdown {
-                            config: config.clone(),
-                            on_change: on_change.clone(),
-                        }
+                        SetDropdown { config: config.clone(), on_change }
+                        PackDropdown { config: config.clone(), on_change }
+                        SourceDropdown { config: config.clone(), on_change }
                     }
                     // Series/Kind: not in primary row below lg — show here instead
                     div { class: "flex flex-col gap-3 lg:hidden",
-                        SeriesFilter {
-                            config: config.clone(),
-                            on_change: on_change.clone(),
-                        }
-                        KindFilter {
-                            config: config.clone(),
-                            on_change: on_change.clone(),
-                        }
+                        SeriesFilter { config: config.clone(), on_change }
+                        KindFilter { config: config.clone(), on_change }
                     }
 
                     // ── Advanced filters (always in panel) ───────────────────
-                    RarityGroup { config: config.clone(), on_change: on_change.clone() }
-                    ElementGroup { config: config.clone(), on_change: on_change.clone() }
-                    StageFilter { config: config.clone(), on_change: on_change.clone() }
+                    RarityGroup { config: config.clone(), on_change }
+                    ElementGroup { config: config.clone(), on_change }
+                    StageFilter { config: config.clone(), on_change }
                     TriStateFilter {
                         filter_label: "Ex",
                         only_text: "Ex only",
@@ -148,7 +130,6 @@ pub fn FilterToolbar(
                         value: config.ex,
                         on_change: {
                             let config = config.clone();
-                            let on_change = on_change.clone();
                             move |v: Option<bool>| {
                                 let mut c = config.clone();
                                 c.ex = v;
@@ -163,7 +144,6 @@ pub fn FilterToolbar(
                         value: config.mega,
                         on_change: {
                             let config = config.clone();
-                            let on_change = on_change.clone();
                             move |v: Option<bool>| {
                                 let mut c = config.clone();
                                 c.mega = v;
@@ -178,7 +158,6 @@ pub fn FilterToolbar(
                         value: config.foil,
                         on_change: {
                             let config = config.clone();
-                            let on_change = on_change.clone();
                             move |v: Option<bool>| {
                                 let mut c = config.clone();
                                 c.foil = v;
@@ -194,7 +173,6 @@ pub fn FilterToolbar(
                             value: config.obtainable,
                             on_change: {
                                 let config = config.clone();
-                                let on_change = on_change.clone();
                                 move |v: Option<bool>| {
                                     let mut c = config.clone();
                                     c.obtainable = v;
@@ -205,10 +183,10 @@ pub fn FilterToolbar(
                     }
                     match &mode {
                         FilterMode::Catalog => rsx! {
-                            CountFilter { config: config.clone(), on_change: on_change.clone() }
+                            CountFilter { config: config.clone(), on_change }
                         },
                         FilterMode::Analysis => rsx! {
-                            AnyVersionFilter { config: config.clone(), on_change: on_change.clone() }
+                            AnyVersionFilter { config: config.clone(), on_change }
                         },
                     }
                 }
@@ -232,7 +210,7 @@ fn SeriesFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> 
                     active: config.series.is_none(),
                     target_id: None,
                     config: config.clone(),
-                    on_change: on_change.clone(),
+                    on_change,
                 }
                 for series in Series::ALL {
                     SeriesBtn {
@@ -241,7 +219,7 @@ fn SeriesFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> 
                         active: config.series == Some(series.id()),
                         target_id: Some(series.id()),
                         config: config.clone(),
-                        on_change: on_change.clone(),
+                        on_change,
                     }
                 }
             }
@@ -287,7 +265,7 @@ fn StageFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> E
                     active: config.stage.is_none(),
                     target_id: None,
                     config: config.clone(),
-                    on_change: on_change.clone(),
+                    on_change,
                 }
                 for stage in Stage::ALL {
                     StageBtn {
@@ -296,7 +274,7 @@ fn StageFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -> E
                         active: config.stage == Some(stage.id()),
                         target_id: Some(stage.id()),
                         config: config.clone(),
-                        on_change: on_change.clone(),
+                        on_change,
                     }
                 }
             }

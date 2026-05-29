@@ -41,7 +41,7 @@ pub fn SetDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
 
     let visible_sets: Vec<&Set> = Set::ALL
         .iter()
-        .filter(|s| config.series.map_or(true, |sid| s.series().id() == sid))
+        .filter(|s| config.series.is_none_or(|sid| s.series().id() == sid))
         .collect();
     let count = config.sets.len();
 
@@ -87,7 +87,7 @@ pub fn SetDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                         key: "{set.id()}",
                         set,
                         config: config.clone(),
-                        on_change: on_change.clone(),
+                        on_change,
                     }
                 }
                 if !config.sets.is_empty() {
@@ -149,7 +149,7 @@ pub fn PackDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>)
     // Build (set_id, [pack_ids]) groups preserving canonical order.
     let mut groups: Vec<(usize, Vec<usize>)> = Vec::new();
     for pack in Pack::ALL {
-        let series_ok = config.series.map_or(true, |sid| pack.series().id() == sid);
+        let series_ok = config.series.is_none_or(|sid| pack.series().id() == sid);
         let set_ok = config.sets.is_empty() || config.sets.contains(&pack.set().id());
         if !series_ok || !set_ok {
             continue;
@@ -190,7 +190,7 @@ pub fn PackDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig>)
                         set_id: *set_id,
                         pack_ids: pack_ids.clone(),
                         config: config.clone(),
-                        on_change: on_change.clone(),
+                        on_change,
                     }
                 }
                 if !config.packs.is_empty() {
@@ -231,7 +231,7 @@ fn PackGroup(
                     key: "{pack_id}",
                     pack,
                     config: config.clone(),
-                    on_change: on_change.clone(),
+                    on_change,
                 }
             }
         }
@@ -303,7 +303,7 @@ pub fn SourceDropdown(config: FilterConfig, on_change: EventHandler<FilterConfig
                         key: "{source.id()}",
                         source,
                         config: config.clone(),
-                        on_change: on_change.clone(),
+                        on_change,
                     }
                 }
                 if !config.sources.is_empty() {
@@ -387,7 +387,7 @@ fn toggle_set(mut config: FilterConfig, id: usize, was_checked: bool) -> FilterC
         let sets = config.sets.clone();
         config
             .packs
-            .retain(|&pid| Pack::from_id(pid).map_or(false, |p| sets.contains(&p.set().id())));
+            .retain(|&pid| Pack::from_id(pid).is_some_and(|p| sets.contains(&p.set().id())));
     } else {
         config.sets.push(id);
     }

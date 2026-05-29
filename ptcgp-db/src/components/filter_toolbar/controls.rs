@@ -49,21 +49,21 @@ pub fn KindFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) -
                     active: config.card_kind.is_none(),
                     target: None,
                     config: config.clone(),
-                    on_change: on_change.clone(),
+                    on_change,
                 }
                 KindBtn {
                     btn_label: "Pokémon",
                     active: config.card_kind == Some(CardKindFilter::Pokemon),
                     target: Some(CardKindFilter::Pokemon),
                     config: config.clone(),
-                    on_change: on_change.clone(),
+                    on_change,
                 }
                 KindBtn {
                     btn_label: "Trainer",
                     active: config.card_kind == Some(CardKindFilter::Trainer),
                     target: Some(CardKindFilter::Trainer),
                     config: config.clone(),
-                    on_change: on_change.clone(),
+                    on_change,
                 }
             }
         }
@@ -113,19 +113,19 @@ pub fn TriStateFilter(
                     btn_label: "Any",
                     active: value.is_none(),
                     target: None,
-                    on_change: on_change.clone(),
+                    on_change,
                 }
                 TriBtn {
                     btn_label: only_text,
                     active: value == Some(true),
                     target: Some(true),
-                    on_change: on_change.clone(),
+                    on_change,
                 }
                 TriBtn {
                     btn_label: exclude_text,
                     active: value == Some(false),
                     target: Some(false),
-                    on_change: on_change.clone(),
+                    on_change,
                 }
             }
         }
@@ -164,7 +164,6 @@ pub fn CountFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
     };
     let has_count = config.owned_count.is_some();
     let config_for_op = config.clone();
-    let on_change_for_op = on_change.clone();
 
     rsx! {
         div { class: "flex flex-col gap-0.5",
@@ -177,7 +176,7 @@ pub fn CountFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                         op: "",
                         n,
                         config: config_for_op.clone(),
-                        on_change: on_change_for_op.clone(),
+                        on_change,
                     }
                     CountOpBtn {
                         btn_label: "= N",
@@ -185,7 +184,7 @@ pub fn CountFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                         op: "eq",
                         n,
                         config: config_for_op.clone(),
-                        on_change: on_change_for_op.clone(),
+                        on_change,
                     }
                     CountOpBtn {
                         btn_label: "< N",
@@ -193,7 +192,7 @@ pub fn CountFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                         op: "lt",
                         n,
                         config: config_for_op.clone(),
-                        on_change: on_change_for_op.clone(),
+                        on_change,
                     }
                     CountOpBtn {
                         btn_label: "≥ N",
@@ -201,7 +200,7 @@ pub fn CountFilter(config: FilterConfig, on_change: EventHandler<FilterConfig>) 
                         op: "gte",
                         n,
                         config: config_for_op,
-                        on_change: on_change_for_op,
+                        on_change,
                     }
                 }
                 if has_count {
