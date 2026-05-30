@@ -43,7 +43,7 @@ pub struct ProfilesSaveData {
     /// in [`profiles`](Self::profiles) whenever profiles is non-empty. Deserialized with a
     /// default of empty so that save files written before this field was added can be loaded
     /// cleanly; [`ProfileStore`](crate::ProfileStore) fills in the primary profile when empty.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub active_profile_names: Vec<String>,
 }
 
