@@ -298,6 +298,29 @@ mod tests {
         assert!(card_pull_rate(pack, card_id) > Prob::ZERO);
     }
 
+    #[test]
+    fn pull_data_logic_non_zero_for_pack_cards() {
+        // Mirrors the pull_data() OnceLock init in catalog.rs.
+        let mut found_non_zero = false;
+        for cv in CardVersion::ALL.iter() {
+            let best = cv
+                .packs()
+                .iter()
+                .filter(|p| !p.set().is_promo())
+                .filter_map(|p| {
+                    let rate = card_pull_rate(p, cv.id());
+                    if rate > Prob::ZERO { Some(rate.as_f64() * 100.0) } else { None }
+                })
+                .reduce(f64::max);
+            if let Some(pct) = best {
+                assert!(pct > 0.0, "cv {} has non-ZERO rate but as_f64()*100 = {}", cv.id(), pct);
+                found_non_zero = true;
+                break;
+            }
+        }
+        assert!(found_non_zero, "no pack card had a non-zero rate — pull_data logic is broken");
+    }
+
     // ---------------------------------------------------------------------------
     // desired_pull_rate
     // ---------------------------------------------------------------------------

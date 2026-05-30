@@ -32,12 +32,23 @@ fn pull_data() -> &'static [CardPullData] {
                     .filter(|p| !p.set().is_promo())
                     .filter_map(|p| {
                         let rate = card_pull_rate(p, cv.id());
-                        if rate > Prob::ZERO { Some((rate.as_f64() * 100.0, p)) } else { None }
+                        if rate > Prob::ZERO {
+                            let pct = rate.numerator() as f64 / rate.denominator() as f64 * 100.0;
+                            Some((pct, p))
+                        } else {
+                            None
+                        }
                     })
                     .max_by(|(a, _), (b, _)| a.total_cmp(b));
                 match best {
-                    Some((rate_pct, pack)) => CardPullData { rate_pct, best_pack: Some(pack) },
-                    None => CardPullData { rate_pct: 0.0, best_pack: None },
+                    Some((rate_pct, pack)) => CardPullData {
+                        rate_pct,
+                        best_pack: Some(pack),
+                    },
+                    None => CardPullData {
+                        rate_pct: 0.0,
+                        best_pack: None,
+                    },
                 }
             })
             .collect()
@@ -55,7 +66,6 @@ enum SortColumn {
     Name,
     OwnedCount,
     Rarity,
-    Element,
     PullRate,
 }
 
@@ -98,7 +108,8 @@ fn passes_filter(
     store: &ProfileStore<AppStorage>,
     today: NaiveDate,
 ) -> bool {
-    if settings.ignore_unobtainable_sets() && cv.set().retirement_date().is_some_and(|d| d <= today) {
+    if settings.ignore_unobtainable_sets() && cv.set().retirement_date().is_some_and(|d| d <= today)
+    {
         return false;
     }
     if settings.ignore_premium_mission() && cv.source().name().as_str() == "Premium Mission" {
@@ -186,7 +197,9 @@ fn passes_filter(
 // ---------------------------------------------------------------------------
 
 fn element_tint_class(cv: &CardVersion) -> &'static str {
-    let Some(pkmn) = cv.card().pokemon() else { return "" };
+    let Some(pkmn) = cv.card().pokemon() else {
+        return "";
+    };
     let name = pkmn.element().name();
     match name.as_str() {
         "Grass" => "bg-element-grass/10",
@@ -204,7 +217,9 @@ fn element_tint_class(cv: &CardVersion) -> &'static str {
 }
 
 fn element_color_hex(cv: &CardVersion) -> &'static str {
-    let Some(pkmn) = cv.card().pokemon() else { return "#6b7280" };
+    let Some(pkmn) = cv.card().pokemon() else {
+        return "#6b7280";
+    };
     let name = pkmn.element().name();
     match name.as_str() {
         "Grass" => "#4ade80",
@@ -273,7 +288,7 @@ fn do_set_count(cv_id: usize, new_count: u32, mut store: Signal<Option<ProfileSt
 // Virtual-list + scroll helpers
 // ---------------------------------------------------------------------------
 
-const ITEM_HEIGHT: f64 = 64.0;
+const ITEM_HEIGHT: f64 = 88.0;
 const SCROLL_BUFFER: usize = 8;
 const SCROLL_CONTAINER_ID: &str = "ptcgp-catalog-vlist";
 
@@ -282,9 +297,7 @@ fn handle_scroll(mut scroll_top: Signal<f64>, mut scroll_pending: Signal<bool>) 
         return;
     }
     scroll_pending.set(true);
-    let script = format!(
-        "dioxus.send(document.getElementById('{SCROLL_CONTAINER_ID}').scrollTop)"
-    );
+    let script = format!("dioxus.send(document.getElementById('{SCROLL_CONTAINER_ID}').scrollTop)");
     let _ = spawn(async move {
         let mut e = document::eval(&script);
         if let Ok(v) = e.recv::<f64>().await {
@@ -307,7 +320,10 @@ fn handle_sort_click(col: SortColumn, mut sort_cfg: Signal<SortConfig>) {
     if sc.column == col {
         sc.dir = sc.dir.toggle();
     } else {
-        *sc = SortConfig { column: col, dir: SortDir::Asc };
+        *sc = SortConfig {
+            column: col,
+            dir: SortDir::Asc,
+        };
     }
 }
 
@@ -357,21 +373,31 @@ pub fn CatalogPage() -> Element {
                     .name()
                     .as_str()
                     .cmp(CardVersion::ALL[b].card().name().as_str());
-                if sc.dir == SortDir::Asc { n.then(a.cmp(&b)) } else { n.reverse().then(a.cmp(&b)) }
+                if sc.dir == SortDir::Asc {
+                    n.then(a.cmp(&b))
+                } else {
+                    n.reverse().then(a.cmp(&b))
+                }
             }),
             SortColumn::OwnedCount => ids.sort_by(|&a, &b| {
                 let n = s.aggregate_count(a).cmp(&s.aggregate_count(b));
-                if sc.dir == SortDir::Asc { n.then(a.cmp(&b)) } else { n.reverse().then(a.cmp(&b)) }
+                if sc.dir == SortDir::Asc {
+                    n.then(a.cmp(&b))
+                } else {
+                    n.reverse().then(a.cmp(&b))
+                }
             }),
             SortColumn::Rarity => ids.sort_by(|&a, &b| {
-                let n = CardVersion::ALL[a].rarity().class().id().cmp(&CardVersion::ALL[b].rarity().class().id());
-                if sc.dir == SortDir::Asc { n.then(a.cmp(&b)) } else { n.reverse().then(a.cmp(&b)) }
-            }),
-            SortColumn::Element => ids.sort_by(|&a, &b| {
-                let ea = CardVersion::ALL[a].card().pokemon().map(|p| p.element().id()).unwrap_or(usize::MAX);
-                let eb = CardVersion::ALL[b].card().pokemon().map(|p| p.element().id()).unwrap_or(usize::MAX);
-                let n = ea.cmp(&eb);
-                if sc.dir == SortDir::Asc { n.then(a.cmp(&b)) } else { n.reverse().then(a.cmp(&b)) }
+                let n = CardVersion::ALL[a]
+                    .rarity()
+                    .class()
+                    .id()
+                    .cmp(&CardVersion::ALL[b].rarity().class().id());
+                if sc.dir == SortDir::Asc {
+                    n.then(a.cmp(&b))
+                } else {
+                    n.reverse().then(a.cmp(&b))
+                }
             }),
             SortColumn::PullRate => {
                 let pd = pull_data();
@@ -384,7 +410,11 @@ pub fn CatalogPage() -> Element {
                         (false, true) => std::cmp::Ordering::Less,
                         _ => {
                             let n = ra.total_cmp(&rb);
-                            if sc.dir == SortDir::Asc { n.then(a.cmp(&b)) } else { n.reverse().then(a.cmp(&b)) }
+                            if sc.dir == SortDir::Asc {
+                                n.then(a.cmp(&b))
+                            } else {
+                                n.reverse().then(a.cmp(&b))
+                            }
                         }
                     }
                 });
@@ -414,7 +444,10 @@ pub fn CatalogPage() -> Element {
     let end_idx = (((st + ch) / ITEM_HEIGHT) as usize + SCROLL_BUFFER + 1).min(total);
     let offset_px = start_idx as f64 * ITEM_HEIGHT;
 
-    let multi_active = store.read().as_ref().is_some_and(|s| s.active_profile_names().len() > 1);
+    let multi_active = store
+        .read()
+        .as_ref()
+        .is_some_and(|s| s.active_profile_names().len() > 1);
 
     rsx! {
         div { class: "flex h-full",
@@ -461,7 +494,7 @@ pub fn CatalogPage() -> Element {
             }
 
             // ── Detail panel (md+ only) ──────────────────────────────────────
-            div { class: "hidden md:flex flex-col w-72 xl:w-80 shrink-0 border-l border-gray-200 dark:border-gray-700",
+            div { class: "hidden md:flex flex-col w-80 xl:w-96 shrink-0 border-l border-gray-200 dark:border-gray-700",
                 DetailPanel { cv_id: selected }
             }
         }
@@ -477,7 +510,7 @@ fn SortHeader(sort_cfg: Signal<SortConfig>) -> Element {
     rsx! {
         div { class: "flex items-center shrink-0 px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 gap-2",
             // Thumbnail placeholder column
-            div { class: "w-10 shrink-0" }
+            div { class: "w-14 shrink-0" }
             // Code + Name
             SortBtn {
                 col: SortColumn::Name,
@@ -492,13 +525,6 @@ fn SortHeader(sort_cfg: Signal<SortConfig>) -> Element {
                 sort_cfg,
                 flex_class: "w-14 text-center",
             }
-            // Element
-            SortBtn {
-                col: SortColumn::Element,
-                label: "Element",
-                sort_cfg,
-                flex_class: "hidden sm:block w-16 text-center",
-            }
             // Pull rate
             SortBtn {
                 col: SortColumn::PullRate,
@@ -511,7 +537,7 @@ fn SortHeader(sort_cfg: Signal<SortConfig>) -> Element {
                 col: SortColumn::OwnedCount,
                 label: "Owned",
                 sort_cfg,
-                flex_class: "w-24 text-right",
+                flex_class: "w-28 text-right",
             }
         }
     }
@@ -565,14 +591,21 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
         let s = s.as_ref();
         let agg = s.map_or(0, |s| s.aggregate_count(cv_id));
         let merged = if merge {
-            cv.duplicates().iter().fold(agg, |acc, d| acc.saturating_add(s.map_or(0, |s| s.aggregate_count(d.id()))))
+            cv.duplicates().iter().fold(agg, |acc, d| {
+                acc.saturating_add(s.map_or(0, |s| s.aggregate_count(d.id())))
+            })
         } else {
             agg
         };
         let stored = if multi_active {
             agg
         } else {
-            s.and_then(|s| s.active_profile_names().first().map(|n| s.owned_count(n, cv_id))).unwrap_or(0)
+            s.and_then(|s| {
+                s.active_profile_names()
+                    .first()
+                    .map(|n| s.owned_count(n, cv_id))
+            })
+            .unwrap_or(0)
         };
         (merged, stored)
     };
@@ -589,15 +622,16 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
     } else {
         "N/A".to_string()
     };
-    let pull_title = pd.best_pack.map(|p| format!("{}", p.title())).unwrap_or_default();
+    let pull_title = pd
+        .best_pack
+        .map(|p| format!("{}", p.title()))
+        .unwrap_or_default();
 
     let set_code = cv.set().code();
     let number = cv.number().get();
     let name = cv.card().name();
     let rarity_icon = cv.rarity().class().icon();
     let card_image = cv.image();
-
-    let element_icon = cv.card().pokemon().map(|p| p.element().icon());
 
     rsx! {
         div {
@@ -610,7 +644,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                 src: "{card_image}",
                 alt: "",
                 loading: "lazy",
-                class: "w-9 h-14 object-cover rounded flex-shrink-0",
+                class: "w-14 h-20 object-cover rounded flex-shrink-0",
             }
 
             // Code + Name
@@ -632,17 +666,6 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                 }
             }
 
-            // Element icon (hidden on narrow)
-            div { class: "hidden sm:flex w-16 justify-center flex-shrink-0",
-                if let Some(icon) = element_icon {
-                    img {
-                        src: "{icon}",
-                        alt: "",
-                        class: "h-5 w-5 object-contain",
-                    }
-                }
-            }
-
             // Pull rate (hidden on narrow)
             div { class: "hidden sm:block w-14 text-right flex-shrink-0",
                 span {
@@ -653,7 +676,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
             }
 
             // Count spinner
-            div { class: "w-24 flex justify-end flex-shrink-0",
+            div { class: "w-28 flex justify-end flex-shrink-0",
                 CountSpinner {
                     value,
                     stored_count,
@@ -684,21 +707,31 @@ fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
 
     let cv = &CardVersion::ALL[id];
     let merge = settings.read().merge_duplicate_printings();
-    let multi_active = store.read().as_ref().is_some_and(|s| s.active_profile_names().len() > 1);
+    let multi_active = store
+        .read()
+        .as_ref()
+        .is_some_and(|s| s.active_profile_names().len() > 1);
 
     let (value, stored_count) = {
         let s = store.read();
         let s = s.as_ref();
         let agg = s.map_or(0, |s| s.aggregate_count(id));
         let merged = if merge {
-            cv.duplicates().iter().fold(agg, |acc, d| acc.saturating_add(s.map_or(0, |s| s.aggregate_count(d.id()))))
+            cv.duplicates().iter().fold(agg, |acc, d| {
+                acc.saturating_add(s.map_or(0, |s| s.aggregate_count(d.id())))
+            })
         } else {
             agg
         };
         let stored = if multi_active {
             agg
         } else {
-            s.and_then(|s| s.active_profile_names().first().map(|n| s.owned_count(n, id))).unwrap_or(0)
+            s.and_then(|s| {
+                s.active_profile_names()
+                    .first()
+                    .map(|n| s.owned_count(n, id))
+            })
+            .unwrap_or(0)
         };
         (merged, stored)
     };
