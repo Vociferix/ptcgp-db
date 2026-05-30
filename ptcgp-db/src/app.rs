@@ -137,12 +137,11 @@ pub fn App() -> Element {
     #[cfg(not(target_arch = "wasm32"))]
     use_drop(move || {
         let guard = store.read();
-        if let Some(s) = guard.as_ref() {
-            if s.needs_save() {
-                if let Err(e) = s.storage().save_profiles_sync(s.save_data_snapshot()) {
-                    tracing::error!("close-time save failed: {e}");
-                }
-            }
+        if let Some(s) = guard.as_ref()
+            && s.needs_save()
+            && let Err(e) = s.storage().save_profiles_sync(s.save_data_snapshot())
+        {
+            tracing::error!("close-time save failed: {e}");
         }
     });
 
