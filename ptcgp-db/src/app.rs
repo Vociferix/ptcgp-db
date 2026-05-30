@@ -132,6 +132,63 @@ pub fn App() -> Element {
         }
     });
 
+    // Desktop: save profile data synchronously on window close, before the component tears down.
+    // This covers the case where the debounce timer hasn't fired yet.
+    #[cfg(not(target_arch = "wasm32"))]
+    use_drop(move || {
+        let guard = store.read();
+        if let Some(s) = guard.as_ref()
+            && s.needs_save()
+            && let Err(e) = s.storage().save_profiles_sync(s.save_data_snapshot())
+        {
+            tracing::error!("close-time save failed: {e}");
+        }
+    });
+
+    // Web: save profile data when the page is hidden (tab closed, navigated away, etc.).
+    // The browser allows IndexedDB transactions started during `visibilitychange` to complete
+    // before tearing down the page, so this reliably covers debounce-window data loss.
+    #[cfg(target_arch = "wasm32")]
+    use_effect(move || {
+        use wasm_bindgen::prelude::*;
+
+        let Some(document) = web_sys::window().and_then(|w| w.document()) else {
+            return;
+        };
+
+        let closure = Closure::<dyn FnMut()>::new(move || {
+            let hidden = web_sys::window()
+                .and_then(|w| w.document())
+                .map(|d| d.visibility_state() == web_sys::VisibilityState::Hidden)
+                .unwrap_or(false);
+            if !hidden {
+                return;
+            }
+
+            let guard = store.read();
+            let Some(s) = guard.as_ref() else { return };
+            if !s.needs_save() {
+                return;
+            }
+            let storage = s.storage().clone();
+            let data = s.save_data_snapshot().clone();
+            drop(guard);
+
+            wasm_bindgen_futures::spawn_local(async move {
+                if let Err(e) = storage.save_profiles(&data).await {
+                    tracing::error!("visibility-change save failed: {e}");
+                }
+            });
+        });
+
+        document
+            .add_event_listener_with_callback("visibilitychange", closure.as_ref().unchecked_ref())
+            .unwrap_or_else(|_| tracing::error!("failed to register visibilitychange listener"));
+
+        // Intentional leak: the listener must live for the entire app lifetime.
+        closure.forget();
+    });
+
     // Apply .dark class to <html> based on theme setting.
     use_effect(move || {
         let theme = settings.read().theme();
