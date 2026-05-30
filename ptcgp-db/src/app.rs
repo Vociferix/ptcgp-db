@@ -183,10 +183,7 @@ pub fn App() -> Element {
         });
 
         document
-            .add_event_listener_with_callback(
-                "visibilitychange",
-                closure.as_ref().unchecked_ref(),
-            )
+            .add_event_listener_with_callback("visibilitychange", closure.as_ref().unchecked_ref())
             .unwrap_or_else(|_| tracing::error!("failed to register visibilitychange listener"));
 
         // Intentional leak: the listener must live for the entire app lifetime.

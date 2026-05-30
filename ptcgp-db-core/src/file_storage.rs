@@ -103,10 +103,7 @@ impl FileStorage {
     ///
     /// Intended for close-time saves from non-async contexts (e.g. `use_drop`). Internally
     /// identical to [`Storage::save_profiles`] — the async wrapper adds no I/O of its own.
-    pub fn save_profiles_sync(
-        &self,
-        data: &ProfilesSaveData,
-    ) -> Result<(), FileStorageError> {
+    pub fn save_profiles_sync(&self, data: &ProfilesSaveData) -> Result<(), FileStorageError> {
         self.save(FILE_PROFILES, data)
     }
 }
