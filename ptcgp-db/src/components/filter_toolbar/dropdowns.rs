@@ -1,3 +1,4 @@
+use crate::components::icons::{Check, ChevronDown, ChevronUp};
 use dioxus::prelude::*;
 use ptcgp_db_data::{CardSource, Pack, Set};
 
@@ -73,12 +74,10 @@ pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
                         "{count}"
                     }
                 }
-                span { class: "text-gray-500 dark:text-gray-400",
-                    if *open.read() {
-                        "▲"
-                    } else {
-                        "▼"
-                    }
+                if *open.read() {
+                    ChevronUp { class: "w-4 h-4 text-gray-500 dark:text-gray-400" }
+                } else {
+                    ChevronDown { class: "w-4 h-4 text-gray-500 dark:text-gray-400" }
                 }
             }
 
@@ -126,8 +125,8 @@ fn SetItem(set: &'static Set, checked: bool, config: Signal<FilterConfig>) -> El
                 class: "h-10 w-auto max-w-32 object-contain",
             }
             if checked {
-                span { class: "ml-auto pl-2 shrink-0 text-blue-500 dark:text-blue-400 font-bold",
-                    "✓"
+                span { class: "ml-auto pl-2 shrink-0",
+                    Check { class: "w-4 h-4 text-blue-500 dark:text-blue-400" }
                 }
             }
         }
@@ -176,12 +175,10 @@ pub fn PackDropdown(config: Signal<FilterConfig>) -> Element {
                         "{count}"
                     }
                 }
-                span { class: "text-gray-500 dark:text-gray-400",
-                    if *open.read() {
-                        "▲"
-                    } else {
-                        "▼"
-                    }
+                if *open.read() {
+                    ChevronUp { class: "w-4 h-4 text-gray-500 dark:text-gray-400" }
+                } else {
+                    ChevronDown { class: "w-4 h-4 text-gray-500 dark:text-gray-400" }
                 }
             }
 
@@ -247,8 +244,8 @@ fn PackItem(pack: &'static Pack, checked: bool, config: Signal<FilterConfig>) ->
                 class: "h-14 w-auto max-w-40 object-contain",
             }
             if checked {
-                span { class: "ml-auto pl-2 shrink-0 text-blue-500 dark:text-blue-400 font-bold",
-                    "✓"
+                span { class: "ml-auto pl-2 shrink-0",
+                    Check { class: "w-4 h-4 text-blue-500 dark:text-blue-400" }
                 }
             }
         }
@@ -278,12 +275,10 @@ pub fn SourceDropdown(config: Signal<FilterConfig>) -> Element {
                         "{count}"
                     }
                 }
-                span { class: "text-gray-500 dark:text-gray-400",
-                    if *open.read() {
-                        "▲"
-                    } else {
-                        "▼"
-                    }
+                if *open.read() {
+                    ChevronUp { class: "w-4 h-4 text-gray-500 dark:text-gray-400" }
+                } else {
+                    ChevronDown { class: "w-4 h-4 text-gray-500 dark:text-gray-400" }
                 }
             }
 
@@ -320,8 +315,8 @@ fn SourceItem(source: &'static CardSource, checked: bool, config: Signal<FilterC
             }
             span { class: "text-sm text-gray-700 dark:text-gray-300", "{source.name()}" }
             if checked {
-                span { class: "ml-auto pl-2 shrink-0 text-blue-500 dark:text-blue-400 font-bold",
-                    "✓"
+                span { class: "ml-auto pl-2 shrink-0",
+                    Check { class: "w-4 h-4 text-blue-500 dark:text-blue-400" }
                 }
             }
         }

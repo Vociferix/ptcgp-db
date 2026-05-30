@@ -6,6 +6,7 @@ use controls::{AnyVersionFilter, CountFilter, GoalFilter, KindFilter, NameFilter
 use dropdowns::{PackDropdown, SetDropdown, SourceDropdown};
 use pickers::{ElementGroup, RarityGroup};
 
+use crate::components::icons::Bars3;
 use dioxus::prelude::*;
 use ptcgp_db_core::AppSettings;
 use ptcgp_db_core::save_data::FilterConfig;
@@ -87,7 +88,7 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                             text-xs font-medium text-gray-600 dark:text-gray-300 \
                             bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600",
                     onclick: move |_| panel_open.toggle(),
-                    "☰"
+                    Bars3 { class: "w-5 h-5" }
                     if total_active > 0 {
                         span { class: "px-1.5 py-0.5 text-xs rounded-full bg-blue-600 text-white",
                             "{total_active}"
