@@ -30,6 +30,8 @@ jobs:
           submodules: recursive
       - name: Compute submodule hash
         run: echo "SUBMODULE_HASH=$(git submodule status | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -54,6 +56,8 @@ jobs:
           submodules: recursive
       - name: Compute submodule hash
         run: echo "SUBMODULE_HASH=$(git submodule status | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
