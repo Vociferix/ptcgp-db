@@ -238,6 +238,27 @@ impl<S: Storage + Clone> ProfileStore<S> {
         Ok(())
     }
 
+    /// Replaces all owned counts for an existing profile with `counts`.
+    ///
+    /// Zero-valued entries are stripped so the map stays compact (absent entries are
+    /// implicitly zero). The entire map is replaced atomically and the dirty flag is set.
+    /// Returns [`ProfileStoreError::NotFound`] if no profile with that name exists.
+    pub fn replace_profile_counts(
+        &mut self,
+        profile_name: &str,
+        counts: HashMap<CardVersionId, u32>,
+    ) -> Result<(), ProfileStoreError<S::Error>> {
+        let profile = self
+            .data
+            .profiles
+            .iter_mut()
+            .find(|p| p.name == profile_name)
+            .ok_or_else(|| ProfileStoreError::NotFound(profile_name.to_string()))?;
+        profile.owned_counts = counts.into_iter().filter(|(_, v)| *v > 0).collect();
+        self.dirty = true;
+        Ok(())
+    }
+
     // ------------------------------------------------------------------
     // Mutations — profile management
     // ------------------------------------------------------------------
@@ -748,6 +769,44 @@ mod tests {
         store.set_owned_count("Main", 0, 2).unwrap();
         store.set_owned_count("Alt", 0, 10).unwrap();
         assert_eq!(store.aggregate_count(0), 2);
+    }
+
+    // --- replace_profile_counts ---
+
+    #[test]
+    fn replace_counts_overwrites_existing_map() {
+        let mut store = store_with_profiles(&["Main"]);
+        store.set_owned_count("Main", 1, 5).unwrap();
+        store.set_owned_count("Main", 2, 3).unwrap();
+        store.dirty = false;
+
+        let new_counts = HashMap::from([(1usize, 10u32), (3, 7)]);
+        store.replace_profile_counts("Main", new_counts).unwrap();
+
+        assert_eq!(store.owned_count("Main", 1), 10);
+        assert_eq!(store.owned_count("Main", 2), 0); // removed
+        assert_eq!(store.owned_count("Main", 3), 7);
+        assert!(store.needs_save());
+    }
+
+    #[test]
+    fn replace_counts_strips_zeros() {
+        let mut store = store_with_profiles(&["Main"]);
+        let counts = HashMap::from([(1usize, 0u32), (2, 5)]);
+        store.replace_profile_counts("Main", counts).unwrap();
+
+        let profile = store.profiles().iter().find(|p| p.name == "Main").unwrap();
+        assert!(!profile.owned_counts.contains_key(&1));
+        assert_eq!(profile.owned_counts[&2], 5);
+    }
+
+    #[test]
+    fn replace_counts_nonexistent_fails() {
+        let mut store = store_with_profiles(&["Main"]);
+        let err = store
+            .replace_profile_counts("Ghost", HashMap::new())
+            .unwrap_err();
+        assert!(matches!(err, ProfileStoreError::NotFound(_)));
     }
 
     // --- load / save round-trip ---
