@@ -3,9 +3,9 @@
 //! All intermediate arithmetic uses [`Prob`] (exact rational arithmetic). Convert to [`f64`]
 //! or a percentage string only at final display time via [`Prob::as_f64`].
 //!
-//! Promo packs have no pull-rate slot data, so functions that operate on a specific [`Pack`]
-//! return [`Prob::ZERO`] for them implicitly. Callers that need to exclude promo packs for
-//! display or ranking purposes should filter on `pack.set().is_promo()` themselves.
+//! Promo packs have pull-rate slot data and are handled correctly by all functions. Callers
+//! that need to exclude promo packs for display or ranking purposes should filter on
+//! `pack.set().is_promo()` themselves.
 
 use std::collections::HashSet;
 
@@ -266,9 +266,9 @@ mod tests {
     // ---------------------------------------------------------------------------
 
     #[test]
-    fn card_pull_rate_promo_pack_returns_zero() {
-        // Promo packs have no slot data, so the product loop never runs and
-        // the accumulated total stays at ZERO.
+    fn card_pull_rate_promo_pack_present_card_is_positive() {
+        // Promo packs have real slot data; the function computes the correct rate.
+        // Callers that want to suppress promo packs filter on pack.set().is_promo().
         let pack = first_promo_pack();
         let card_id = pack
             .card_versions()
@@ -276,7 +276,7 @@ mod tests {
             .next()
             .map(|c| c.id())
             .expect("promo pack has at least one card");
-        assert_eq!(card_pull_rate(pack, card_id), Prob::ZERO);
+        assert!(card_pull_rate(pack, card_id) > Prob::ZERO);
     }
 
     #[test]
@@ -309,11 +309,11 @@ mod tests {
     }
 
     #[test]
-    fn desired_pull_rate_promo_pack_returns_zero() {
-        // Promo packs have no slot data, so the product loop never runs and
-        // the accumulated total stays at ZERO.
+    fn desired_pull_rate_promo_pack_all_desired_is_positive() {
+        // Promo packs have real slot data; the function computes the correct rate.
+        // Callers that want to suppress promo packs filter on pack.set().is_promo().
         let pack = first_promo_pack();
-        assert_eq!(desired_pull_rate(pack, |_| true), Prob::ZERO);
+        assert!(desired_pull_rate(pack, |_| true) > Prob::ZERO);
     }
 
     #[test]
