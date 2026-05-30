@@ -31,7 +31,8 @@ fn do_export(store: Signal<Option<ProfileStore<AppStorage>>>) {
         .read()
         .as_ref()
         .map(|s| s.save_data_snapshot().clone());
-    let Some(data) = snapshot else { return };
+    let Some(mut data) = snapshot else { return };
+    data.active_profile_names.clear();
     spawn(async move {
         let json = match serde_json::to_string_pretty(&data) {
             Ok(j) => j,
@@ -62,7 +63,8 @@ fn do_export(store: Signal<Option<ProfileStore<AppStorage>>>) {
         .read()
         .as_ref()
         .map(|s| s.save_data_snapshot().clone());
-    let Some(data) = snapshot else { return };
+    let Some(mut data) = snapshot else { return };
+    data.active_profile_names.clear();
     spawn(async move {
         let json = match serde_json::to_string_pretty(&data) {
             Ok(j) => j,
