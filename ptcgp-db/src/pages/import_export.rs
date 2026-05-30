@@ -265,10 +265,10 @@ fn import_trigger(
 // ---------------------------------------------------------------------------
 
 fn set_conflict_choice(mut import_step: Signal<ImportStep>, idx: usize, overwrite: bool) {
-    if let ImportStep::Resolving { conflicts, .. } = &mut *import_step.write() {
-        if let Some(c) = conflicts.get_mut(idx) {
-            c.1 = overwrite;
-        }
+    if let ImportStep::Resolving { conflicts, .. } = &mut *import_step.write()
+        && let Some(c) = conflicts.get_mut(idx)
+    {
+        c.1 = overwrite;
     }
 }
 
