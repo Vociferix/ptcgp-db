@@ -10,6 +10,7 @@ workspace = true
 dioxus = { version = "0.7", features = ["router"] }
 ptcgp-db-core = { path = "../ptcgp-db-core" }
 ptcgp-db-data = { path = "../ptcgp-db-data", features = ["images"] }
+chrono = { version = "0.4", features = ["wasmbind"] }
 futures-channel = "0.3"
 futures-util = "0.3"
 serde_json = "1"
