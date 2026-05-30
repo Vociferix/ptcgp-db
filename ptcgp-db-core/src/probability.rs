@@ -43,7 +43,8 @@ pub fn card_pull_rate(pack: &Pack, card_id: CardVersionId) -> Prob {
                 }
             }
         }
-        total = (total + (Prob::ONE.saturating_sub(&not_prob) * variant.pull_rate())).min(Prob::ONE);
+        total =
+            (total + (Prob::ONE.saturating_sub(&not_prob) * variant.pull_rate())).min(Prob::ONE);
     }
     total
 }
@@ -76,7 +77,8 @@ pub fn desired_pull_rate(pack: &Pack, is_desired: impl Fn(CardVersionId) -> bool
             }
             not_prob *= Prob::ONE.saturating_sub(&slot_sum);
         }
-        total = (total + (Prob::ONE.saturating_sub(&not_prob) * variant.pull_rate())).min(Prob::ONE);
+        total =
+            (total + (Prob::ONE.saturating_sub(&not_prob) * variant.pull_rate())).min(Prob::ONE);
     }
     total
 }

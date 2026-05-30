@@ -377,15 +377,21 @@ fn packs(state: &mut State) -> Result<()> {
         match Ord::cmp(&l.set_id, &r.set_id) {
             std::cmp::Ordering::Less => return std::cmp::Ordering::Less,
             std::cmp::Ordering::Greater => return std::cmp::Ordering::Greater,
-            _ => {},
+            _ => {}
         }
 
         if !state.data.sets[l.set_id].is_promo {
             return Ord::cmp(&l.subtitle_id, &r.subtitle_id);
         }
 
-        let l_vol = state.data.pack_subtitles[l.subtitle_id].trim_start_matches("Vol ").parse::<u32>().unwrap_or(0);
-        let r_vol = state.data.pack_subtitles[r.subtitle_id].trim_start_matches("Vol ").parse::<u32>().unwrap_or(0);
+        let l_vol = state.data.pack_subtitles[l.subtitle_id]
+            .trim_start_matches("Vol ")
+            .parse::<u32>()
+            .unwrap_or(0);
+        let r_vol = state.data.pack_subtitles[r.subtitle_id]
+            .trim_start_matches("Vol ")
+            .parse::<u32>()
+            .unwrap_or(0);
         Ord::cmp(&l_vol, &r_vol)
     });
 
