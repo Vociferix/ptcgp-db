@@ -324,34 +324,38 @@ page's "next pack to open" and the Analysis page.
 
 ### Per-Card Pull Rate for a Pack
 
-For a given non-promo pack and a target card (or set of cards), the aggregate pull rate is:
+For a given pack and a target card, the probability of obtaining that card from a single opening
+is:
 
 ```
-P(card from pack) =
+P(card appears in at least one slot) =
   sum over all variants v:
-    v.pull_rate() * sum over all slots s in v.slots():
-      card_rate(card, s)
+    v.pull_rate() × (1 - product over all slots s in v.slots():
+      (1 - card_rate(card, s)))
 ```
 
 Where `card_rate(card, s)` is the `Prob` from the `CardVersionPullRate` entry for `card` in
-`s.card_versions()`, or `Prob::ZERO` if the card is absent. All arithmetic uses `Prob` (exact
-rational arithmetic). Convert to a percentage only at final display time.
+`s.card_versions()`, or `Prob::ZERO` if the card is absent. The inner product is P(card misses
+every slot | variant v); subtracting from 1 gives P(card in at least one slot | variant v).
+Slots within a variant are independent draws. All arithmetic uses `Prob` (exact rational
+arithmetic). Convert to a percentage only at final display time.
 
 ### Probability of Pulling Any "Desired" Card
 
-For features like "next pack to open," the target is not one card but a set of desired cards
-(e.g., all unowned cards). Treat the set of desired cards as a union:
+For features like "next pack to open," the target is a set of desired cards (e.g., all unowned
+cards). The probability of obtaining at least one desired card from a single opening is:
 
 ```
-P(any desired card from pack) =
+P(at least one desired card) =
   sum over all variants v:
-    v.pull_rate() * sum over all slots s in v.slots():
-      sum over all desired cards c in s.card_versions():
-        c.pull_rate()
+    v.pull_rate() × (1 - product over all slots s in v.slots():
+      (1 - sum over all desired cards c in s.card_versions():
+        c.pull_rate()))
 ```
 
-This works because within any given slot, cards are mutually exclusive (only one card appears
-per slot).
+Within a single slot, cards are mutually exclusive (only one card appears per slot), so the
+inner sum is P(any desired card drawn in slot s). The product accumulates P(no desired card in
+any slot | variant v); subtracting from 1 gives a true probability in [0, 1].
 
 When the **Merge duplicate printings** setting is enabled, treat all versions within a duplicate
 group as a single card for the purpose of determining desired status. The combined count (sum

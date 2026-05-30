@@ -3,8 +3,9 @@
 //! All intermediate arithmetic uses [`Prob`] (exact rational arithmetic). Convert to [`f64`]
 //! or a percentage string only at final display time via [`Prob::as_f64`].
 //!
-//! **Promo packs are excluded from all calculations in this module.** Functions that operate
-//! on a specific [`Pack`] return [`Prob::ZERO`] when given a promo pack.
+//! Promo packs have no pull-rate slot data, so functions that operate on a specific [`Pack`]
+//! return [`Prob::ZERO`] for them implicitly. Callers that need to exclude promo packs for
+//! display or ranking purposes should filter on `pack.set().is_promo()` themselves.
 
 use std::collections::HashSet;
 
@@ -12,71 +13,70 @@ use ptcgp_db_data::{CardVersion, Pack, Prob};
 
 use crate::save_data::CardVersionId;
 
-/// Computes the aggregate pull probability for a single card version from a specific pack.
+/// Computes the probability ([0, 1]) that opening a specific pack will yield a specific card.
 ///
-/// Uses the formula from DESIGN.md §Per-Card Pull Rate for a Pack:
+/// Uses the following formula:
 /// ```text
-/// P = Σ_v [ v.pull_rate × Σ_s card_rate(card, s) ]
+/// P = Σ_v [ (1 - ∏_s [ 1 - card_rate(card, s) ]) × v.pull_rate ]
 /// ```
 /// where `card_rate(card, s)` is the `Prob` from the `CardVersionPullRate` entry for the card
 /// in slot `s`, or zero if the card does not appear in that slot.
+///
+/// The inner product `∏_s (1 - card_rate(s))` is the probability the card appears in *no* slot
+/// of variant `v`; subtracting from 1 gives P(card in at least one slot | variant v). Slots
+/// within a variant are independent draws, so the product is exact.
 ///
 /// **Performance note**: the innermost loop performs a linear scan over
 /// `PackSlot::card_versions()` (hundreds of entries per slot) for each of the ~2–4 variants
 /// and ~5–6 slots. For a single lookup this is negligible. A future optimization would be to
 /// store a per-card, per-pack precomputed rate directly in `ptcgp-db-data`, reducing each
 /// call to O(1). Profile before committing to that change.
-///
-/// Returns [`Prob::ZERO`] for promo packs.
 pub fn card_pull_rate(pack: &Pack, card_id: CardVersionId) -> Prob {
-    if pack.set().is_promo() {
-        return Prob::ZERO;
-    }
-
     let mut total = Prob::ZERO;
     for variant in pack.variants() {
-        let mut slot_sum = Prob::ZERO;
+        let mut not_prob = Prob::ONE;
         for slot in variant.slots() {
             for cvpr in slot.card_versions() {
                 if cvpr.card_version().id() == card_id {
-                    slot_sum += cvpr.pull_rate();
-                    break; // each card appears at most once per slot
+                    not_prob *= Prob::ONE.saturating_sub(&cvpr.pull_rate());
+                    break;
                 }
             }
         }
-        total += variant.pull_rate() * slot_sum;
+        total = (total + (Prob::ONE.saturating_sub(&not_prob) * variant.pull_rate())).min(Prob::ONE);
     }
     total
 }
 
-/// Applies the formula from DESIGN.md §Probability of Pulling Any "Desired" Card:
-/// ```text
-/// Σ_v [ v.pull_rate × Σ_s Σ_{desired c in s} c.pull_rate ]
-/// ```
-/// Within any given slot cards are mutually exclusive (only one card appears per slot), so
-/// individual desired-card rates sum correctly within a slot. Across multiple slots the result
-/// is the **expected number of desired cards drawn per opening** — technically not a probability
-/// (it can exceed 1 for packs with many slots and high desired-card coverage), but it is the
-/// correct value for ranking packs by best-to-open. Display it as a percentage as DESIGN.md
-/// directs; in practice for typical desired-card sets the value is well below 1.
+/// Computes the probability ([0, 1]) that opening a specific pack will yield at least one
+/// desired card.
 ///
-/// Returns [`Prob::ZERO`] for promo packs or when `is_desired` returns `false` for every card.
+/// Applies the following formula:
+/// ```text
+/// P = Σ_v [ (1 - ∏_s [ 1 - Σ_{desired c in s} c.pull_rate ]) × v.pull_rate ]
+/// ```
+///
+/// Within a single slot the desired-card rates sum to P(any desired card in that slot), since
+/// cards within a slot are mutually exclusive. The product `∏_s` accumulates the probability
+/// that *no* slot yields a desired card; subtracting from 1 gives P(at least one desired card |
+/// variant v). Results are in [0, 1].
+///
+/// Returns [`Prob::ZERO`] when `is_desired` returns `false` for every card, or when the pack
+/// has no slot data (e.g. promo packs).
 pub fn desired_pull_rate(pack: &Pack, is_desired: impl Fn(CardVersionId) -> bool) -> Prob {
-    if pack.set().is_promo() {
-        return Prob::ZERO;
-    }
-
     let mut total = Prob::ZERO;
     for variant in pack.variants() {
-        let mut slot_sum = Prob::ZERO;
+        let mut not_prob = Prob::ONE;
         for slot in variant.slots() {
+            let mut slot_sum = Prob::ZERO;
             for cvpr in slot.card_versions() {
                 if is_desired(cvpr.card_version().id()) {
                     slot_sum += cvpr.pull_rate();
                 }
             }
+            not_prob *= Prob::ONE.saturating_sub(&slot_sum);
         }
-        total += variant.pull_rate() * slot_sum;
+        total = (total + (Prob::ONE.saturating_sub(&not_prob) * variant.pull_rate())).min(Prob::ONE);
     }
     total
 }
@@ -85,9 +85,6 @@ pub fn desired_pull_rate(pack: &Pack, is_desired: impl Fn(CardVersionId) -> bool
 ///
 /// Iterates only the packs associated with this card version via `CardVersion::packs()` —
 /// all other packs have an implicit rate of zero for this card.
-///
-/// Returns [`Prob::ZERO`] if the card has no non-promo packs (promo cards or cards with a
-/// non-Pack source).
 pub fn max_card_pull_rate(card_id: CardVersionId) -> Prob {
     let Some(card) = CardVersion::from_id(card_id) else {
         return Prob::ZERO;
@@ -268,6 +265,8 @@ mod tests {
 
     #[test]
     fn card_pull_rate_promo_pack_returns_zero() {
+        // Promo packs have no slot data, so the product loop never runs and
+        // the accumulated total stays at ZERO.
         let pack = first_promo_pack();
         let card_id = pack
             .card_versions()
@@ -309,14 +308,21 @@ mod tests {
 
     #[test]
     fn desired_pull_rate_promo_pack_returns_zero() {
+        // Promo packs have no slot data, so the product loop never runs and
+        // the accumulated total stays at ZERO.
         let pack = first_promo_pack();
         assert_eq!(desired_pull_rate(pack, |_| true), Prob::ZERO);
     }
 
     #[test]
-    fn desired_pull_rate_all_desired_is_positive() {
+    fn desired_pull_rate_all_desired_equals_one() {
+        // With every card desired, each slot's desired-card rates sum to exactly 1.0
+        // (since all card rates in a slot sum to 1.0). The "not" probability for each
+        // slot is then 1 - 1 = 0, the product across slots is 0, and P(at least one
+        // desired) = 1 - 0 = 1.0 for every variant. Weighted sum across variants also
+        // equals 1.0.
         let pack = first_non_promo_pack();
-        assert!(desired_pull_rate(pack, |_| true) > Prob::ZERO);
+        assert_eq!(desired_pull_rate(pack, |_| true), Prob::ONE);
     }
 
     #[test]

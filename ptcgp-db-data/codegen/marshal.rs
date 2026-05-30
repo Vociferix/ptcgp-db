@@ -373,7 +373,21 @@ fn packs(state: &mut State) -> Result<()> {
         }
     }
 
-    packs.sort_by(|l, r| Ord::cmp(&(l.set_id, l.subtitle_id), &(r.set_id, r.subtitle_id)));
+    packs.sort_by(|l, r| {
+        match Ord::cmp(&l.set_id, &r.set_id) {
+            std::cmp::Ordering::Less => return std::cmp::Ordering::Less,
+            std::cmp::Ordering::Greater => return std::cmp::Ordering::Greater,
+            _ => {},
+        }
+
+        if !state.data.sets[l.set_id].is_promo {
+            return Ord::cmp(&l.subtitle_id, &r.subtitle_id);
+        }
+
+        let l_vol = state.data.pack_subtitles[l.subtitle_id].trim_start_matches("Vol ").parse::<u32>().unwrap_or(0);
+        let r_vol = state.data.pack_subtitles[r.subtitle_id].trim_start_matches("Vol ").parse::<u32>().unwrap_or(0);
+        Ord::cmp(&l_vol, &r_vol)
+    });
 
     packs.iter_mut().enumerate().for_each(|(id, pack)| {
         pack.id = id;
