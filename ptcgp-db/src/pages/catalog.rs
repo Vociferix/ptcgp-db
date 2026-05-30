@@ -744,6 +744,17 @@ fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
     let card_image = cv.image();
     let source_name = cv.source().name();
     let source_desc = cv.source().description();
+    let element_info = cv
+        .card()
+        .pokemon()
+        .map(|p| (p.element().icon(), p.element().name()));
+    let pd = &pull_data()[id];
+    let pull_label = if pd.rate_pct > 0.0 {
+        Some(format!("{:.2}%", pd.rate_pct))
+    } else {
+        None
+    };
+    let best_pack_title = pd.best_pack.map(|p| format!("{}", p.title()));
 
     rsx! {
         div { class: "flex flex-col h-full overflow-y-auto",
@@ -777,10 +788,35 @@ fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
                     span { class: "text-xs text-gray-500 dark:text-gray-400", "{rarity_name}" }
                 }
 
+                // Element type (Pokemon only)
+                if let Some((icon, ename)) = element_info {
+                    div { class: "flex items-center gap-2",
+                        img {
+                            src: "{icon}",
+                            alt: "",
+                            class: "h-5 w-5 object-contain",
+                        }
+                        span { class: "text-xs text-gray-500 dark:text-gray-400", "{ename}" }
+                    }
+                }
+
                 // Source (when not a regular Pack card)
                 if source_name.as_str() != "Pack" {
                     div { class: "text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded p-2",
                         "{source_desc}"
+                    }
+                }
+
+                // Pull rate (pack cards only)
+                if let Some(pct) = &pull_label {
+                    div { class: "flex flex-col gap-0.5",
+                        span { class: "text-xs text-gray-400 dark:text-gray-500", "Pull rate" }
+                        span { class: "text-sm text-gray-900 dark:text-gray-100", "{pct}" }
+                        if let Some(title) = &best_pack_title {
+                            span { class: "text-xs text-gray-400 dark:text-gray-500",
+                                "{title}"
+                            }
+                        }
                     }
                 }
 
