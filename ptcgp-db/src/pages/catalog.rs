@@ -32,13 +32,7 @@ fn pull_data() -> &'static [CardPullData] {
                     .filter(|p| !p.set().is_promo())
                     .filter_map(|p| {
                         let rate = card_pull_rate(p, cv.id());
-                        if rate > Prob::ZERO {
-                            // Avoid Prob::as_f64 which panics when shift >= 64 (large den).
-                            let pct = rate.numerator() as f64 / rate.denominator() as f64 * 100.0;
-                            Some((pct, p))
-                        } else {
-                            None
-                        }
+                        if rate > Prob::ZERO { Some((rate.as_f64() * 100.0, p)) } else { None }
                     })
                     .max_by(|(a, _), (b, _)| a.total_cmp(b));
                 match best {

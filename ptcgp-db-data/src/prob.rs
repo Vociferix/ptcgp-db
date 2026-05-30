@@ -96,7 +96,7 @@ impl Prob {
 
         // The result is scaled / 2^shift as an exact rational;
         // convert to f64 by multiplying by 2^-shift
-        (scaled as f64) / ((1u64 << shift) as f64)
+        (scaled as f64) / ((1u128 << shift) as f64)
     }
 
     const fn add_impl(&self, other: &Self) -> Self {
