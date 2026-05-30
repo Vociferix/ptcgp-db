@@ -204,6 +204,30 @@ onkeydown: move |evt| {
 },
 ```
 
+## Icons
+
+All icons use the SVG components in `components/icons.rs`, sourced from
+[Heroicons v2](https://heroicons.com/) outline set. Never use Unicode glyphs (▲, ▼, ☰, ✓, +, −,
+etc.) for UI icons — always use or add to the icon components.
+
+Currently available:
+
+| Component | Heroicons name | Used for |
+|-----------|---------------|---------|
+| `ChevronUp` | `chevron-up` | Dropdown open state |
+| `ChevronDown` | `chevron-down` | Dropdown closed state |
+| `Bars3` | `bars-3` | Filter panel toggle (hamburger) |
+| `Check` | `check` | Selected-item indicator |
+| `Plus` | `plus` | Count increment |
+| `Minus` | `minus` | Count decrement |
+
+Each component takes a `class: String` prop for Tailwind sizing and color (e.g.
+`class: "w-4 h-4 text-gray-500 dark:text-gray-400"`). Icons render at `currentColor` so
+text color classes control stroke color.
+
+To add a new icon: copy the SVG `path` `d` attribute from heroicons.com, add a component following
+the existing pattern in `icons.rs`, and add a row to this table.
+
 ## Shared components
 
 ### CountSpinner (`components/count_spinner.rs`)
