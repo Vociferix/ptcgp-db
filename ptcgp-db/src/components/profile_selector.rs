@@ -1,6 +1,6 @@
-use dioxus::prelude::*;
-
 use crate::app::{AppStorage, schedule_save};
+use crate::components::icons::{Check, ChevronDown, ChevronUp};
+use dioxus::prelude::*;
 
 /// Profile selector embedded in the navigation bar.
 ///
@@ -44,12 +44,10 @@ pub fn ProfileSelector(#[props(default = false)] open_upward: bool) -> Element {
                         text-gray-800 dark:text-gray-100 w-full",
                 onclick: move |_| open.toggle(),
                 span { class: "truncate flex-1 text-left", "{label}" }
-                span { class: "ml-1 text-gray-500 dark:text-gray-400 shrink-0",
-                    if *open.read() {
-                        "▲"
-                    } else {
-                        "▼"
-                    }
+                if *open.read() {
+                    ChevronUp { class: "ml-1 w-4 h-4 text-gray-500 dark:text-gray-400 shrink-0" }
+                } else {
+                    ChevronDown { class: "ml-1 w-4 h-4 text-gray-500 dark:text-gray-400 shrink-0" }
                 }
             }
 
@@ -133,11 +131,9 @@ fn ProfileRow(
                 }
             },
             // Active indicator — checkmark for active profiles, blank space otherwise
-            span { class: "shrink-0 w-4 text-blue-500 dark:text-blue-400 font-bold",
+            span { class: "shrink-0 w-4 h-4",
                 if is_active {
-                    "✓"
-                } else {
-                    ""
+                    Check { class: "w-4 h-4 text-blue-500 dark:text-blue-400" }
                 }
             }
             span { class: "flex-1 truncate select-none", "{name}" }

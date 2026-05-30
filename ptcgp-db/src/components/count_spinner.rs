@@ -1,3 +1,4 @@
+use crate::components::icons::{Minus, Plus};
 use dioxus::prelude::*;
 
 /// Owned-card count editor used in Card Catalog rows and Card Details.
@@ -73,7 +74,7 @@ pub fn CountSpinner(
                         on_change.call(stored_count.saturating_sub(1));
                     }
                 },
-                "−"
+                Minus { class: "w-4 h-4" }
             }
 
             // Numeric text input (not <input type="number"> — see DESIGN.md §Count Spinner)
@@ -129,7 +130,7 @@ pub fn CountSpinner(
                         on_change.call(stored_count.saturating_add(1));
                     }
                 },
-                "+"
+                Plus { class: "w-4 h-4" }
             }
         }
     }

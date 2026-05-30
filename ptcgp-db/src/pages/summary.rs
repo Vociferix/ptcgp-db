@@ -5,6 +5,7 @@ use ptcgp_db_core::{AppSettings, ProfileStore, completion, completion_merged, de
 use ptcgp_db_data::{CardVersion, Pack, Prob, Set};
 
 use crate::app::AppStorage;
+use crate::components::icons::{ChevronDown, ChevronUp};
 use crate::components::toggle::Toggle;
 
 // ---------------------------------------------------------------------------
@@ -126,9 +127,9 @@ fn SetCompletionRow(
                             class: "shrink-0 w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-gray-600 dark:hover:text-gray-200",
                             onclick: move |_| expanded.set(!expanded()),
                             if expanded() {
-                                "▲"
+                                ChevronUp { class: "w-4 h-4" }
                             } else {
-                                "▼"
+                                ChevronDown { class: "w-4 h-4" }
                             }
                         }
                     }
