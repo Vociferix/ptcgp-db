@@ -734,6 +734,15 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
     }
 }
 
+fn ordinal_suffix(n: usize) -> &'static str {
+    match n {
+        1 => "st",
+        2 => "nd",
+        3 => "rd",
+        _ => "th",
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Pull rate hierarchy: PullRateSection → PackPullBlock
 // ---------------------------------------------------------------------------
@@ -812,7 +821,7 @@ fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
                 div { class: "ml-6 flex flex-col gap-0.5",
                     div { class: "flex items-center gap-2",
                         span { class: "flex-1 text-xs text-gray-600 dark:text-gray-400",
-                            "{vname} · {vpct:.3}% of opens"
+                            "{vname} · {vpct:.3}% of packs"
                         }
                         span { class: "text-xs tabular-nums text-gray-700 dark:text-gray-300",
                             "{cpct:.3}%"
@@ -822,7 +831,7 @@ fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
                     for (pull_num, slot_pct) in slots {
                         div { class: "ml-4 flex items-center gap-2",
                             span { class: "flex-1 text-xs text-gray-400 dark:text-gray-500",
-                                "Slot {pull_num + 1}"
+                                "{pull_num + 1}{ordinal_suffix(pull_num + 1)} Card"
                             }
                             span { class: "text-xs tabular-nums text-gray-500 dark:text-gray-400",
                                 "{slot_pct:.3}%"
