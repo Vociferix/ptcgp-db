@@ -49,6 +49,19 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
         )
     };
 
+    // Catalog has a narrower list column (side panel takes space), so Set/Pack/Source
+    // only appear in the primary row at lg+ to avoid overflowing into the detail panel.
+    let sps_row_cls = if mode == FilterMode::Catalog {
+        "hidden lg:flex items-end gap-2"
+    } else {
+        "hidden sm:flex items-end gap-2"
+    };
+    let sps_panel_cls = if mode == FilterMode::Catalog {
+        "flex flex-col gap-3 lg:hidden"
+    } else {
+        "flex flex-col gap-3 sm:hidden"
+    };
+
     rsx! {
         div { class: "relative",
             // ── Primary row ─────────────────────────────────────────────────
@@ -67,8 +80,8 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                     }
                 }
 
-                // Set + Pack + Source — visible at sm+ (640px); hidden items appear in panel
-                div { class: "hidden sm:flex items-end gap-2",
+                // Set + Pack + Source — breakpoint depends on mode (see sps_row_cls above)
+                div { class: "{sps_row_cls}",
                     SetDropdown { config }
                     PackDropdown { config }
                     SourceDropdown { config }
@@ -113,8 +126,8 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                             min-w-64 max-w-[min(640px,calc(100vw-1rem))]",
 
                     // ── Primary filters hidden from the row at narrow widths ──
-                    // Set/Pack/Source: not in primary row below sm — show here instead
-                    div { class: "flex flex-col gap-3 sm:hidden",
+                    // Set/Pack/Source: shown in panel when not in primary row
+                    div { class: "{sps_panel_cls}",
                         SetDropdown { config }
                         PackDropdown { config }
                         SourceDropdown { config }

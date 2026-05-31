@@ -66,6 +66,7 @@ enum SortColumn {
     Name,
     OwnedCount,
     Rarity,
+    Element,
     PullRate,
 }
 
@@ -149,12 +150,12 @@ fn passes_filter(
 
     let pkmn = cv.card().pokemon();
     if let Some(ex_only) = cfg.ex
-        && pkmn.map_or(!ex_only, |p| p.is_ex() != ex_only)
+        && pkmn.is_none_or(|p| p.is_ex() != ex_only)
     {
         return false;
     }
     if let Some(mega_only) = cfg.mega
-        && pkmn.map_or(!mega_only, |p| p.is_mega() != mega_only)
+        && pkmn.is_none_or(|p| p.is_mega() != mega_only)
     {
         return false;
     }
@@ -318,7 +319,11 @@ fn handle_container_mounted(data: Event<MountedData>, mut container_height: Sign
 fn handle_sort_click(col: SortColumn, mut sort_cfg: Signal<SortConfig>) {
     let mut sc = sort_cfg.write();
     if sc.column == col {
-        sc.dir = sc.dir.toggle();
+        if sc.dir == SortDir::Desc {
+            *sc = SortConfig::default();
+        } else {
+            sc.dir = sc.dir.toggle();
+        }
     } else {
         *sc = SortConfig {
             column: col,
@@ -393,6 +398,24 @@ pub fn CatalogPage() -> Element {
                     .class()
                     .id()
                     .cmp(&CardVersion::ALL[b].rarity().class().id());
+                if sc.dir == SortDir::Asc {
+                    n.then(a.cmp(&b))
+                } else {
+                    n.reverse().then(a.cmp(&b))
+                }
+            }),
+            SortColumn::Element => ids.sort_by(|&a, &b| {
+                let ea = CardVersion::ALL[a]
+                    .card()
+                    .pokemon()
+                    .map(|p| p.element().id())
+                    .unwrap_or(usize::MAX);
+                let eb = CardVersion::ALL[b]
+                    .card()
+                    .pokemon()
+                    .map(|p| p.element().id())
+                    .unwrap_or(usize::MAX);
+                let n = ea.cmp(&eb);
                 if sc.dir == SortDir::Asc {
                     n.then(a.cmp(&b))
                 } else {
@@ -516,8 +539,10 @@ fn SortHeader(sort_cfg: Signal<SortConfig>) -> Element {
                 col: SortColumn::Name,
                 label: "Name",
                 sort_cfg,
-                flex_class: "flex-1 min-w-0",
+                flex_class: "flex-1 min-w-0 text-left",
             }
+            // Set / pack logo placeholder
+            div { class: "w-10 shrink-0" }
             // Rarity
             SortBtn {
                 col: SortColumn::Rarity,
@@ -525,12 +550,19 @@ fn SortHeader(sort_cfg: Signal<SortConfig>) -> Element {
                 sort_cfg,
                 flex_class: "w-14 text-center",
             }
-            // Pull rate
+            // Element (hidden below lg)
+            SortBtn {
+                col: SortColumn::Element,
+                label: "Element",
+                sort_cfg,
+                flex_class: "hidden lg:block w-12 text-center",
+            }
+            // Pull rate (hidden below lg)
             SortBtn {
                 col: SortColumn::PullRate,
                 label: "Pull %",
                 sort_cfg,
-                flex_class: "hidden sm:block w-14 text-right",
+                flex_class: "hidden lg:block w-14 text-right",
             }
             // Owned count
             SortBtn {
@@ -632,6 +664,14 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
     let name = cv.card().name();
     let rarity_icon = cv.rarity().class().icon();
     let card_image = cv.image();
+    let element_icon = cv.card().pokemon().map(|p| p.element().icon());
+    let pack_logo = {
+        let mut non_promo = cv.packs().iter().filter(|p| !p.set().is_promo());
+        match (non_promo.next(), non_promo.next()) {
+            (Some(p), None) => p.logo(),
+            _ => cv.set().icon(),
+        }
+    };
 
     rsx! {
         div {
@@ -657,17 +697,37 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                 }
             }
 
+            // Set / pack logo
+            div { class: "w-10 flex justify-center items-center flex-shrink-0",
+                img {
+                    src: "{pack_logo}",
+                    alt: "",
+                    class: "h-8 w-10 object-contain",
+                }
+            }
+
             // Rarity icon
             div { class: "w-14 flex justify-center flex-shrink-0",
                 img {
                     src: "{rarity_icon}",
                     alt: "",
-                    class: "h-5 w-auto object-contain",
+                    class: "h-6 w-auto object-contain",
                 }
             }
 
-            // Pull rate (hidden on narrow)
-            div { class: "hidden sm:block w-14 text-right flex-shrink-0",
+            // Element icon (hidden below lg)
+            div { class: "hidden lg:flex w-12 justify-center flex-shrink-0",
+                if let Some(icon) = element_icon {
+                    img {
+                        src: "{icon}",
+                        alt: "",
+                        class: "h-5 w-5 object-contain",
+                    }
+                }
+            }
+
+            // Pull rate (hidden below lg)
+            div { class: "hidden lg:block w-14 text-right flex-shrink-0",
                 span {
                     class: "text-xs text-gray-600 dark:text-gray-400",
                     title: "{pull_title}",
