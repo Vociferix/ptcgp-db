@@ -426,9 +426,9 @@ pub fn CatalogPage() -> Element {
         div { class: "flex h-full",
 
             // ── List column ──────────────────────────────────────────────────
-            // Fixed at 720px once the detail panel is visible (xl+); full-width below xl.
-            // At xl the 208px sidebar leaves 1072px content; 720px list + 352px detail.
-            div { class: "flex flex-col flex-1 xl:flex-none xl:w-[720px] min-w-0",
+            // Fixed at 780px once the detail panel is visible (xl+); full-width below xl.
+            // At xl the 208px sidebar leaves 1072px content; 780px list + 292px detail.
+            div { class: "flex flex-col flex-1 xl:flex-none xl:w-[780px] min-w-0",
 
                 // Filter toolbar
                 div { class: "p-4 pb-2 shrink-0",
@@ -469,7 +469,7 @@ pub fn CatalogPage() -> Element {
             }
 
             // ── Detail panel (xl+ only) ──────────────────────────────────────
-            div { class: "hidden xl:flex flex-col flex-1 min-w-80 border-l border-gray-200 dark:border-gray-700",
+            div { class: "hidden xl:flex flex-col flex-1 min-w-72 border-l border-gray-200 dark:border-gray-700",
                 DetailPanel { cv_id: selected }
             }
         }
