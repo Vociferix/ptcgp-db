@@ -699,11 +699,11 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
             }
 
             // Set / pack logo
-            div { class: "w-20 flex justify-center items-center flex-shrink-0",
+            div { class: "w-20 h-full flex justify-center items-center flex-shrink-0",
                 img {
                     src: "{pack_logo}",
                     alt: "",
-                    class: "h-8 w-20 object-contain",
+                    class: "max-h-full w-20 object-contain",
                 }
             }
 

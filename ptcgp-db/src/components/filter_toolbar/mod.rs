@@ -70,15 +70,15 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                     }
                 }
 
-                // Set + Pack + Source — visible when container >= 640px
-                div { class: "hidden @sm:flex items-end gap-2",
+                // Set + Pack + Source — visible when container >= 42rem (672px)
+                div { class: "hidden @2xl:flex items-end gap-2",
                     SetDropdown { config }
                     PackDropdown { config }
                     SourceDropdown { config }
                 }
 
-                // Series + Kind — visible when container >= 768px
-                div { class: "hidden @md:flex items-end gap-2",
+                // Series + Kind — visible when container >= 56rem (896px)
+                div { class: "hidden @4xl:flex items-end gap-2",
                     SeriesFilter { config }
                     KindFilter { config }
                 }
@@ -116,14 +116,14 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                             min-w-64 max-w-[min(640px,calc(100vw-1rem))]",
 
                     // ── Primary filters hidden from the row at narrow widths ──
-                    // Set/Pack/Source: in panel when container < 640px
-                    div { class: "flex flex-col gap-3 @sm:hidden",
+                    // Set/Pack/Source: in panel when container < 42rem (672px)
+                    div { class: "flex flex-col gap-3 @2xl:hidden",
                         SetDropdown { config }
                         PackDropdown { config }
                         SourceDropdown { config }
                     }
-                    // Series/Kind: in panel when container < 768px
-                    div { class: "flex flex-col gap-3 @md:hidden",
+                    // Series/Kind: in panel when container < 56rem (896px)
+                    div { class: "flex flex-col gap-3 @4xl:hidden",
                         SeriesFilter { config }
                         KindFilter { config }
                     }
