@@ -721,9 +721,8 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                 }
             }
 
-            // Count spinner — hidden below xl; at narrow widths editing is done on the
-            // full-screen detail page to avoid overlap with the navigation overlay.
-            div { class: "w-28 hidden xl:flex justify-end flex-shrink-0 relative z-20",
+            // Count spinner — z-20 keeps it above the xl:hidden Link overlay beneath.
+            div { class: "w-28 flex justify-end flex-shrink-0 relative z-20",
                 CountSpinner {
                     value,
                     stored_count,
@@ -736,26 +735,104 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
 }
 
 // ---------------------------------------------------------------------------
-// PackRateRow
+// Pull rate hierarchy: PullRateSection → PackPullBlock
 // ---------------------------------------------------------------------------
 
 #[component]
-fn PackRateRow(pack_id: usize, percent: f64) -> Element {
+fn PullRateSection(cv_id: usize) -> Element {
+    let pd = &CARD_PULL_RATES[cv_id];
+    rsx! {
+        div { class: "flex flex-col gap-3",
+            p { class: "text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide",
+                "Pull Rates"
+            }
+            for pr in pd.pack_pull_rates.iter() {
+                PackPullBlock {
+                    pack_id: pr.pack.id(),
+                    overall_pct: pr.percent,
+                    cv_id,
+                }
+            }
+        }
+    }
+}
+
+#[allow(clippy::type_complexity)]
+#[component]
+fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
     let Some(pack) = ptcgp_db_data::Pack::from_id(pack_id) else {
         return rsx! {};
     };
     let logo = pack.logo();
     let title = pack.title();
-    rsx! {
-        div { class: "flex items-center gap-2",
-            img {
-                src: "{logo}",
-                alt: "",
-                class: "h-8 w-16 object-contain flex-shrink-0",
+
+    // Compute variant pull data: (name, variant_selection_pct, card_pct_if_variant, slots)
+    // Only includes variants where the card actually appears.
+    let variant_rows: Vec<(String, f64, f64, Vec<(usize, f64)>)> = pack
+        .variants()
+        .iter()
+        .filter_map(|variant| {
+            let slots: Vec<(usize, f64)> = variant
+                .slots()
+                .iter()
+                .filter_map(|slot| {
+                    slot.card_versions()
+                        .iter()
+                        .find(|cvpr| cvpr.card_version().id() == cv_id)
+                        .map(|cvpr| (slot.pull_number(), cvpr.pull_rate().as_f64() * 100.0))
+                        .filter(|(_, r)| *r > 0.0)
+                })
+                .collect();
+            if slots.is_empty() {
+                return None;
             }
-            span { class: "flex-1 text-sm text-gray-700 dark:text-gray-300", "{title}" }
-            span { class: "text-sm tabular-nums font-medium text-gray-900 dark:text-gray-100",
-                "{percent:.3}%"
+            let not_prob = slots.iter().fold(1.0f64, |acc, (_, r)| acc * (1.0 - r / 100.0));
+            let card_pct = (1.0 - not_prob) * 100.0;
+            let variant_pct = variant.pull_rate().as_f64() * 100.0;
+            Some((variant.name().as_str().to_string(), variant_pct, card_pct, slots))
+        })
+        .collect();
+
+    rsx! {
+        div { class: "flex flex-col gap-1.5",
+            // Pack header row
+            div { class: "flex items-center gap-3",
+                img {
+                    src: "{logo}",
+                    alt: "",
+                    class: "h-12 w-24 object-contain flex-shrink-0",
+                }
+                span { class: "flex-1 text-sm text-gray-700 dark:text-gray-300", "{title}" }
+                span { class: "text-sm tabular-nums font-medium text-gray-900 dark:text-gray-100",
+                    "{overall_pct:.3}%"
+                }
+            }
+            // Variant rows
+            for (vname, vpct, cpct, slots) in variant_rows {
+                div { class: "ml-6 flex flex-col gap-0.5",
+                    div { class: "flex items-center gap-2",
+                        span { class: "flex-1 text-xs text-gray-600 dark:text-gray-400",
+                            "{vname}"
+                        }
+                        span { class: "text-xs text-gray-400 dark:text-gray-500 tabular-nums",
+                            "{vpct:.0}% of opens"
+                        }
+                        span { class: "w-20 text-right text-xs tabular-nums text-gray-700 dark:text-gray-300",
+                            "{cpct:.3}% if drawn"
+                        }
+                    }
+                    // Slot rows
+                    for (pull_num, slot_pct) in slots {
+                        div { class: "ml-4 flex items-center gap-2",
+                            span { class: "flex-1 text-xs text-gray-400 dark:text-gray-500",
+                                "Slot {pull_num + 1}"
+                            }
+                            span { class: "text-xs tabular-nums text-gray-500 dark:text-gray-400",
+                                "{slot_pct:.3}%"
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -775,7 +852,7 @@ fn AttackRow(attack_id: usize) -> Element {
     rsx! {
         div { class: "flex flex-col gap-1 p-2 rounded bg-gray-50 dark:bg-gray-800",
             div { class: "flex items-center gap-2",
-                div { class: "flex items-center gap-0.5 shrink-0",
+                div { class: "flex items-center gap-1 shrink-0",
                     if cost.is_empty() {
                         img {
                             src: "{ptcgp_db_data::Element::NO_COST}",
@@ -815,19 +892,58 @@ fn AttackRow(attack_id: usize) -> Element {
 // ---------------------------------------------------------------------------
 
 #[component]
-fn VersionChip(cv_id: usize, current_id: usize) -> Element {
+fn VersionChip(cv_id: usize, current_id: usize, on_click: EventHandler<usize>) -> Element {
     let cv = &CardVersion::ALL[cv_id];
     let set_code = cv.set().code();
     let number = cv.number().get();
     let rarity = cv.rarity().name();
     let is_current = cv_id == current_id;
     let cls = if is_current {
-        "text-xs px-2 py-0.5 rounded-full border font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"
+        "text-xs px-2 py-0.5 rounded-full border font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700 cursor-default"
     } else {
-        "text-xs px-2 py-0.5 rounded-full border bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
+        "text-xs px-2 py-0.5 rounded-full border bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer"
     };
     rsx! {
-        span { class: "{cls}", title: "{rarity}", "{set_code} {number:03}" }
+        button {
+            r#type: "button",
+            class: "{cls}",
+            title: "{rarity}",
+            onclick: move |_| on_click.call(cv_id),
+            "{set_code} {number:03}"
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VersionCard — card image thumbnail with code label, used in All Versions
+// ---------------------------------------------------------------------------
+
+#[component]
+fn VersionCard(cv_id: usize, current_id: usize, on_click: EventHandler<usize>) -> Element {
+    let cv = &CardVersion::ALL[cv_id];
+    let card_image = cv.image();
+    let set_code = cv.set().code();
+    let number = cv.number().get();
+    let is_current = cv_id == current_id;
+    let ring_cls = if is_current {
+        "ring-2 ring-blue-500 dark:ring-blue-400"
+    } else {
+        "ring-1 ring-gray-200 dark:ring-gray-700 hover:ring-blue-400 dark:hover:ring-blue-500"
+    };
+    rsx! {
+        button {
+            r#type: "button",
+            class: "flex flex-col items-center gap-1 cursor-pointer",
+            onclick: move |_| on_click.call(cv_id),
+            img {
+                src: "{card_image}",
+                alt: "",
+                class: "w-14 h-20 object-cover rounded {ring_cls}",
+            }
+            span { class: "text-xs text-gray-500 dark:text-gray-400 tabular-nums",
+                "{set_code} {number:03}"
+            }
+        }
     }
 }
 
@@ -836,7 +952,7 @@ fn VersionChip(cv_id: usize, current_id: usize) -> Element {
 // ---------------------------------------------------------------------------
 
 #[component]
-fn CardDetailBody(cv_id: usize) -> Element {
+fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
     let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
     let settings = use_context::<Signal<AppSettings>>();
 
@@ -917,7 +1033,7 @@ fn CardDetailBody(cv_id: usize) -> Element {
                     img {
                         src: "{rarity_icon}",
                         alt: "",
-                        class: "h-5 w-auto object-contain",
+                        class: "h-6 w-auto object-contain",
                     }
                     span { class: "text-xs text-gray-500 dark:text-gray-400", "{rarity_name}" }
                 }
@@ -933,16 +1049,9 @@ fn CardDetailBody(cv_id: usize) -> Element {
                     }
                 }
 
-                // Pack pull rates
+                // Pack pull rates — full pack → variant → slot hierarchy
                 if is_pack_source && !pd.pack_pull_rates.is_empty() {
-                    div { class: "flex flex-col gap-2",
-                        p { class: "text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide",
-                            "Pull Rates"
-                        }
-                        for pr in pd.pack_pull_rates.iter() {
-                            PackRateRow { pack_id: pr.pack.id(), percent: pr.percent }
-                        }
-                    }
+                    PullRateSection { cv_id }
                 }
 
                 // Source description (non-pack)
@@ -996,8 +1105,8 @@ fn CardDetailBody(cv_id: usize) -> Element {
                         }
 
                         // Retreat cost
-                        div { class: "flex items-center gap-1.5",
-                            span { class: "text-xs text-gray-400 dark:text-gray-500 w-14 shrink-0",
+                        div { class: "flex items-center gap-2",
+                            span { class: "text-xs text-gray-400 dark:text-gray-500 w-20 shrink-0",
                                 "Retreat"
                             }
                             if p.retreat_cost() == 0 {
@@ -1005,7 +1114,7 @@ fn CardDetailBody(cv_id: usize) -> Element {
                                     "Free"
                                 }
                             } else {
-                                div { class: "flex items-center gap-0.5",
+                                div { class: "flex items-center gap-1",
                                     for _ in 0..p.retreat_cost() {
                                         if let Some(colorless) = ptcgp_db_data::Element::ALL
                                             .iter()
@@ -1014,7 +1123,7 @@ fn CardDetailBody(cv_id: usize) -> Element {
                                             img {
                                                 src: "{colorless.icon()}",
                                                 alt: "",
-                                                class: "h-4 w-4 object-contain",
+                                                class: "h-5 w-5 object-contain",
                                             }
                                         }
                                     }
@@ -1024,17 +1133,19 @@ fn CardDetailBody(cv_id: usize) -> Element {
 
                         // Weakness
                         if let Some(w) = p.weakness() {
-                            div { class: "flex items-center gap-1.5",
-                                span { class: "text-xs text-gray-400 dark:text-gray-500 w-14 shrink-0",
+                            div { class: "flex items-center gap-2",
+                                span { class: "text-xs text-gray-400 dark:text-gray-500 w-20 shrink-0",
                                     "Weakness"
                                 }
-                                img {
-                                    src: "{w.icon()}",
-                                    alt: "",
-                                    class: "h-4 w-4 object-contain",
-                                }
-                                span { class: "text-sm text-gray-700 dark:text-gray-300",
-                                    "{w.name()}"
+                                div { class: "flex items-center gap-1",
+                                    img {
+                                        src: "{w.icon()}",
+                                        alt: "",
+                                        class: "h-5 w-5 object-contain",
+                                    }
+                                    span { class: "text-sm text-gray-700 dark:text-gray-300",
+                                        "{w.name()}"
+                                    }
                                 }
                             }
                         }
@@ -1112,7 +1223,7 @@ fn CardDetailBody(cv_id: usize) -> Element {
                     }
                 }
 
-                // Duplicate printings
+                // Duplicate printings — chips only (images would be identical)
                 if !duplicates.is_empty() {
                     div { class: "flex flex-col gap-2",
                         p { class: "text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide",
@@ -1120,21 +1231,29 @@ fn CardDetailBody(cv_id: usize) -> Element {
                         }
                         div { class: "flex flex-wrap gap-1",
                             for d in duplicates.iter() {
-                                VersionChip { cv_id: d.id(), current_id: cv_id }
+                                VersionChip {
+                                    cv_id: d.id(),
+                                    current_id: cv_id,
+                                    on_click: on_navigate,
+                                }
                             }
                         }
                     }
                 }
 
-                // All versions of this abstract card
+                // All versions of this abstract card — shown as card images
                 if all_versions.len() > 1 {
                     div { class: "flex flex-col gap-2",
                         p { class: "text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide",
                             "All Versions"
                         }
-                        div { class: "flex flex-wrap gap-1",
+                        div { class: "flex flex-wrap gap-3",
                             for v in all_versions.iter() {
-                                VersionChip { cv_id: v.id(), current_id: cv_id }
+                                VersionCard {
+                                    cv_id: v.id(),
+                                    current_id: cv_id,
+                                    on_click: on_navigate,
+                                }
                             }
                         }
                     }
@@ -1158,7 +1277,7 @@ fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
         };
     };
     rsx! {
-        CardDetailBody { cv_id: id }
+        CardDetailBody { cv_id: id, on_navigate: move |new_id| cv_id.set(Some(new_id)) }
     }
 }
 
@@ -1190,7 +1309,15 @@ pub fn CardDetailPage(card_id: usize) -> Element {
                 }
             }
             div { class: "flex-1 min-h-0",
-                CardDetailBody { cv_id: card_id }
+                CardDetailBody {
+                    cv_id: card_id,
+                    on_navigate: move |id| drop(
+                        nav
+                            .push(Route::CardDetailPage {
+                                card_id: id,
+                            }),
+                    ),
+                }
             }
         }
     }
