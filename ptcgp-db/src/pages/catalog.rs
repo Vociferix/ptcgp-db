@@ -426,9 +426,9 @@ pub fn CatalogPage() -> Element {
         div { class: "flex h-full",
 
             // ── List column ──────────────────────────────────────────────────
-            // Fixed at 780px once the detail panel is visible (xl+); full-width below xl.
-            // At xl the 208px sidebar leaves 1072px content; 780px list + 292px detail.
-            div { class: "flex flex-col flex-1 xl:flex-none xl:w-[780px] min-w-0",
+            // Fixed at 840px once the detail panel is visible (xl+); full-width below xl.
+            // At xl the 208px sidebar leaves 1072px content; 840px list + 232px detail.
+            div { class: "flex flex-col flex-1 xl:flex-none xl:w-[840px] min-w-0",
 
                 // Filter toolbar
                 div { class: "p-4 pb-2 shrink-0",
@@ -469,7 +469,7 @@ pub fn CatalogPage() -> Element {
             }
 
             // ── Detail panel (xl+ only) ──────────────────────────────────────
-            div { class: "hidden xl:flex flex-col flex-1 min-w-72 border-l border-gray-200 dark:border-gray-700",
+            div { class: "hidden xl:flex flex-col flex-1 min-w-52 border-l border-gray-200 dark:border-gray-700",
                 DetailPanel { cv_id: selected }
             }
         }
@@ -662,7 +662,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                 span { class: "text-xs text-gray-400 dark:text-gray-500 tabular-nums leading-none",
                     "{set_code} {number:03}"
                 }
-                span { class: "text-sm font-medium text-gray-900 dark:text-gray-100 truncate leading-snug",
+                span { class: "text-sm font-medium text-gray-900 dark:text-gray-100 leading-snug",
                     "{name}"
                 }
             }
