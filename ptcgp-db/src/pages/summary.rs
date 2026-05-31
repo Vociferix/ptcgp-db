@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
 use dioxus::prelude::*;
-use ptcgp_db_core::save_data::CardVersionId;
+use ptcgp_db_core::save_data::{CardVersionId, FilterConfig};
 use ptcgp_db_core::{AppSettings, ProfileStore, completion, completion_merged, desired_pull_rate};
 use ptcgp_db_data::{CardVersion, Pack, Prob, Set};
 
@@ -16,6 +16,20 @@ use crate::routes::Route;
 fn handle_expand_click(e: Event<MouseData>, mut expanded: Signal<bool>) {
     e.stop_propagation();
     expanded.set(!expanded());
+}
+
+fn apply_pack_filter(pack_id: usize, mut filter: Signal<FilterConfig>) {
+    *filter.write() = FilterConfig {
+        packs: vec![pack_id],
+        ..FilterConfig::default()
+    };
+}
+
+fn apply_set_filter(set_id: usize, mut filter: Signal<FilterConfig>) {
+    *filter.write() = FilterConfig {
+        sets: vec![set_id],
+        ..FilterConfig::default()
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -67,10 +81,16 @@ fn PackSubRow(
     rate_pct: f64,
 ) -> Element {
     let nav = use_navigator();
+    let catalog_filter = use_context::<Signal<FilterConfig>>();
+    let pack_id = pack.id();
+    let on_click = move |_| {
+        apply_pack_filter(pack_id, catalog_filter);
+        drop(nav.push(Route::CatalogPage {}));
+    };
     rsx! {
         div {
             class: "flex items-center gap-3 py-2 pl-8 pr-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/60",
-            onclick: move |_| drop(nav.push(Route::CatalogPage {})),
+            onclick: on_click,
             img {
                 src: "{pack.image()}",
                 alt: "",
@@ -121,15 +141,21 @@ fn SetCompletionRow(
 ) -> Element {
     let expanded = use_signal(|| false);
     let nav = use_navigator();
+    let catalog_filter = use_context::<Signal<FilterConfig>>();
     let set_name = set.name();
     let is_promo = set.is_promo();
     let is_expandable = !pack_rows.is_empty();
+    let set_id = set.id();
+    let on_click = move |_| {
+        apply_set_filter(set_id, catalog_filter);
+        drop(nav.push(Route::CatalogPage {}));
+    };
 
     rsx! {
         div { class: "border-b border-gray-100 dark:border-gray-700 last:border-0",
             div {
                 class: "grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-3 items-center cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-700/50",
-                onclick: move |_| drop(nav.push(Route::CatalogPage {})),
+                onclick: on_click,
                 div { class: "flex items-center gap-2 min-w-0",
                     if is_expandable {
                         button {
@@ -204,6 +230,8 @@ fn SetCompletionRow(
 pub fn SummaryPage() -> Element {
     let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
     let settings = use_context::<Signal<AppSettings>>();
+    let catalog_filter = use_context::<Signal<FilterConfig>>();
+    let nav = use_navigator();
     let mut include_unobtainable = use_signal(|| false);
 
     let store_guard = store.read();
@@ -460,10 +488,13 @@ pub fn SummaryPage() -> Element {
                     } else {
                         div { class: "{next_pack_cls}",
                             for (pack, rate) in best_packs.iter().copied() {
-                                Link {
+                                div {
                                     key: "{pack.id()}",
-                                    to: Route::CatalogPage {},
-                                    class: "flex items-start gap-4 py-4 cursor-pointer rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/60 no-underline",
+                                    class: "flex items-start gap-4 py-4 cursor-pointer rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/60",
+                                    onclick: move |_| {
+                                        apply_pack_filter(pack.id(), catalog_filter);
+                                        drop(nav.push(Route::CatalogPage {}));
+                                    },
                                     img {
                                         src: "{pack.image()}",
                                         alt: "{pack.title()}",

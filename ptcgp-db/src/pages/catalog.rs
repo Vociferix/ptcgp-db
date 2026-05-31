@@ -290,7 +290,7 @@ pub fn CatalogPage() -> Element {
     let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
     let settings = use_context::<Signal<AppSettings>>();
 
-    let config = use_signal(FilterConfig::default);
+    let config = use_context::<Signal<FilterConfig>>();
     let sort_cfg: Signal<SortConfig> = use_signal(SortConfig::default);
     let selected: Signal<Option<usize>> = use_signal(|| None);
     let mut scroll_top: Signal<f64> = use_signal(|| 0.0);

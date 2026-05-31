@@ -3,7 +3,7 @@ use std::time::Duration;
 use dioxus::prelude::*;
 use futures_channel::mpsc::UnboundedReceiver;
 use futures_util::StreamExt as _;
-use ptcgp_db_core::save_data::Theme;
+use ptcgp_db_core::save_data::{FilterConfig, Theme};
 use ptcgp_db_core::storage::Storage as _;
 use ptcgp_db_core::{AppSettings, ProfileStore, SavedQueries};
 
@@ -94,6 +94,9 @@ pub fn App() -> Element {
         use_context_provider(|| Signal::new(AppSettings::default()));
     let mut queries: Signal<SavedQueries> =
         use_context_provider(|| Signal::new(SavedQueries::default()));
+    // Persistent catalog filter: survives navigation away and back. Other pages may
+    // write to this before navigating to the catalog to pre-set a filter.
+    let _: Signal<FilterConfig> = use_context_provider(|| Signal::new(FilterConfig::default()));
     let mut load_error: Signal<Option<String>> = use_signal(|| None);
 
     // Auto-save coroutine: waits for ScheduleSave signals, debounces 2 s, then
