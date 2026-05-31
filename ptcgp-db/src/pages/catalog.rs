@@ -476,7 +476,7 @@ pub fn CatalogPage() -> Element {
         div { class: "flex h-full",
 
             // ── List column ──────────────────────────────────────────────────
-            div { class: "flex flex-col flex-1 min-w-0",
+            div { class: "flex flex-col flex-1 max-w-3xl min-w-0",
 
                 // Filter toolbar
                 div { class: "p-4 pb-2 shrink-0",
@@ -517,7 +517,7 @@ pub fn CatalogPage() -> Element {
             }
 
             // ── Detail panel (md+ only) ──────────────────────────────────────
-            div { class: "hidden md:flex flex-col w-80 xl:w-96 shrink-0 border-l border-gray-200 dark:border-gray-700",
+            div { class: "hidden md:flex flex-col md:w-80 xl:flex-1 xl:min-w-96 border-l border-gray-200 dark:border-gray-700",
                 DetailPanel { cv_id: selected }
             }
         }
