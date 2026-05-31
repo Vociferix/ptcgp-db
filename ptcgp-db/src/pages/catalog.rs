@@ -1034,7 +1034,7 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                     }
                 }
 
-                // Owned count
+                // Owned count + rarity on the same row
                 div { class: "flex items-center gap-2",
                     span { class: "text-sm text-gray-600 dark:text-gray-400", "Owned" }
                     CountSpinner {
@@ -1043,16 +1043,14 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                         disabled: multi_active,
                         on_change: move |n| do_set_count(cv_id, n, store),
                     }
-                }
-
-                // Rarity
-                div { class: "flex items-center gap-2",
-                    img {
-                        src: "{rarity_icon}",
-                        alt: "",
-                        class: "h-6 w-auto object-contain",
+                    div { class: "flex items-center gap-2 ml-auto",
+                        img {
+                            src: "{rarity_icon}",
+                            alt: "",
+                            class: "h-6 w-auto object-contain",
+                        }
+                        span { class: "text-xs text-gray-500 dark:text-gray-400", "{rarity_name}" }
                     }
-                    span { class: "text-xs text-gray-500 dark:text-gray-400", "{rarity_name}" }
                 }
 
                 // Source description (non-pack)
