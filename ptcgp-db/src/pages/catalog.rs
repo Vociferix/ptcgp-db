@@ -476,9 +476,9 @@ pub fn CatalogPage() -> Element {
         div { class: "flex h-full",
 
             // ── List column ──────────────────────────────────────────────────
-            // Fixed at 704px once the detail panel is visible (lg+); full-width below lg.
-            // 704px fits all columns at lg with a comfortable 112px name column.
-            div { class: "flex flex-col flex-1 lg:flex-none lg:w-[704px] min-w-0",
+            // Fixed at 720px once the detail panel is visible (xl+); full-width below xl.
+            // At xl the 208px sidebar leaves 1072px content; 720px list + 352px detail.
+            div { class: "flex flex-col flex-1 xl:flex-none xl:w-[720px] min-w-0",
 
                 // Filter toolbar
                 div { class: "p-4 pb-2 shrink-0",
@@ -518,8 +518,8 @@ pub fn CatalogPage() -> Element {
                 }
             }
 
-            // ── Detail panel (lg+ only) ──────────────────────────────────────
-            div { class: "hidden lg:flex flex-col flex-1 min-w-80 border-l border-gray-200 dark:border-gray-700",
+            // ── Detail panel (xl+ only) ──────────────────────────────────────
+            div { class: "hidden xl:flex flex-col flex-1 min-w-80 border-l border-gray-200 dark:border-gray-700",
                 DetailPanel { cv_id: selected }
             }
         }
@@ -543,10 +543,10 @@ fn SortHeader(sort_cfg: Signal<SortConfig>) -> Element {
                 sort_cfg,
                 flex_class: "flex-1 min-w-0 text-left",
             }
-            // Set icon placeholder (hidden below sm)
-            div { class: "hidden sm:block w-12 shrink-0" }
-            // Pack / set logo placeholder (hidden below sm)
-            div { class: "hidden sm:block w-28 shrink-0" }
+            // Set icon placeholder (hidden below lg)
+            div { class: "hidden lg:block w-12 shrink-0" }
+            // Pack / set logo placeholder (hidden below lg)
+            div { class: "hidden lg:block w-28 shrink-0" }
             // Rarity
             SortBtn {
                 col: SortColumn::Rarity,
@@ -554,19 +554,19 @@ fn SortHeader(sort_cfg: Signal<SortConfig>) -> Element {
                 sort_cfg,
                 flex_class: "w-20 text-center",
             }
-            // Element (hidden below sm)
+            // Element (hidden below lg)
             SortBtn {
                 col: SortColumn::Element,
                 label: "Element",
                 sort_cfg,
-                flex_class: "hidden sm:block w-12 text-center",
+                flex_class: "hidden lg:block w-12 text-center",
             }
-            // Pull rate (hidden below sm)
+            // Pull rate (hidden below lg)
             SortBtn {
                 col: SortColumn::PullRate,
                 label: "Pull %",
                 sort_cfg,
-                flex_class: "hidden sm:block w-14 text-right",
+                flex_class: "hidden lg:block w-14 text-right",
             }
             // Owned count
             SortBtn {
@@ -708,8 +708,8 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                 }
             }
 
-            // Set icon (hidden below sm)
-            div { class: "hidden sm:flex w-12 h-full justify-center items-center flex-shrink-0",
+            // Set icon (hidden below lg — sidebar consumes 208px at md+, leaving too little room)
+            div { class: "hidden lg:flex w-12 h-full justify-center items-center flex-shrink-0",
                 img {
                     src: "{set_icon}",
                     alt: "",
@@ -717,8 +717,8 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                 }
             }
 
-            // Pack / set logo (hidden below sm)
-            div { class: "hidden sm:flex w-28 h-full py-2 justify-center items-center flex-shrink-0",
+            // Pack / set logo (hidden below lg)
+            div { class: "hidden lg:flex w-28 h-full py-2 justify-center items-center flex-shrink-0",
                 img { src: "{pack_logo}", alt: "", class: "{logo_img_class}" }
             }
 
@@ -731,8 +731,8 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                 }
             }
 
-            // Element icon (hidden below sm)
-            div { class: "hidden sm:flex w-12 justify-center flex-shrink-0",
+            // Element icon (hidden below lg)
+            div { class: "hidden lg:flex w-12 justify-center flex-shrink-0",
                 if let Some(icon) = element_icon {
                     img {
                         src: "{icon}",
@@ -742,8 +742,8 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                 }
             }
 
-            // Pull rate (hidden below sm)
-            div { class: "hidden sm:block w-14 text-right flex-shrink-0",
+            // Pull rate (hidden below lg)
+            div { class: "hidden lg:block w-14 text-right flex-shrink-0",
                 span {
                     class: "text-xs text-gray-600 dark:text-gray-400",
                     title: "{pull_title}",
