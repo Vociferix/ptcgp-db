@@ -17,7 +17,7 @@ pub fn NameFilter(config: Signal<FilterConfig>) -> Element {
             span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Name" }
             input {
                 r#type: "text",
-                placeholder: "Name or number…",
+                placeholder: "Name…",
                 value: "{value}",
                 class: "px-2 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 \
                         bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 \
