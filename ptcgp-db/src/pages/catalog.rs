@@ -812,13 +812,10 @@ fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
                 div { class: "ml-6 flex flex-col gap-0.5",
                     div { class: "flex items-center gap-2",
                         span { class: "flex-1 text-xs text-gray-600 dark:text-gray-400",
-                            "{vname}"
+                            "{vname} · {vpct:.3}% of opens"
                         }
-                        span { class: "text-xs text-gray-400 dark:text-gray-500 tabular-nums",
-                            "{vpct:.0}% of opens"
-                        }
-                        span { class: "w-20 text-right text-xs tabular-nums text-gray-700 dark:text-gray-300",
-                            "{cpct:.3}% if drawn"
+                        span { class: "text-xs tabular-nums text-gray-700 dark:text-gray-300",
+                            "{cpct:.3}%"
                         }
                     }
                     // Slot rows
@@ -1028,16 +1025,6 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                     }
                 }
 
-                // Rarity
-                div { class: "flex items-center gap-2",
-                    img {
-                        src: "{rarity_icon}",
-                        alt: "",
-                        class: "h-6 w-auto object-contain",
-                    }
-                    span { class: "text-xs text-gray-500 dark:text-gray-400", "{rarity_name}" }
-                }
-
                 // Owned count
                 div { class: "flex items-center gap-2",
                     span { class: "text-sm text-gray-600 dark:text-gray-400", "Owned" }
@@ -1049,9 +1036,14 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                     }
                 }
 
-                // Pack pull rates — full pack → variant → slot hierarchy
-                if is_pack_source && !pd.pack_pull_rates.is_empty() {
-                    PullRateSection { cv_id }
+                // Rarity
+                div { class: "flex items-center gap-2",
+                    img {
+                        src: "{rarity_icon}",
+                        alt: "",
+                        class: "h-6 w-auto object-contain",
+                    }
+                    span { class: "text-xs text-gray-500 dark:text-gray-400", "{rarity_name}" }
                 }
 
                 // Source description (non-pack)
@@ -1064,6 +1056,13 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                 // Pokémon-only fields
                 if let Some(p) = pkmn {
                     div { class: "flex flex-col gap-3",
+                        // Flavor text first — sets context before stats
+                        if let Some(ft) = p.flavor_text() {
+                            p { class: "text-xs italic text-gray-400 dark:text-gray-500 leading-relaxed",
+                                "{ft}"
+                            }
+                        }
+
                         // Stats: Pokédex · HP · Stage
                         div { class: "grid grid-cols-3 gap-2",
                             div { class: "flex flex-col items-center p-2 rounded bg-gray-50 dark:bg-gray-800",
@@ -1200,12 +1199,6 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                             }
                         }
 
-                        // Flavor text
-                        if let Some(ft) = p.flavor_text() {
-                            p { class: "text-xs italic text-gray-400 dark:text-gray-500 leading-relaxed",
-                                "{ft}"
-                            }
-                        }
                     }
                 }
 
@@ -1257,6 +1250,11 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                             }
                         }
                     }
+                }
+
+                // Pack pull rates — full pack → variant → slot hierarchy (at bottom)
+                if is_pack_source && !pd.pack_pull_rates.is_empty() {
+                    PullRateSection { cv_id }
                 }
             }
         }
