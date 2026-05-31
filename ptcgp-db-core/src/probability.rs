@@ -309,16 +309,28 @@ mod tests {
                 .filter(|p| !p.set().is_promo())
                 .filter_map(|p| {
                     let rate = card_pull_rate(p, cv.id());
-                    if rate > Prob::ZERO { Some(rate.as_f64() * 100.0) } else { None }
+                    if rate > Prob::ZERO {
+                        Some(rate.as_f64() * 100.0)
+                    } else {
+                        None
+                    }
                 })
                 .reduce(f64::max);
             if let Some(pct) = best {
-                assert!(pct > 0.0, "cv {} has non-ZERO rate but as_f64()*100 = {}", cv.id(), pct);
+                assert!(
+                    pct > 0.0,
+                    "cv {} has non-ZERO rate but as_f64()*100 = {}",
+                    cv.id(),
+                    pct
+                );
                 found_non_zero = true;
                 break;
             }
         }
-        assert!(found_non_zero, "no pack card had a non-zero rate — pull_data logic is broken");
+        assert!(
+            found_non_zero,
+            "no pack card had a non-zero rate — pull_data logic is broken"
+        );
     }
 
     // ---------------------------------------------------------------------------
