@@ -545,14 +545,14 @@ fn SortHeader(sort_cfg: Signal<SortConfig>) -> Element {
             }
             // Set icon placeholder (hidden below lg)
             div { class: "hidden lg:block w-12 shrink-0" }
-            // Pack / set logo placeholder (hidden below lg)
-            div { class: "hidden lg:block w-28 shrink-0" }
-            // Rarity
+            // Pack / set logo placeholder (always visible)
+            div { class: "w-28 shrink-0" }
+            // Rarity (hidden below lg)
             SortBtn {
                 col: SortColumn::Rarity,
                 label: "Rarity",
                 sort_cfg,
-                flex_class: "w-20 text-center",
+                flex_class: "hidden lg:block w-20 text-center",
             }
             // Element (hidden below lg)
             SortBtn {
@@ -717,13 +717,13 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                 }
             }
 
-            // Pack / set logo (hidden below lg)
-            div { class: "hidden lg:flex w-28 h-full py-2 justify-center items-center flex-shrink-0",
+            // Pack / set logo (always visible)
+            div { class: "flex w-28 h-full py-2 justify-center items-center flex-shrink-0",
                 img { src: "{pack_logo}", alt: "", class: "{logo_img_class}" }
             }
 
-            // Rarity icon
-            div { class: "w-20 flex justify-center flex-shrink-0",
+            // Rarity icon (hidden below lg)
+            div { class: "hidden lg:flex w-20 justify-center flex-shrink-0",
                 img {
                     src: "{rarity_icon}",
                     alt: "",
