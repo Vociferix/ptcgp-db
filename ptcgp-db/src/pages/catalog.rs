@@ -541,8 +541,10 @@ fn SortHeader(sort_cfg: Signal<SortConfig>) -> Element {
                 sort_cfg,
                 flex_class: "flex-1 min-w-0 text-left",
             }
-            // Set / pack logo placeholder
-            div { class: "w-20 shrink-0" }
+            // Set icon placeholder
+            div { class: "w-8 shrink-0" }
+            // Pack / set logo placeholder (hidden below lg)
+            div { class: "hidden lg:block w-28 shrink-0" }
             // Rarity
             SortBtn {
                 col: SortColumn::Rarity,
@@ -665,13 +667,19 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
     let rarity_icon = cv.rarity().class().icon();
     let card_image = cv.image();
     let element_icon = cv.card().pokemon().map(|p| p.element().icon());
-    let pack_logo = {
+    let set_icon = cv.set().icon();
+    let (pack_logo, is_source_icon) = {
         let mut packs = cv.packs().iter();
         match (packs.next(), packs.next()) {
-            (None, _) => cv.source().icon(),
-            (Some(p), None) => p.logo(),
-            _ => cv.set().logo(),
+            (None, _) => (cv.source().icon(), true),
+            (Some(p), None) => (p.logo(), false),
+            _ => (cv.set().logo(), false),
         }
+    };
+    let logo_img_class = if is_source_icon {
+        "h-8 w-auto object-contain"
+    } else {
+        "max-h-full w-full object-contain"
     };
 
     rsx! {
@@ -698,13 +706,18 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                 }
             }
 
-            // Set / pack logo
-            div { class: "w-20 h-full flex justify-center items-center flex-shrink-0",
+            // Set icon (always visible)
+            div { class: "w-8 flex justify-center items-center flex-shrink-0",
                 img {
-                    src: "{pack_logo}",
+                    src: "{set_icon}",
                     alt: "",
-                    class: "max-h-full w-20 object-contain",
+                    class: "h-6 w-6 object-contain",
                 }
+            }
+
+            // Pack / set logo (hidden below lg)
+            div { class: "hidden lg:flex w-28 h-full justify-center items-center flex-shrink-0",
+                img { src: "{pack_logo}", alt: "", class: "{logo_img_class}" }
             }
 
             // Rarity icon
