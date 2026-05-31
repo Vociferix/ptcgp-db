@@ -8,6 +8,7 @@ use std::sync::OnceLock;
 
 use crate::app::{AppStorage, schedule_save};
 use crate::components::count_spinner::CountSpinner;
+use crate::components::icons::{ChevronDown, ChevronUp};
 use crate::components::{FilterMode, FilterToolbar};
 
 // ---------------------------------------------------------------------------
@@ -82,12 +83,6 @@ impl SortDir {
         match self {
             Self::Asc => Self::Desc,
             Self::Desc => Self::Asc,
-        }
-    }
-    fn label(self) -> &'static str {
-        match self {
-            Self::Asc => "↑",
-            Self::Desc => "↓",
         }
     }
 }
@@ -588,7 +583,7 @@ fn SortBtn(
 ) -> Element {
     let sc = sort_cfg.read();
     let active = sc.column == col;
-    let dir_label = if active { sc.dir.label() } else { "" };
+    let dir = if active { Some(sc.dir) } else { None };
     drop(sc);
     let cls = if active {
         "cursor-pointer select-none text-blue-600 dark:text-blue-400"
@@ -600,7 +595,16 @@ fn SortBtn(
             r#type: "button",
             class: "{flex_class} {cls}",
             onclick: move |_| handle_sort_click(col, sort_cfg),
-            "{label}{dir_label}"
+            span { class: "inline-flex items-center gap-0.5",
+                "{label}"
+                if let Some(d) = dir {
+                    if d == SortDir::Asc {
+                        ChevronUp { class: "w-3 h-3".to_string() }
+                    } else {
+                        ChevronDown { class: "w-3 h-3".to_string() }
+                    }
+                }
+            }
         }
     }
 }
@@ -660,7 +664,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
     };
     let pull_title = pd
         .best_pack
-        .map(|p| format!("{}", p.title()))
+        .map(|p| p.title().to_string())
         .unwrap_or_default();
 
     let set_code = cv.set().code();
@@ -783,13 +787,11 @@ fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
 
     let cv = &CardVersion::ALL[id];
     let merge = settings.read().merge_duplicate_printings();
-    let multi_active = store
-        .read()
-        .as_ref()
-        .is_some_and(|s| s.active_profile_names().len() > 1);
-
-    let (value, stored_count) = {
+    let (multi_active, value, stored_count) = {
         let s = store.read();
+        let multi_active = s
+            .as_ref()
+            .is_some_and(|s| s.active_profile_names().len() > 1);
         let s = s.as_ref();
         let agg = s.map_or(0, |s| s.aggregate_count(id));
         let merged = if merge {
@@ -809,7 +811,7 @@ fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
             })
             .unwrap_or(0)
         };
-        (merged, stored)
+        (multi_active, merged, stored)
     };
 
     let set_code = cv.set().code();
@@ -830,7 +832,7 @@ fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
     } else {
         None
     };
-    let best_pack_title = pd.best_pack.map(|p| format!("{}", p.title()));
+    let best_pack_title = pd.best_pack.map(|p| p.title().to_string());
 
     rsx! {
         div { class: "flex flex-col h-full overflow-y-auto",
