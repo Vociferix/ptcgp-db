@@ -3,7 +3,7 @@ use dioxus::document;
 use dioxus::prelude::*;
 use ptcgp_db_core::save_data::{CardKindFilter, CountThreshold, FilterConfig};
 use ptcgp_db_core::{AppSettings, CARD_PULL_RATES, ProfileStore};
-use ptcgp_db_data::CardVersion;
+use ptcgp_db_data::{Card, CardVersion};
 
 use crate::app::{AppStorage, schedule_save};
 use crate::components::count_spinner::CountSpinner;
@@ -57,6 +57,7 @@ fn passes_filter(
     settings: &AppSettings,
     store: &ProfileStore<AppStorage>,
     today: NaiveDate,
+    matched_name_ids: Option<&[usize]>,
 ) -> bool {
     if settings.ignore_unobtainable_sets() && cv.set().retirement_date().is_some_and(|d| d <= today)
     {
@@ -69,13 +70,8 @@ fn passes_filter(
         return false;
     }
 
-    if let Some(q) = cfg.name_query.as_deref().filter(|s| !s.is_empty()) {
-        let ql = q.to_ascii_lowercase();
-        let name = cv.card().name().as_str().to_ascii_lowercase();
-        let num = cv.number().get().to_string();
-        if !name.contains(ql.as_str()) && !num.contains(ql.as_str()) {
-            return false;
-        }
+    if matched_name_ids.is_some_and(|ids| !ids.contains(&cv.card().name().id())) {
+        return false;
     }
 
     if cfg.series.is_some_and(|sid| cv.series().id() != sid) {
@@ -309,9 +305,15 @@ pub fn CatalogPage() -> Element {
         let sett = settings.read();
         let sc = sort_cfg.read();
 
+        let matched_name_ids: Option<Vec<usize>> = cfg
+            .name_query
+            .as_deref()
+            .filter(|q| !q.trim().is_empty())
+            .map(|q| Card::NAMES.search(q).map(|e| e.id()).collect());
+
         let mut ids: Vec<usize> = CardVersion::ALL
             .iter()
-            .filter(|cv| passes_filter(cv, &cfg, &sett, s, today))
+            .filter(|cv| passes_filter(cv, &cfg, &sett, s, today, matched_name_ids.as_deref()))
             .map(|cv| cv.id())
             .collect();
 
