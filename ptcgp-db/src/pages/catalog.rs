@@ -805,7 +805,7 @@ fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
     rsx! {
         div { class: "flex flex-col gap-1.5",
             // Pack header row
-            div { class: "flex items-center gap-3",
+            div { class: "flex items-center gap-3 rounded px-1 hover:bg-gray-100 dark:hover:bg-gray-700/50",
                 img {
                     src: "{logo}",
                     alt: "",
@@ -819,7 +819,7 @@ fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
             // Variant rows
             for (vname, vpct, cpct, slots) in variant_rows {
                 div { class: "ml-6 flex flex-col gap-0.5",
-                    div { class: "flex items-center gap-2",
+                    div { class: "flex items-center gap-2 rounded px-1 hover:bg-gray-100 dark:hover:bg-gray-700/50",
                         span { class: "flex-1 text-xs text-gray-600 dark:text-gray-400",
                             "{vname} · {vpct:.3}% of packs"
                         }
@@ -829,7 +829,7 @@ fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
                     }
                     // Slot rows
                     for (pull_num, slot_pct) in slots {
-                        div { class: "ml-4 flex items-center gap-2",
+                        div { class: "ml-4 flex items-center gap-2 rounded px-1 hover:bg-gray-100 dark:hover:bg-gray-700/50",
                             span { class: "flex-1 text-xs text-gray-400 dark:text-gray-500",
                                 "{pull_num + 1}{ordinal_suffix(pull_num + 1)} Card"
                             }
