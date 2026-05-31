@@ -13,6 +13,8 @@ use ptcgp_db_data::{CardVersion, Pack, Prob};
 
 use crate::save_data::CardVersionId;
 
+include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+
 /// Computes the probability ([0, 1]) that opening a specific pack will yield a specific card.
 ///
 /// Uses the following formula:
@@ -32,21 +34,15 @@ use crate::save_data::CardVersionId;
 /// store a per-card, per-pack precomputed rate directly in `ptcgp-db-data`, reducing each
 /// call to O(1). Profile before committing to that change.
 pub fn card_pull_rate(pack: &Pack, card_id: CardVersionId) -> Prob {
-    let mut total = Prob::ZERO;
-    for variant in pack.variants() {
-        let mut not_prob = Prob::ONE;
-        for slot in variant.slots() {
-            for cvpr in slot.card_versions() {
-                if cvpr.card_version().id() == card_id {
-                    not_prob *= Prob::ONE.saturating_sub(&cvpr.pull_rate());
-                    break;
-                }
-            }
-        }
-        total =
-            (total + (Prob::ONE.saturating_sub(&not_prob) * variant.pull_rate())).min(Prob::ONE);
+    let Some(pull_rates) = CARD_PULL_RATES.get(card_id) else {
+        return Prob::ZERO;
+    };
+
+    let pull_rate = &pull_rates.pack_pull_rates[pack.id() % pull_rates.pack_pull_rates.len()];
+    if pull_rate.pack != pack {
+        return Prob::ZERO;
     }
-    total
+    pull_rate.prob
 }
 
 /// Computes the probability ([0, 1]) that opening a specific pack will yield at least one
@@ -88,16 +84,11 @@ pub fn desired_pull_rate(pack: &Pack, is_desired: impl Fn(CardVersionId) -> bool
 /// Iterates only the packs associated with this card version via `CardVersion::packs()` —
 /// all other packs have an implicit rate of zero for this card.
 pub fn max_card_pull_rate(card_id: CardVersionId) -> Prob {
-    let Some(card) = CardVersion::from_id(card_id) else {
+    let Some(pull_rates) = CARD_PULL_RATES.get(card_id) else {
         return Prob::ZERO;
     };
 
-    card.packs()
-        .iter()
-        .filter(|p| !p.set().is_promo())
-        .map(|p| card_pull_rate(p, card_id))
-        .max()
-        .unwrap_or(Prob::ZERO)
+    pull_rates.max_pull_rate
 }
 
 /// Returns the non-promo pack with the highest desired pull rate, along with that rate.

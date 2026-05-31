@@ -2,59 +2,13 @@ use chrono::NaiveDate;
 use dioxus::document;
 use dioxus::prelude::*;
 use ptcgp_db_core::save_data::{CardKindFilter, CountThreshold, FilterConfig};
-use ptcgp_db_core::{AppSettings, ProfileStore, card_pull_rate};
-use ptcgp_db_data::{CardVersion, Pack, Prob};
-use std::sync::OnceLock;
+use ptcgp_db_core::{AppSettings, CARD_PULL_RATES, ProfileStore};
+use ptcgp_db_data::CardVersion;
 
 use crate::app::{AppStorage, schedule_save};
 use crate::components::count_spinner::CountSpinner;
 use crate::components::icons::{ChevronDown, ChevronUp};
 use crate::components::{FilterMode, FilterToolbar};
-
-// ---------------------------------------------------------------------------
-// Precomputed pull rates — computed once on first catalog visit
-// ---------------------------------------------------------------------------
-
-struct CardPullData {
-    rate_pct: f64,
-    best_pack: Option<&'static Pack>,
-}
-
-static PULL_DATA: OnceLock<Vec<CardPullData>> = OnceLock::new();
-
-fn pull_data() -> &'static [CardPullData] {
-    PULL_DATA.get_or_init(|| {
-        CardVersion::ALL
-            .iter()
-            .map(|cv| {
-                let best = cv
-                    .packs()
-                    .iter()
-                    .filter(|p| !p.set().is_promo())
-                    .filter_map(|p| {
-                        let rate = card_pull_rate(p, cv.id());
-                        if rate > Prob::ZERO {
-                            let pct = rate.as_f64() * 100.0;
-                            Some((pct, p))
-                        } else {
-                            None
-                        }
-                    })
-                    .max_by(|(a, _), (b, _)| a.total_cmp(b));
-                match best {
-                    Some((rate_pct, pack)) => CardPullData {
-                        rate_pct,
-                        best_pack: Some(pack),
-                    },
-                    None => CardPullData {
-                        rate_pct: 0.0,
-                        best_pack: None,
-                    },
-                }
-            })
-            .collect()
-    })
-}
 
 // ---------------------------------------------------------------------------
 // Sort state
@@ -418,10 +372,9 @@ pub fn CatalogPage() -> Element {
                 }
             }),
             SortColumn::PullRate => {
-                let pd = pull_data();
                 ids.sort_by(|&a, &b| {
-                    let ra = pd[a].rate_pct;
-                    let rb = pd[b].rate_pct;
+                    let ra = CARD_PULL_RATES[a].max_pull_rate_pct;
+                    let rb = CARD_PULL_RATES[b].max_pull_rate_pct;
                     // Zero-rate (no pack) cards always sort last regardless of direction.
                     match (ra == 0.0, rb == 0.0) {
                         (true, false) => std::cmp::Ordering::Greater,
@@ -619,7 +572,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
     let settings = use_context::<Signal<AppSettings>>();
 
     let cv = &CardVersion::ALL[cv_id];
-    let pd = &pull_data()[cv_id];
+    let pd = &CARD_PULL_RATES[cv_id];
 
     let tint = element_tint_class(cv);
     let premium = premium_tint_class(cv);
@@ -657,8 +610,8 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
         "hover:bg-gray-50 dark:hover:bg-gray-700/50"
     };
 
-    let pull_label = if pd.rate_pct > 0.0 {
-        format!("{:.2}%", pd.rate_pct)
+    let pull_label = if pd.max_pull_rate_pct > 0.0 {
+        format!("{:.2}%", pd.max_pull_rate_pct)
     } else {
         "N/A".to_string()
     };
@@ -826,9 +779,9 @@ fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
         .card()
         .pokemon()
         .map(|p| (p.element().icon(), p.element().name()));
-    let pd = &pull_data()[id];
-    let pull_label = if pd.rate_pct > 0.0 {
-        Some(format!("{:.2}%", pd.rate_pct))
+    let pd = &CARD_PULL_RATES[id];
+    let pull_label = if pd.max_pull_rate_pct > 0.0 {
+        Some(format!("{:.2}%", pd.max_pull_rate_pct))
     } else {
         None
     };
