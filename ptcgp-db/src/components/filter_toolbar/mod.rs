@@ -49,21 +49,11 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
         )
     };
 
-    // Catalog has a narrower list column (side panel takes space), so Set/Pack/Source
-    // only appear in the primary row at lg+ to avoid overflowing into the detail panel.
-    let sps_row_cls = if mode == FilterMode::Catalog {
-        "hidden lg:flex items-end gap-2"
-    } else {
-        "hidden sm:flex items-end gap-2"
-    };
-    let sps_panel_cls = if mode == FilterMode::Catalog {
-        "flex flex-col gap-3 lg:hidden"
-    } else {
-        "flex flex-col gap-3 sm:hidden"
-    };
-
     rsx! {
-        div { class: "relative",
+        // @container makes breakpoints respond to the available container width,
+        // not the viewport width. This prevents toolbar overflow into the detail panel
+        // at medium viewport widths where the list column is narrower than the viewport.
+        div { class: "relative @container",
             // ── Primary row ─────────────────────────────────────────────────
             // flex-nowrap prevents wrapping; filters that don't fit at a given
             // breakpoint are hidden here and surfaced in the floating panel.
@@ -80,15 +70,15 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                     }
                 }
 
-                // Set + Pack + Source — breakpoint depends on mode (see sps_row_cls above)
-                div { class: "{sps_row_cls}",
+                // Set + Pack + Source — visible when container >= 640px
+                div { class: "hidden @sm:flex items-end gap-2",
                     SetDropdown { config }
                     PackDropdown { config }
                     SourceDropdown { config }
                 }
 
-                // Series + Kind — visible at lg+ (1024px); hidden items appear in panel
-                div { class: "hidden lg:flex items-end gap-2",
+                // Series + Kind — visible when container >= 768px
+                div { class: "hidden @md:flex items-end gap-2",
                     SeriesFilter { config }
                     KindFilter { config }
                 }
@@ -126,14 +116,14 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                             min-w-64 max-w-[min(640px,calc(100vw-1rem))]",
 
                     // ── Primary filters hidden from the row at narrow widths ──
-                    // Set/Pack/Source: shown in panel when not in primary row
-                    div { class: "{sps_panel_cls}",
+                    // Set/Pack/Source: in panel when container < 640px
+                    div { class: "flex flex-col gap-3 @sm:hidden",
                         SetDropdown { config }
                         PackDropdown { config }
                         SourceDropdown { config }
                     }
-                    // Series/Kind: not in primary row below lg — show here instead
-                    div { class: "flex flex-col gap-3 lg:hidden",
+                    // Series/Kind: in panel when container < 768px
+                    div { class: "flex flex-col gap-3 @md:hidden",
                         SeriesFilter { config }
                         KindFilter { config }
                     }

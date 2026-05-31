@@ -542,13 +542,13 @@ fn SortHeader(sort_cfg: Signal<SortConfig>) -> Element {
                 flex_class: "flex-1 min-w-0 text-left",
             }
             // Set / pack logo placeholder
-            div { class: "w-10 shrink-0" }
+            div { class: "w-20 shrink-0" }
             // Rarity
             SortBtn {
                 col: SortColumn::Rarity,
                 label: "Rarity",
                 sort_cfg,
-                flex_class: "w-14 text-center",
+                flex_class: "w-20 text-center",
             }
             // Element (hidden below lg)
             SortBtn {
@@ -666,10 +666,11 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
     let card_image = cv.image();
     let element_icon = cv.card().pokemon().map(|p| p.element().icon());
     let pack_logo = {
-        let mut non_promo = cv.packs().iter().filter(|p| !p.set().is_promo());
-        match (non_promo.next(), non_promo.next()) {
+        let mut packs = cv.packs().iter();
+        match (packs.next(), packs.next()) {
+            (None, _) => cv.source().icon(),
             (Some(p), None) => p.logo(),
-            _ => cv.set().icon(),
+            _ => cv.set().logo(),
         }
     };
 
@@ -698,20 +699,20 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
             }
 
             // Set / pack logo
-            div { class: "w-10 flex justify-center items-center flex-shrink-0",
+            div { class: "w-20 flex justify-center items-center flex-shrink-0",
                 img {
                     src: "{pack_logo}",
                     alt: "",
-                    class: "h-8 w-10 object-contain",
+                    class: "h-8 w-20 object-contain",
                 }
             }
 
             // Rarity icon
-            div { class: "w-14 flex justify-center flex-shrink-0",
+            div { class: "w-20 flex justify-center flex-shrink-0",
                 img {
                     src: "{rarity_icon}",
                     alt: "",
-                    class: "h-6 w-auto object-contain",
+                    class: "h-6 max-w-full object-contain",
                 }
             }
 
