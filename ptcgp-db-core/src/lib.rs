@@ -17,8 +17,8 @@ pub mod web_storage;
 pub use file_storage::{FileStorage, FileStorageError};
 pub use migration::{MigrationError, migrate_profiles, migrate_saved_queries, migrate_settings};
 pub use probability::{
-    best_pack_for_desired, card_pull_rate, completion, completion_merged, desired_pull_rate,
-    max_card_pull_rate,
+    CARD_PULL_RATES, best_pack_for_desired, card_pull_rate, completion, completion_merged,
+    desired_pull_rate, max_card_pull_rate,
 };
 pub use profile_store::{ProfileStore, ProfileStoreError};
 pub use queries::{RenameError, SavedQueries};
