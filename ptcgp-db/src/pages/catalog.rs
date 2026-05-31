@@ -7,8 +7,10 @@ use ptcgp_db_data::{Card, CardVersion};
 
 use crate::app::{AppStorage, schedule_save};
 use crate::components::count_spinner::CountSpinner;
-use crate::components::icons::{ChevronDown, ChevronUp};
+use crate::components::effect_text::EffectText;
+use crate::components::icons::{ArrowLeft, ChevronDown, ChevronUp};
 use crate::components::{FilterMode, FilterToolbar};
+use crate::routes::Route;
 
 // ---------------------------------------------------------------------------
 // Sort state
@@ -645,9 +647,18 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
 
     rsx! {
         div {
-            class: "flex items-center gap-2 px-3 cursor-pointer {tint} {premium} {selected_class}",
+            class: "relative flex items-center gap-2 px-3 cursor-pointer {tint} {premium} {selected_class}",
             style: "height: {ITEM_HEIGHT}px; {border_style}",
             onclick: move |_| selected.set(Some(cv_id)),
+
+            // Narrow-viewport: transparent overlay that navigates to the full detail page.
+            // Hidden at xl+ where the inline detail panel handles selection instead.
+            Link {
+                class: "absolute inset-0 xl:hidden z-10",
+                to: Route::CardDetailPage {
+                    card_id: cv_id,
+                },
+            }
 
             // Thumbnail
             img {
@@ -710,8 +721,9 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                 }
             }
 
-            // Count spinner
-            div { class: "w-28 flex justify-end flex-shrink-0",
+            // Count spinner — hidden below xl; at narrow widths editing is done on the
+            // full-screen detail page to avoid overlap with the navigation overlay.
+            div { class: "w-28 hidden xl:flex justify-end flex-shrink-0 relative z-20",
                 CountSpinner {
                     value,
                     stored_count,
@@ -724,47 +736,129 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
 }
 
 // ---------------------------------------------------------------------------
-// DetailPanel
+// PackRateRow
 // ---------------------------------------------------------------------------
 
 #[component]
-fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
+fn PackRateRow(pack_id: usize, percent: f64) -> Element {
+    let Some(pack) = ptcgp_db_data::Pack::from_id(pack_id) else {
+        return rsx! {};
+    };
+    let logo = pack.logo();
+    let title = pack.title();
+    rsx! {
+        div { class: "flex items-center gap-2",
+            img {
+                src: "{logo}",
+                alt: "",
+                class: "h-8 w-16 object-contain flex-shrink-0",
+            }
+            span { class: "flex-1 text-sm text-gray-700 dark:text-gray-300", "{title}" }
+            span { class: "text-sm tabular-nums font-medium text-gray-900 dark:text-gray-100",
+                "{percent:.3}%"
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AttackRow
+// ---------------------------------------------------------------------------
+
+#[component]
+fn AttackRow(attack_id: usize) -> Element {
+    let attack = &ptcgp_db_data::Attack::ALL[attack_id];
+    let cost = attack.cost();
+    let name = attack.name();
+    let damage = attack.damage();
+    let effect = attack.effect();
+    rsx! {
+        div { class: "flex flex-col gap-1 p-2 rounded bg-gray-50 dark:bg-gray-800",
+            div { class: "flex items-center gap-2",
+                div { class: "flex items-center gap-0.5 shrink-0",
+                    if cost.is_empty() {
+                        img {
+                            src: "{ptcgp_db_data::Element::NO_COST}",
+                            alt: "",
+                            class: "h-5 w-5 object-contain",
+                        }
+                    } else {
+                        for elem in cost.iter() {
+                            img {
+                                src: "{elem.icon()}",
+                                alt: "",
+                                class: "h-5 w-5 object-contain",
+                            }
+                        }
+                    }
+                }
+                span { class: "flex-1 text-sm font-medium text-gray-900 dark:text-gray-100",
+                    "{name}"
+                }
+                if attack.base_damage() > 0 || attack.damage_suffix().is_some() {
+                    span { class: "text-sm font-bold tabular-nums text-gray-900 dark:text-gray-100",
+                        "{damage}"
+                    }
+                }
+            }
+            if let Some(eff) = effect {
+                p { class: "text-xs text-gray-600 dark:text-gray-400",
+                    EffectText { text: eff.to_string() }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VersionChip
+// ---------------------------------------------------------------------------
+
+#[component]
+fn VersionChip(cv_id: usize, current_id: usize) -> Element {
+    let cv = &CardVersion::ALL[cv_id];
+    let set_code = cv.set().code();
+    let number = cv.number().get();
+    let rarity = cv.rarity().name();
+    let is_current = cv_id == current_id;
+    let cls = if is_current {
+        "text-xs px-2 py-0.5 rounded-full border font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"
+    } else {
+        "text-xs px-2 py-0.5 rounded-full border bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
+    };
+    rsx! {
+        span { class: "{cls}", title: "{rarity}", "{set_code} {number:03}" }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CardDetailBody — shared by DetailPanel (wide) and CardDetailPage (narrow)
+// ---------------------------------------------------------------------------
+
+#[component]
+fn CardDetailBody(cv_id: usize) -> Element {
     let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
     let settings = use_context::<Signal<AppSettings>>();
 
-    let Some(id) = *cv_id.read() else {
-        return rsx! {
-            div { class: "flex flex-col items-center justify-center h-full text-sm text-gray-400 dark:text-gray-600 p-6 text-center",
-                "Select a card to view details."
-            }
-        };
-    };
-
-    let cv = &CardVersion::ALL[id];
+    let cv = &CardVersion::ALL[cv_id];
     let merge = settings.read().merge_duplicate_printings();
     let (multi_active, value, stored_count) = {
         let s = store.read();
-        let multi_active = s
-            .as_ref()
-            .is_some_and(|s| s.active_profile_names().len() > 1);
+        let multi_active = s.as_ref().is_some_and(|s| s.active_profile_names().len() > 1);
         let s = s.as_ref();
-        let agg = s.map_or(0, |s| s.aggregate_count(id));
+        let agg = s.map_or(0, |s| s.aggregate_count(cv_id));
         let merged = if merge {
-            cv.duplicates().iter().fold(agg, |acc, d| {
-                acc.saturating_add(s.map_or(0, |s| s.aggregate_count(d.id())))
-            })
+            cv.duplicates()
+                .iter()
+                .fold(agg, |acc, d| acc.saturating_add(s.map_or(0, |s| s.aggregate_count(d.id()))))
         } else {
             agg
         };
         let stored = if multi_active {
             agg
         } else {
-            s.and_then(|s| {
-                s.active_profile_names()
-                    .first()
-                    .map(|n| s.owned_count(n, id))
-            })
-            .unwrap_or(0)
+            s.and_then(|s| s.active_profile_names().first().map(|n| s.owned_count(n, cv_id)))
+                .unwrap_or(0)
         };
         (multi_active, merged, stored)
     };
@@ -777,21 +871,17 @@ fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
     let card_image = cv.image();
     let source_name = cv.source().name();
     let source_desc = cv.source().description();
-    let element_info = cv
-        .card()
-        .pokemon()
-        .map(|p| (p.element().icon(), p.element().name()));
-    let pd = &CARD_PULL_RATES[id];
-    let pull_label = if pd.max_pull_rate_pct > 0.0 {
-        Some(format!("{:.3}%", pd.max_pull_rate_pct))
-    } else {
-        None
-    };
-    let best_pack_title = pd.best_pack.map(|p| p.title().to_string());
+    let is_pack_source = source_name.as_str() == "Pack";
+    let is_pokemon = cv.card().is_pokemon();
+    let is_trainer = cv.card().is_trainer();
+    let pd = &CARD_PULL_RATES[cv_id];
+    let pkmn = cv.card().pokemon();
+    let trainer = cv.card().trainer();
+    let duplicates = cv.duplicates();
+    let all_versions = cv.card().versions();
 
     rsx! {
         div { class: "flex flex-col h-full overflow-y-auto",
-            // Card image
             div { class: "flex justify-center p-4 bg-gray-50 dark:bg-gray-800/50 shrink-0",
                 img {
                     src: "{card_image}",
@@ -800,14 +890,25 @@ fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
                 }
             }
 
-            div { class: "flex flex-col gap-3 p-4",
-                // Name + code
-                div {
-                    p { class: "text-lg font-bold text-gray-900 dark:text-gray-100 leading-tight",
-                        "{name}"
+            div { class: "flex flex-col gap-4 p-4",
+                // Name + code + type badge
+                div { class: "flex items-start justify-between gap-2",
+                    div {
+                        p { class: "text-lg font-bold text-gray-900 dark:text-gray-100 leading-tight",
+                            "{name}"
+                        }
+                        p { class: "text-xs text-gray-400 dark:text-gray-500 tabular-nums",
+                            "{set_code} {number:03}"
+                        }
                     }
-                    p { class: "text-xs text-gray-400 dark:text-gray-500 tabular-nums",
-                        "{set_code} {number:03}"
+                    if is_pokemon {
+                        span { class: "text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 shrink-0 mt-0.5",
+                            "Pokémon"
+                        }
+                    } else if is_trainer {
+                        span { class: "text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 shrink-0 mt-0.5",
+                            "Trainer"
+                        }
                     }
                 }
 
@@ -821,48 +922,275 @@ fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
                     span { class: "text-xs text-gray-500 dark:text-gray-400", "{rarity_name}" }
                 }
 
-                // Element type (Pokemon only)
-                if let Some((icon, ename)) = element_info {
-                    div { class: "flex items-center gap-2",
-                        img {
-                            src: "{icon}",
-                            alt: "",
-                            class: "h-5 w-5 object-contain",
-                        }
-                        span { class: "text-xs text-gray-500 dark:text-gray-400", "{ename}" }
+                // Owned count
+                div { class: "flex items-center gap-2",
+                    span { class: "text-sm text-gray-600 dark:text-gray-400", "Owned" }
+                    CountSpinner {
+                        value,
+                        stored_count,
+                        disabled: multi_active,
+                        on_change: move |n| do_set_count(cv_id, n, store),
                     }
                 }
 
-                // Source (when not a regular Pack card)
-                if source_name.as_str() != "Pack" {
+                // Pack pull rates
+                if is_pack_source && !pd.pack_pull_rates.is_empty() {
+                    div { class: "flex flex-col gap-2",
+                        p { class: "text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide",
+                            "Pull Rates"
+                        }
+                        for pr in pd.pack_pull_rates.iter() {
+                            PackRateRow { pack_id: pr.pack.id(), percent: pr.percent }
+                        }
+                    }
+                }
+
+                // Source description (non-pack)
+                if !is_pack_source {
                     div { class: "text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded p-2",
                         "{source_desc}"
                     }
                 }
 
-                // Pull rate (pack cards only)
-                if let Some(pct) = &pull_label {
-                    div { class: "flex flex-col gap-0.5",
-                        span { class: "text-xs text-gray-400 dark:text-gray-500", "Pull rate" }
-                        span { class: "text-sm text-gray-900 dark:text-gray-100", "{pct}" }
-                        if let Some(title) = &best_pack_title {
-                            span { class: "text-xs text-gray-400 dark:text-gray-500",
-                                "{title}"
+                // Pokémon-only fields
+                if let Some(p) = pkmn {
+                    div { class: "flex flex-col gap-3",
+                        // Stats: Pokédex · HP · Stage
+                        div { class: "grid grid-cols-3 gap-2",
+                            div { class: "flex flex-col items-center p-2 rounded bg-gray-50 dark:bg-gray-800",
+                                span { class: "text-xs text-gray-400 dark:text-gray-500",
+                                    "Pokédex"
+                                }
+                                span { class: "text-sm font-bold tabular-nums text-gray-900 dark:text-gray-100",
+                                    "#{p.base_pokemon().natdex_number()}"
+                                }
+                            }
+                            div { class: "flex flex-col items-center p-2 rounded bg-gray-50 dark:bg-gray-800",
+                                span { class: "text-xs text-gray-400 dark:text-gray-500",
+                                    "HP"
+                                }
+                                span { class: "text-sm font-bold tabular-nums text-gray-900 dark:text-gray-100",
+                                    "{p.hp()}"
+                                }
+                            }
+                            div { class: "flex flex-col items-center p-2 rounded bg-gray-50 dark:bg-gray-800",
+                                span { class: "text-xs text-gray-400 dark:text-gray-500",
+                                    "Stage"
+                                }
+                                span { class: "text-sm font-bold text-gray-900 dark:text-gray-100",
+                                    "{p.stage().name()}"
+                                }
+                            }
+                        }
+
+                        // Element
+                        div { class: "flex items-center gap-2",
+                            img {
+                                src: "{p.element().icon()}",
+                                alt: "",
+                                class: "h-5 w-5 object-contain",
+                            }
+                            span { class: "text-sm text-gray-700 dark:text-gray-300",
+                                "{p.element().name()}"
+                            }
+                        }
+
+                        // Retreat cost
+                        div { class: "flex items-center gap-1.5",
+                            span { class: "text-xs text-gray-400 dark:text-gray-500 w-14 shrink-0",
+                                "Retreat"
+                            }
+                            if p.retreat_cost() == 0 {
+                                span { class: "text-xs text-gray-500 dark:text-gray-400",
+                                    "Free"
+                                }
+                            } else {
+                                div { class: "flex items-center gap-0.5",
+                                    for _ in 0..p.retreat_cost() {
+                                        if let Some(colorless) = ptcgp_db_data::Element::ALL
+                                            .iter()
+                                            .find(|e| e.code() == Some('C'))
+                                        {
+                                            img {
+                                                src: "{colorless.icon()}",
+                                                alt: "",
+                                                class: "h-4 w-4 object-contain",
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Weakness
+                        if let Some(w) = p.weakness() {
+                            div { class: "flex items-center gap-1.5",
+                                span { class: "text-xs text-gray-400 dark:text-gray-500 w-14 shrink-0",
+                                    "Weakness"
+                                }
+                                img {
+                                    src: "{w.icon()}",
+                                    alt: "",
+                                    class: "h-4 w-4 object-contain",
+                                }
+                                span { class: "text-sm text-gray-700 dark:text-gray-300",
+                                    "{w.name()}"
+                                }
+                            }
+                        }
+
+                        // Flags
+                        if p.is_ex() || p.is_mega() {
+                            div { class: "flex gap-2",
+                                if p.is_ex() {
+                                    span { class: "text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",
+                                        "Pokémon ex"
+                                    }
+                                }
+                                if p.is_mega() {
+                                    span { class: "text-xs px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300",
+                                        "Mega Pokémon ex"
+                                    }
+                                }
+                            }
+                        }
+
+                        // Evolves from
+                        if let Some(evo) = p.evolves_from() {
+                            p { class: "text-xs text-gray-500 dark:text-gray-400",
+                                "Evolves from "
+                                span { class: "font-medium text-gray-700 dark:text-gray-300",
+                                    "{evo}"
+                                }
+                            }
+                        }
+
+                        // Attacks
+                        if !p.attacks().is_empty() {
+                            div { class: "flex flex-col gap-2",
+                                p { class: "text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide",
+                                    "Attacks"
+                                }
+                                for attack in p.attacks().iter() {
+                                    AttackRow { attack_id: attack.id() }
+                                }
+                            }
+                        }
+
+                        // Ability
+                        if let Some(ab) = p.ability() {
+                            div { class: "flex flex-col gap-1 p-2 rounded bg-blue-50 dark:bg-blue-900/20",
+                                p { class: "text-xs font-semibold text-blue-700 dark:text-blue-300",
+                                    "Ability — {ab.name()}"
+                                }
+                                p { class: "text-xs text-gray-600 dark:text-gray-400",
+                                    EffectText { text: ab.effect().to_string() }
+                                }
+                            }
+                        }
+
+                        // Flavor text
+                        if let Some(ft) = p.flavor_text() {
+                            p { class: "text-xs italic text-gray-400 dark:text-gray-500 leading-relaxed",
+                                "{ft}"
                             }
                         }
                     }
                 }
 
-                // Owned count
-                div { class: "flex items-center gap-2",
-                    span { class: "text-sm text-gray-600 dark:text-gray-400", "Owned:" }
-                    CountSpinner {
-                        value,
-                        stored_count,
-                        disabled: multi_active,
-                        on_change: move |n| do_set_count(id, n, store),
+                // Trainer-only fields
+                if let Some(t) = trainer {
+                    div { class: "flex flex-col gap-3",
+                        span { class: "self-start text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
+                            "{t.kind().name()}"
+                        }
+                        div { class: "p-2 rounded bg-gray-50 dark:bg-gray-800",
+                            p { class: "text-xs text-gray-700 dark:text-gray-300",
+                                EffectText { text: t.effect().to_string() }
+                            }
+                        }
                     }
                 }
+
+                // Duplicate printings
+                if !duplicates.is_empty() {
+                    div { class: "flex flex-col gap-2",
+                        p { class: "text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide",
+                            "Duplicate Printings"
+                        }
+                        div { class: "flex flex-wrap gap-1",
+                            for d in duplicates.iter() {
+                                VersionChip { cv_id: d.id(), current_id: cv_id }
+                            }
+                        }
+                    }
+                }
+
+                // All versions of this abstract card
+                if all_versions.len() > 1 {
+                    div { class: "flex flex-col gap-2",
+                        p { class: "text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide",
+                            "All Versions"
+                        }
+                        div { class: "flex flex-wrap gap-1",
+                            for v in all_versions.iter() {
+                                VersionChip { cv_id: v.id(), current_id: cv_id }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DetailPanel — wide-viewport panel beside the catalog list
+// ---------------------------------------------------------------------------
+
+#[component]
+fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
+    let Some(id) = *cv_id.read() else {
+        return rsx! {
+            div { class: "flex flex-col items-center justify-center h-full text-sm text-gray-400 dark:text-gray-600 p-6 text-center",
+                "Select a card to view details."
+            }
+        };
+    };
+    rsx! {
+        CardDetailBody { cv_id: id }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CardDetailPage — full-screen narrow-viewport detail page
+// ---------------------------------------------------------------------------
+
+#[component]
+pub fn CardDetailPage(card_id: usize) -> Element {
+    let nav = use_navigator();
+    if card_id >= CardVersion::ALL.len() {
+        return rsx! {
+            div { class: "flex flex-col items-center justify-center h-full text-sm text-gray-400 dark:text-gray-600 p-6",
+                "Card not found."
+            }
+        };
+    }
+    rsx! {
+        div { class: "flex flex-col h-full",
+            div { class: "flex items-center shrink-0 px-3 py-2 border-b border-gray-200 dark:border-gray-700",
+                button {
+                    r#type: "button",
+                    class: "flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100",
+                    onclick: move |_| {
+                        drop(nav.push(Route::CatalogPage {}));
+                    },
+                    ArrowLeft { class: "w-4 h-4".to_string() }
+                    "Catalog"
+                }
+            }
+            div { class: "flex-1 min-h-0",
+                CardDetailBody { cv_id: card_id }
             }
         }
     }

@@ -220,6 +220,7 @@ Currently available:
 | `Check` | `check` | Selected-item indicator |
 | `Plus` | `plus` | Count increment |
 | `Minus` | `minus` | Count decrement |
+| `ArrowLeft` | `arrow-left` | Back navigation |
 
 Each component takes a `class: String` prop for Tailwind sizing and color (e.g.
 `class: "w-4 h-4 text-gray-500 dark:text-gray-400"`). Icons render at `currentColor` so

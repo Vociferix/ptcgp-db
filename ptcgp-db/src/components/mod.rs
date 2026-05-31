@@ -1,4 +1,5 @@
 pub mod count_spinner;
+pub mod effect_text;
 pub mod filter_toolbar;
 pub mod icons;
 pub mod nav;
