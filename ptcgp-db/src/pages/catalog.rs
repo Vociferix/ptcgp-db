@@ -516,7 +516,7 @@ fn SortHeader(sort_cfg: Signal<SortConfig>) -> Element {
                 col: SortColumn::PullRate,
                 label: "Pull %",
                 sort_cfg,
-                flex_class: "hidden lg:block w-14 text-right",
+                flex_class: "hidden lg:block w-16 text-right",
             }
             // Owned count
             SortBtn {
@@ -613,7 +613,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
     };
 
     let pull_label = if pd.max_pull_rate_pct > 0.0 {
-        format!("{:.2}%", pd.max_pull_rate_pct)
+        format!("{:.3}%", pd.max_pull_rate_pct)
     } else {
         "N/A".to_string()
     };
@@ -702,7 +702,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
             }
 
             // Pull rate (hidden below lg)
-            div { class: "hidden lg:block w-14 text-right flex-shrink-0",
+            div { class: "hidden lg:block w-16 text-right flex-shrink-0",
                 span {
                     class: "text-xs text-gray-600 dark:text-gray-400",
                     title: "{pull_title}",
@@ -783,7 +783,7 @@ fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
         .map(|p| (p.element().icon(), p.element().name()));
     let pd = &CARD_PULL_RATES[id];
     let pull_label = if pd.max_pull_rate_pct > 0.0 {
-        Some(format!("{:.2}%", pd.max_pull_rate_pct))
+        Some(format!("{:.3}%", pd.max_pull_rate_pct))
     } else {
         None
     };
