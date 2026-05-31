@@ -34,7 +34,7 @@ fn pull_data() -> &'static [CardPullData] {
                     .filter_map(|p| {
                         let rate = card_pull_rate(p, cv.id());
                         if rate > Prob::ZERO {
-                            let pct = rate.numerator() as f64 / rate.denominator() as f64 * 100.0;
+                            let pct = rate.as_f64() * 100.0;
                             Some((pct, p))
                         } else {
                             None

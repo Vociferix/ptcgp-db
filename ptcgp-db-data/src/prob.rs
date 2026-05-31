@@ -80,19 +80,8 @@ impl Prob {
             .saturating_add(den_bits);
 
         // Perform the scaled integer division
-        let scaled = if shift <= 63 {
-            // num fits after shifting
-            let scaled_num = if let Some(tmp) = num.checked_shl(shift) {
-                tmp
-            } else {
-                u64::MAX
-            };
-            scaled_num / den
-        } else {
-            // shift is large; use u128 to avoid overflow
-            let scaled_num = (num as u128) << shift;
-            (scaled_num / den as u128) as u64
-        };
+        let scaled_num = (num as u128) << shift;
+        let scaled = (scaled_num / den as u128) as u64;
 
         // The result is scaled / 2^shift as an exact rational;
         // convert to f64 by multiplying by 2^-shift
