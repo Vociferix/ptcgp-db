@@ -1,4 +1,3 @@
-mod analysis;
 mod catalog;
 mod import_export;
 mod onboarding;
@@ -7,7 +6,6 @@ mod settings;
 mod summary;
 mod trade;
 
-pub use analysis::AnalysisPage;
 pub use catalog::{CardDetailPage, CatalogPage};
 pub use import_export::ImportExportPage;
 pub use onboarding::OnboardingPage;
