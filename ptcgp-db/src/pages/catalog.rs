@@ -734,6 +734,12 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
     }
 }
 
+fn focus_on_mount(data: Event<MountedData>) {
+    let _ = spawn(async move {
+        let _ = data.set_focus(true).await;
+    });
+}
+
 fn ordinal_suffix(n: usize) -> &'static str {
     match n {
         1 => "st",
@@ -1001,6 +1007,7 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
     let trainer = cv.card().trainer();
     let duplicates = cv.duplicates();
     let all_versions = cv.card().versions();
+    let mut lightbox_open: Signal<bool> = use_signal(|| false);
 
     rsx! {
         div { class: "flex flex-col h-full overflow-y-auto",
@@ -1008,7 +1015,8 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                 img {
                     src: "{card_image}",
                     alt: "{name}",
-                    class: "h-64 w-auto object-contain rounded shadow-md",
+                    class: "h-64 w-auto object-contain rounded shadow-md cursor-zoom-in",
+                    onclick: move |_| lightbox_open.set(true),
                 }
             }
 
@@ -1262,6 +1270,27 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                 // Pack pull rates — full pack → variant → slot hierarchy (at bottom)
                 if is_pack_source && !pd.pack_pull_rates.is_empty() {
                     PullRateSection { cv_id }
+                }
+            }
+        }
+
+        // Lightbox — full-resolution card image in a darkened overlay
+        if *lightbox_open.read() {
+            div {
+                class: "fixed inset-0 z-50 flex items-center justify-center bg-black/80 cursor-zoom-out",
+                tabindex: "-1",
+                onmounted: focus_on_mount,
+                onkeydown: move |evt| {
+                    if evt.key() == Key::Escape {
+                        lightbox_open.set(false);
+                    }
+                },
+                onclick: move |_| lightbox_open.set(false),
+                img {
+                    src: "{card_image}",
+                    alt: "{name}",
+                    class: "max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] object-contain rounded shadow-2xl",
+                    onclick: move |evt| evt.stop_propagation(),
                 }
             }
         }
