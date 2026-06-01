@@ -16,8 +16,9 @@ fn parse_segments(text: &str) -> Vec<Segment> {
                 && after.as_bytes()[1] == b']'
             {
                 let code = after.as_bytes()[0] as char;
-                if let Some(elem) =
-                    ptcgp_db_data::Element::ALL.iter().find(|e| e.code() == Some(code))
+                if let Some(elem) = ptcgp_db_data::Element::ALL
+                    .iter()
+                    .find(|e| e.code() == Some(code))
                 {
                     if pos > 0 {
                         segments.push(Segment::Text(rest[..pos].to_string()));

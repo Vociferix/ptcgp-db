@@ -783,7 +783,12 @@ fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
 
     // Compute variant pull data: (name, variant_selection_pct, card_pct_if_variant, slots)
     // Only includes variants where the card actually appears.
-    let variant_rows: Vec<(ptcgp_db_data::str_table::StrEntry, f64, f64, Vec<(usize, f64)>)> = pack
+    let variant_rows: Vec<(
+        ptcgp_db_data::str_table::StrEntry,
+        f64,
+        f64,
+        Vec<(usize, f64)>,
+    )> = pack
         .variants()
         .iter()
         .filter_map(|variant| {
@@ -801,7 +806,9 @@ fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
             if slots.is_empty() {
                 return None;
             }
-            let not_prob = slots.iter().fold(1.0f64, |acc, (_, r)| acc * (1.0 - r / 100.0));
+            let not_prob = slots
+                .iter()
+                .fold(1.0f64, |acc, (_, r)| acc * (1.0 - r / 100.0));
             let card_pct = (1.0 - not_prob) * 100.0;
             let variant_pct = variant.pull_rate().as_f64() * 100.0;
             Some((variant.name(), variant_pct, card_pct, slots))
@@ -972,21 +979,27 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
     let merge = settings.read().merge_duplicate_printings();
     let (multi_active, value, stored_count) = {
         let s = store.read();
-        let multi_active = s.as_ref().is_some_and(|s| s.active_profile_names().len() > 1);
+        let multi_active = s
+            .as_ref()
+            .is_some_and(|s| s.active_profile_names().len() > 1);
         let s = s.as_ref();
         let agg = s.map_or(0, |s| s.aggregate_count(cv_id));
         let merged = if merge {
-            cv.duplicates()
-                .iter()
-                .fold(agg, |acc, d| acc.saturating_add(s.map_or(0, |s| s.aggregate_count(d.id()))))
+            cv.duplicates().iter().fold(agg, |acc, d| {
+                acc.saturating_add(s.map_or(0, |s| s.aggregate_count(d.id())))
+            })
         } else {
             agg
         };
         let stored = if multi_active {
             agg
         } else {
-            s.and_then(|s| s.active_profile_names().first().map(|n| s.owned_count(n, cv_id)))
-                .unwrap_or(0)
+            s.and_then(|s| {
+                s.active_profile_names()
+                    .first()
+                    .map(|n| s.owned_count(n, cv_id))
+            })
+            .unwrap_or(0)
         };
         (multi_active, merged, stored)
     };
