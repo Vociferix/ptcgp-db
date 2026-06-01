@@ -1031,17 +1031,19 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                         p { class: "text-xs text-gray-400 dark:text-gray-500 tabular-nums",
                             "{set_code} {number:03}"
                         }
-                        p { class: "text-xs italic text-gray-400 dark:text-gray-500",
-                            "Illus. {illustrator}"
-                        }
                     }
-                    if is_pokemon {
-                        span { class: "text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 shrink-0 mt-0.5",
-                            "Pokémon"
+                    div { class: "flex flex-col items-end gap-1 shrink-0",
+                        if is_pokemon {
+                            span { class: "text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300",
+                                "Pokémon"
+                            }
+                        } else if is_trainer {
+                            span { class: "text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
+                                "Trainer"
+                            }
                         }
-                    } else if is_trainer {
-                        span { class: "text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 shrink-0 mt-0.5",
-                            "Trainer"
+                        span { class: "text-xs italic text-gray-400 dark:text-gray-500",
+                            "Illus. {illustrator}"
                         }
                     }
                 }
@@ -1089,10 +1091,7 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                                     "Pokédex"
                                 }
                                 span { class: "text-sm font-bold tabular-nums text-gray-900 dark:text-gray-100",
-                                    "#{p.base_pokemon().natdex_number()}"
-                                }
-                                span { class: "text-xs text-gray-600 dark:text-gray-400",
-                                    "{p.base_pokemon().name()}"
+                                    "#{p.base_pokemon().natdex_number()} {p.base_pokemon().name()}"
                                 }
                             }
                             div { class: "flex flex-col items-center p-2 rounded bg-gray-50 dark:bg-gray-800",
