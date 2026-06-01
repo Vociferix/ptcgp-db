@@ -783,7 +783,7 @@ fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
 
     // Compute variant pull data: (name, variant_selection_pct, card_pct_if_variant, slots)
     // Only includes variants where the card actually appears.
-    let variant_rows: Vec<(String, f64, f64, Vec<(usize, f64)>)> = pack
+    let variant_rows: Vec<(ptcgp_db_data::str_table::StrEntry, f64, f64, Vec<(usize, f64)>)> = pack
         .variants()
         .iter()
         .filter_map(|variant| {
@@ -804,7 +804,7 @@ fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
             let not_prob = slots.iter().fold(1.0f64, |acc, (_, r)| acc * (1.0 - r / 100.0));
             let card_pct = (1.0 - not_prob) * 100.0;
             let variant_pct = variant.pull_rate().as_f64() * 100.0;
-            Some((variant.name().as_str().to_string(), variant_pct, card_pct, slots))
+            Some((variant.name(), variant_pct, card_pct, slots))
         })
         .collect();
 
