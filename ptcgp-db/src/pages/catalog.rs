@@ -994,6 +994,7 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
     let set_code = cv.set().code();
     let number = cv.number().get();
     let name = cv.card().name();
+    let illustrator = cv.illustrator();
     let rarity_icon = cv.rarity().class().icon();
     let rarity_name = cv.rarity().name();
     let card_image = cv.image();
@@ -1029,6 +1030,9 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                         }
                         p { class: "text-xs text-gray-400 dark:text-gray-500 tabular-nums",
                             "{set_code} {number:03}"
+                        }
+                        p { class: "text-xs italic text-gray-400 dark:text-gray-500",
+                            "Illus. {illustrator}"
                         }
                     }
                     if is_pokemon {
@@ -1086,6 +1090,9 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                                 }
                                 span { class: "text-sm font-bold tabular-nums text-gray-900 dark:text-gray-100",
                                     "#{p.base_pokemon().natdex_number()}"
+                                }
+                                span { class: "text-xs text-gray-600 dark:text-gray-400",
+                                    "{p.base_pokemon().name()}"
                                 }
                             }
                             div { class: "flex flex-col items-center p-2 rounded bg-gray-50 dark:bg-gray-800",
@@ -1165,8 +1172,8 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                         }
 
                         // Flags
-                        if p.is_ex() || p.is_mega() {
-                            div { class: "flex gap-2",
+                        if p.is_ex() || p.is_mega() || cv.is_foil() || !cv.is_tradable() {
+                            div { class: "flex flex-wrap gap-2",
                                 if p.is_ex() {
                                     span { class: "text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",
                                         "Pokémon ex"
@@ -1175,6 +1182,16 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                                 if p.is_mega() {
                                     span { class: "text-xs px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300",
                                         "Mega Pokémon ex"
+                                    }
+                                }
+                                if cv.is_foil() {
+                                    span { class: "text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300",
+                                        "Foil"
+                                    }
+                                }
+                                if !cv.is_tradable() {
+                                    span { class: "text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400",
+                                        "Not Tradable"
                                     }
                                 }
                             }
@@ -1220,8 +1237,20 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                 // Trainer-only fields
                 if let Some(t) = trainer {
                     div { class: "flex flex-col gap-3",
-                        span { class: "self-start text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
-                            "{t.kind().name()}"
+                        div { class: "flex flex-wrap gap-2",
+                            span { class: "text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
+                                "{t.kind().name()}"
+                            }
+                            if cv.is_foil() {
+                                span { class: "text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300",
+                                    "Foil"
+                                }
+                            }
+                            if !cv.is_tradable() {
+                                span { class: "text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400",
+                                    "Not Tradable"
+                                }
+                            }
                         }
                         div { class: "p-2 rounded bg-gray-50 dark:bg-gray-800",
                             p { class: "text-xs text-gray-700 dark:text-gray-300",
