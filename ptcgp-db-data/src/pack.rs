@@ -77,7 +77,7 @@ impl Pack {
                 let set_name = set_name.as_str();
                 let subtitle = subtitle.as_str();
 
-                if set_name == subtitle {
+                if set_name.contains(subtitle) {
                     f.write_str(set_name)
                 } else {
                     write!(f, "{set_name}: {subtitle}")
