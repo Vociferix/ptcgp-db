@@ -1090,8 +1090,13 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                                 span { class: "text-xs text-gray-400 dark:text-gray-500",
                                     "Pokédex"
                                 }
-                                span { class: "text-sm font-bold tabular-nums text-gray-900 dark:text-gray-100",
-                                    "#{p.base_pokemon().natdex_number()} {p.base_pokemon().name()}"
+                                span { class: "flex items-baseline gap-1",
+                                    span { class: "text-sm font-bold tabular-nums text-gray-900 dark:text-gray-100",
+                                        "#{p.base_pokemon().natdex_number()}"
+                                    }
+                                    span { class: "text-xs text-gray-600 dark:text-gray-400",
+                                        "{p.base_pokemon().name()}"
+                                    }
                                 }
                             }
                             div { class: "flex flex-col items-center p-2 rounded bg-gray-50 dark:bg-gray-800",
