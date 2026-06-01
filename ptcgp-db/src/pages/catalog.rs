@@ -1290,7 +1290,6 @@ fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> Element {
                     src: "{card_image}",
                     alt: "{name}",
                     class: "max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] object-contain rounded shadow-2xl",
-                    onclick: move |evt| evt.stop_propagation(),
                 }
             }
         }
