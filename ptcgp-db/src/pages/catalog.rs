@@ -1,6 +1,6 @@
 use dioxus::document;
 use dioxus::prelude::*;
-use ptcgp_db_core::save_data::FilterConfig;
+use ptcgp_db_core::save_data::{CardVersionId, FilterConfig};
 use ptcgp_db_core::{AppSettings, CARD_PULL_RATES, ProfileStore, filter_card};
 use ptcgp_db_data::{Card, CardVersion};
 
@@ -228,7 +228,9 @@ pub fn CatalogPage() -> Element {
         let mut ids: Vec<usize> = CardVersion::ALL
             .iter()
             .filter(|cv| {
-                let owned_count = cfg.owned_count.map(|_| s.aggregate_count(cv.id()));
+                let owned_count = cfg
+                    .owned_count
+                    .map(|_| s.aggregate_count(CardVersionId(cv.id())));
                 filter_card(
                     cv,
                     &cfg,
@@ -258,7 +260,8 @@ pub fn CatalogPage() -> Element {
             }
             SortColumn::OwnedCount => {
                 sort_with_dir(&mut ids, sc.dir, |a, b| {
-                    s.aggregate_count(a).cmp(&s.aggregate_count(b))
+                    s.aggregate_count(CardVersionId(a))
+                        .cmp(&s.aggregate_count(CardVersionId(b)))
                 });
             }
             SortColumn::Rarity => {
@@ -483,10 +486,10 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
     let (value, stored_count) = {
         let s = store.read();
         let s = s.as_ref();
-        let agg = s.map_or(0, |s| s.aggregate_count(cv_id));
+        let agg = s.map_or(0, |s| s.aggregate_count(CardVersionId(cv_id)));
         let merged = if merge {
             cv.duplicates().iter().fold(agg, |acc, d| {
-                acc.saturating_add(s.map_or(0, |s| s.aggregate_count(d.id())))
+                acc.saturating_add(s.map_or(0, |s| s.aggregate_count(CardVersionId(d.id()))))
             })
         } else {
             agg
@@ -497,7 +500,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
             s.and_then(|s| {
                 s.active_profile_names()
                     .first()
-                    .map(|n| s.owned_count(n, cv_id))
+                    .map(|n| s.owned_count(n, CardVersionId(cv_id)))
             })
             .unwrap_or(0)
         };

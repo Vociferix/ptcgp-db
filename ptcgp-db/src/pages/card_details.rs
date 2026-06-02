@@ -4,6 +4,7 @@
 //! and `CardDetailPage` wraps it for the routed full-screen view.
 
 use dioxus::prelude::*;
+use ptcgp_db_core::save_data::CardVersionId;
 use ptcgp_db_core::{AppSettings, CARD_PULL_RATES, ProfileStore};
 use ptcgp_db_data::CardVersion;
 
@@ -261,10 +262,10 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
             .as_ref()
             .is_some_and(|s| s.active_profile_names().len() > 1);
         let s = s.as_ref();
-        let agg = s.map_or(0, |s| s.aggregate_count(cv_id));
+        let agg = s.map_or(0, |s| s.aggregate_count(CardVersionId(cv_id)));
         let merged = if merge {
             cv.duplicates().iter().fold(agg, |acc, d| {
-                acc.saturating_add(s.map_or(0, |s| s.aggregate_count(d.id())))
+                acc.saturating_add(s.map_or(0, |s| s.aggregate_count(CardVersionId(d.id()))))
             })
         } else {
             agg
@@ -275,7 +276,7 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
             s.and_then(|s| {
                 s.active_profile_names()
                     .first()
-                    .map(|n| s.owned_count(n, cv_id))
+                    .map(|n| s.owned_count(n, CardVersionId(cv_id)))
             })
             .unwrap_or(0)
         };

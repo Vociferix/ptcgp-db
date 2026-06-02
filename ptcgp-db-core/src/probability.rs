@@ -34,7 +34,7 @@ include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 /// store a per-card, per-pack precomputed rate directly in `ptcgp-db-data`, reducing each
 /// call to O(1). Profile before committing to that change.
 pub fn card_pull_rate(pack: &Pack, card_id: CardVersionId) -> Prob {
-    let Some(pull_rates) = CARD_PULL_RATES.get(card_id) else {
+    let Some(pull_rates) = CARD_PULL_RATES.get(card_id.0) else {
         return Prob::ZERO;
     };
 
@@ -67,7 +67,7 @@ pub fn desired_pull_rate(pack: &Pack, is_desired: impl Fn(CardVersionId) -> bool
         for slot in variant.slots() {
             let mut slot_sum = Prob::ZERO;
             for cvpr in slot.card_versions() {
-                if is_desired(cvpr.card_version().id()) {
+                if is_desired(CardVersionId(cvpr.card_version().id())) {
                     slot_sum += cvpr.pull_rate();
                 }
             }
@@ -84,7 +84,7 @@ pub fn desired_pull_rate(pack: &Pack, is_desired: impl Fn(CardVersionId) -> bool
 /// Iterates only the packs associated with this card version via `CardVersion::packs()` —
 /// all other packs have an implicit rate of zero for this card.
 pub fn max_card_pull_rate(card_id: CardVersionId) -> Prob {
-    let Some(pull_rates) = CARD_PULL_RATES.get(card_id) else {
+    let Some(pull_rates) = CARD_PULL_RATES.get(card_id.0) else {
         return Prob::ZERO;
     };
 
@@ -169,12 +169,12 @@ pub fn completion_merged(
     }
 
     // Track group representatives already processed to avoid double-counting.
-    let mut seen: HashSet<usize> = HashSet::new();
+    let mut seen: HashSet<CardVersionId> = HashSet::new();
     let mut numerator: u64 = 0;
     let mut denominator: u64 = 0;
 
     for card_id in query {
-        let Some(card) = CardVersion::from_id(card_id) else {
+        let Some(card) = CardVersion::from_id(card_id.0) else {
             continue;
         };
 
@@ -186,7 +186,7 @@ pub fn completion_merged(
             card.duplicates()
                 .iter()
                 .find(|d| d.is_original())
-                .map(|d| d.id())
+                .map(|d| CardVersionId(d.id()))
                 .unwrap_or(card_id)
         };
 
@@ -197,7 +197,7 @@ pub fn completion_merged(
         // Sum owned counts across all versions in the duplicate group.
         let mut group_count: u32 = counts(card_id);
         for dup in card.duplicates().iter() {
-            group_count = group_count.saturating_add(counts(dup.id()));
+            group_count = group_count.saturating_add(counts(CardVersionId(dup.id())));
         }
 
         numerator += group_count.min(target) as u64;
@@ -265,7 +265,7 @@ mod tests {
             .card_versions()
             .iter()
             .next()
-            .map(|c| c.id())
+            .map(|c| CardVersionId(c.id()))
             .expect("promo pack has at least one card");
         assert!(card_pull_rate(pack, card_id) > Prob::ZERO);
     }
@@ -273,8 +273,8 @@ mod tests {
     #[test]
     fn card_pull_rate_absent_card_returns_zero() {
         let pack = first_non_promo_pack();
-        // CardVersionId::MAX is not a valid card — its rate must be zero.
-        assert_eq!(card_pull_rate(pack, usize::MAX), Prob::ZERO);
+        // CardVersionId(usize::MAX) is not a valid card — its rate must be zero.
+        assert_eq!(card_pull_rate(pack, CardVersionId(usize::MAX)), Prob::ZERO);
     }
 
     #[test]
@@ -284,7 +284,7 @@ mod tests {
             .card_versions()
             .iter()
             .next()
-            .map(|c| c.id())
+            .map(|c| CardVersionId(c.id()))
             .expect("non-promo pack has at least one card");
         assert!(card_pull_rate(pack, card_id) > Prob::ZERO);
     }
@@ -299,7 +299,7 @@ mod tests {
                 .iter()
                 .filter(|p| !p.set().is_promo())
                 .filter_map(|p| {
-                    let rate = card_pull_rate(p, cv.id());
+                    let rate = card_pull_rate(p, CardVersionId(cv.id()));
                     if rate > Prob::ZERO {
                         Some(rate.as_f64() * 100.0)
                     } else {
@@ -360,7 +360,7 @@ mod tests {
             .card_versions()
             .iter()
             .next()
-            .map(|c| c.id())
+            .map(|c| CardVersionId(c.id()))
             .expect("non-promo pack has at least one card");
 
         let via_desired = desired_pull_rate(pack, |id| id == card_id);
@@ -374,7 +374,7 @@ mod tests {
 
     #[test]
     fn max_card_pull_rate_invalid_id_returns_zero() {
-        assert_eq!(max_card_pull_rate(usize::MAX), Prob::ZERO);
+        assert_eq!(max_card_pull_rate(CardVersionId(usize::MAX)), Prob::ZERO);
     }
 
     #[test]
@@ -383,7 +383,7 @@ mod tests {
         let card_id = CardVersion::ALL
             .iter()
             .find(|c| !c.packs().is_empty() && !c.set().is_promo())
-            .map(|c| c.id())
+            .map(|c| CardVersionId(c.id()))
             .expect("data must contain at least one non-promo pack card");
         assert!(max_card_pull_rate(card_id) > Prob::ZERO);
     }
@@ -393,7 +393,7 @@ mod tests {
         // Find a card version with no packs (non-Pack source).
         let result = CardVersion::ALL.iter().find(|c| c.packs().is_empty());
         if let Some(card) = result {
-            assert_eq!(max_card_pull_rate(card.id()), Prob::ZERO);
+            assert_eq!(max_card_pull_rate(CardVersionId(card.id())), Prob::ZERO);
         }
         // If no such card exists in the test data, the test vacuously passes.
     }
@@ -435,31 +435,38 @@ mod tests {
 
     #[test]
     fn completion_target_zero_returns_zero() {
-        assert_eq!(completion(one_counts, 0, [0usize]), Prob::ZERO);
+        assert_eq!(completion(one_counts, 0, [CardVersionId(0)]), Prob::ZERO);
     }
 
     #[test]
     fn completion_empty_query_returns_one() {
-        assert_eq!(completion(zero_counts, 1, []), Prob::ONE);
+        assert_eq!(
+            completion(zero_counts, 1, [] as [CardVersionId; 0]),
+            Prob::ONE
+        );
     }
 
     #[test]
     fn completion_none_owned_t1_returns_zero() {
-        let ids: Vec<usize> = CardVersion::ALL.iter().take(10).map(|c| c.id()).collect();
+        let ids: Vec<CardVersionId> = CardVersion::ALL
+            .iter()
+            .take(10)
+            .map(|c| CardVersionId(c.id()))
+            .collect();
         assert_eq!(completion(zero_counts, 1, ids), Prob::ZERO);
     }
 
     #[test]
     fn completion_all_owned_t1_returns_one() {
-        let ids: Vec<usize> = (0..5).collect();
+        let ids: Vec<CardVersionId> = (0..5).map(CardVersionId).collect();
         assert_eq!(completion(one_counts, 1, ids), Prob::ONE);
     }
 
     #[test]
     fn completion_half_owned_t1() {
         // 5 cards, only card 0 owned
-        let ids: Vec<usize> = (0..5).collect();
-        let counts = count_for(0, 1);
+        let ids: Vec<CardVersionId> = (0..5).map(CardVersionId).collect();
+        let counts = count_for(CardVersionId(0), 1);
         let result = completion(counts, 1, ids);
         assert_eq!(result, Prob::new(1, 5));
     }
@@ -467,26 +474,29 @@ mod tests {
     #[test]
     fn completion_t2_count_one() {
         // 1 card, count=1, T=2 → 1/2
-        assert_eq!(completion(one_counts, 2, [0usize]), Prob::new(1, 2));
+        assert_eq!(
+            completion(one_counts, 2, [CardVersionId(0)]),
+            Prob::new(1, 2)
+        );
     }
 
     #[test]
     fn completion_t2_count_two_returns_one() {
-        assert_eq!(completion(two_counts, 2, [0usize]), Prob::ONE);
+        assert_eq!(completion(two_counts, 2, [CardVersionId(0)]), Prob::ONE);
     }
 
     #[test]
     fn completion_count_exceeds_target_clamped() {
         // count=5, T=2 → clamped to min(5,2)=2 → 2/2 = 1
         let high = |_: CardVersionId| 5u32;
-        assert_eq!(completion(high, 2, [0usize]), Prob::ONE);
+        assert_eq!(completion(high, 2, [CardVersionId(0)]), Prob::ONE);
     }
 
     #[test]
     fn completion_two_cards_one_owned_t2() {
         // 2 cards, card 0 count=2, card 1 count=0, T=2 → (2+0)/(2×2) = 2/4 = 1/2
-        let counts = count_for(0, 2);
-        let result = completion(counts, 2, [0usize, 1]);
+        let counts = count_for(CardVersionId(0), 2);
+        let result = completion(counts, 2, [CardVersionId(0), CardVersionId(1)]);
         assert_eq!(result, Prob::new(1, 2));
     }
 
@@ -496,22 +506,28 @@ mod tests {
 
     #[test]
     fn completion_merged_target_zero_returns_zero() {
-        assert_eq!(completion_merged(one_counts, 0, [0usize]), Prob::ZERO);
+        assert_eq!(
+            completion_merged(one_counts, 0, [CardVersionId(0)]),
+            Prob::ZERO
+        );
     }
 
     #[test]
     fn completion_merged_empty_query_returns_one() {
-        assert_eq!(completion_merged(zero_counts, 1, []), Prob::ONE);
+        assert_eq!(
+            completion_merged(zero_counts, 1, [] as [CardVersionId; 0]),
+            Prob::ONE
+        );
     }
 
     #[test]
     fn completion_merged_no_duplicates_matches_completion() {
         // For cards without duplicates, merged and non-merged formulas should agree.
-        let ids: Vec<usize> = CardVersion::ALL
+        let ids: Vec<CardVersionId> = CardVersion::ALL
             .iter()
             .take(20)
             .filter(|c| c.duplicates().is_empty())
-            .map(|c| c.id())
+            .map(|c| CardVersionId(c.id()))
             .collect();
 
         if ids.is_empty() {
@@ -532,13 +548,13 @@ mod tests {
         let dup = original.duplicates().iter().next().unwrap();
 
         // Query contains both the original and its duplicate — should count as one card.
-        let ids = [original.id(), dup.id()];
+        let ids = [CardVersionId(original.id()), CardVersionId(dup.id())];
         let result = completion_merged(zero_counts, 1, ids);
         // denominator = 1×T = 1, numerator = 0 → 0/1 = ZERO
         assert_eq!(result, Prob::ZERO);
 
         // With one owned copy the group is complete at T=1.
-        let counts = count_for(original.id(), 1);
+        let counts = count_for(CardVersionId(original.id()), 1);
         let result = completion_merged(counts, 1, ids);
         assert_eq!(result, Prob::ONE);
     }
@@ -556,14 +572,14 @@ mod tests {
 
         // Own 1 copy of original + 1 copy of duplicate → group_count=2, T=2 → complete.
         let counts = move |id: CardVersionId| {
-            if id == original.id() || id == dup.id() {
+            if id == CardVersionId(original.id()) || id == CardVersionId(dup.id()) {
                 1
             } else {
                 0
             }
         };
         // Query includes only the original; the merged formula should still see both copies.
-        let result = completion_merged(counts, 2, [original.id()]);
+        let result = completion_merged(counts, 2, [CardVersionId(original.id())]);
         assert_eq!(
             result,
             Prob::ONE,

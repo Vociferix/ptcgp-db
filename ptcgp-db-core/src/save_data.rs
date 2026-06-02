@@ -7,10 +7,44 @@
 
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 
-/// Index into [`ptcgp_db_data::CardVersion::ALL`], used as the key for owned-count storage.
-pub type CardVersionId = usize;
+/// Stable identity for a card version, used as the key for owned-count storage.
+///
+/// Internally holds the index into [`ptcgp_db_data::CardVersion::ALL`] for O(1) runtime
+/// lookups. Serializes to and from the string `{set_code}-{number}` (e.g. `"A1-25"`,
+/// `"P-A-10"`) so that stored data remains valid across data updates that may reorder the
+/// `CardVersion::ALL` slice.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CardVersionId(pub usize);
+
+impl Serialize for CardVersionId {
+    fn serialize<S: ser::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        use ptcgp_db_data::CardVersion;
+        let v = CardVersion::from_id(self.0)
+            .ok_or_else(|| ser::Error::custom(format!("invalid CardVersionId: {}", self.0)))?;
+        s.collect_str(&format_args!("{}-{}", v.set().code(), v.number()))
+    }
+}
+
+impl<'de> Deserialize<'de> for CardVersionId {
+    fn deserialize<D: de::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        use ptcgp_db_data::CardVersion;
+        let s = String::deserialize(d)?;
+        // Set codes may contain `-` (e.g. "P-A"), so split at the last hyphen only.
+        let (set_code, num_str) = s
+            .rsplit_once('-')
+            .ok_or_else(|| de::Error::custom(format!("expected SET-NUMBER format, got {s:?}")))?;
+        let number: usize = num_str
+            .parse()
+            .map_err(|_| de::Error::custom(format!("invalid card number in {s:?}")))?;
+        let id = CardVersion::ALL
+            .iter()
+            .position(|v| v.set().code().as_str() == set_code && v.number().get() == number)
+            .ok_or_else(|| de::Error::custom(format!("unknown card version {s:?}")))?;
+        Ok(CardVersionId(id))
+    }
+}
 
 /// Current format version written when creating new [`ProfilesSaveData`].
 pub const PROFILES_FORMAT_VERSION: u32 = 1;
@@ -53,9 +87,8 @@ pub struct ProfileData {
     /// Display name; unique across all profiles.
     pub name: String,
 
-    /// Owned count per card version. Keys are [`CardVersionId`] values (indices into
-    /// `CardVersion::ALL`); absent entries implicitly have a count of zero. JSON serializes
-    /// these keys as decimal strings.
+    /// Owned count per card version. Keys are [`CardVersionId`] values, serialized as
+    /// `{set_code}-{number}` strings. Absent entries implicitly have a count of zero.
     pub owned_counts: HashMap<CardVersionId, u32>,
 }
 

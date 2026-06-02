@@ -72,13 +72,13 @@ fn effective_count<S: Storage + Clone>(
 ) -> u32 {
     let goal = cfg.goal.max(1);
     if cfg.any_version_owned {
-        let Some(cv) = CardVersion::from_id(cv_id) else {
+        let Some(cv) = CardVersion::from_id(cv_id.0) else {
             return 0;
         };
         cv.card()
             .versions()
             .iter()
-            .map(|v| store.aggregate_count(v.id()))
+            .map(|v| store.aggregate_count(CardVersionId(v.id())))
             .fold(0u32, u32::saturating_add)
             .min(goal)
     } else {
@@ -121,16 +121,19 @@ pub fn compute_summary<S: Storage + Clone>(
             // check when building pack rows below, replacing redundant filter_card calls.
             let eff_counts: HashMap<CardVersionId, u32> = matching_cvs
                 .iter()
-                .map(|cv| (cv.id(), effective_count(cv.id(), cfg, store)))
+                .map(|cv| {
+                    let id = CardVersionId(cv.id());
+                    (id, effective_count(id, cfg, store))
+                })
                 .collect();
 
             let owned: usize = eff_counts.values().map(|&c| c as usize).sum();
             let total = matching_cvs.len() * goal as usize;
 
             let comp = if merge_dupes {
-                completion_merged(counts, goal, matching_cvs.iter().map(|cv| cv.id()))
+                completion_merged(counts, goal, matching_cvs.iter().map(|cv| CardVersionId(cv.id())))
             } else {
-                completion(counts, goal, matching_cvs.iter().map(|cv| cv.id()))
+                completion(counts, goal, matching_cvs.iter().map(|cv| CardVersionId(cv.id())))
             };
 
             let obtainable = set.retirement_date().is_none_or(|r| r > today);
@@ -173,8 +176,8 @@ pub fn compute_summary<S: Storage + Clone>(
                     let p_matching_ids: Vec<CardVersionId> = p
                         .card_versions()
                         .iter()
-                        .filter(|cv| eff_counts.contains_key(&cv.id()))
-                        .map(|cv| cv.id())
+                        .filter(|cv| eff_counts.contains_key(&CardVersionId(cv.id())))
+                        .map(|cv| CardVersionId(cv.id()))
                         .collect();
 
                     let p_owned: usize = p_matching_ids
@@ -380,7 +383,7 @@ mod tests {
     fn total_owned_increases_when_card_owned() {
         let mut store = empty_store();
         let cv = CardVersion::ALL.iter().next().expect("at least one card");
-        store.set_owned_count("Main", cv.id(), 1).unwrap();
+        store.set_owned_count("Main", CardVersionId(cv.id()), 1).unwrap();
 
         let cfg = FilterConfig::default();
         let settings = AppSettings::default();
@@ -393,7 +396,7 @@ mod tests {
         let mut store = empty_store();
         let cv = CardVersion::ALL.iter().next().expect("at least one card");
         // Own 5 copies but goal is 1 — contribution to owned/denom must be clamped to 1.
-        store.set_owned_count("Main", cv.id(), 5).unwrap();
+        store.set_owned_count("Main", CardVersionId(cv.id()), 5).unwrap();
 
         let cfg = FilterConfig {
             goal: 1,
@@ -424,7 +427,7 @@ mod tests {
         let mut store = empty_store();
         let goal: u32 = 1;
         for cv in CardVersion::ALL.iter() {
-            store.set_owned_count("Main", cv.id(), goal).unwrap();
+            store.set_owned_count("Main", CardVersionId(cv.id()), goal).unwrap();
         }
 
         let cfg = FilterConfig {
@@ -494,7 +497,7 @@ mod tests {
             return;
         };
         let cv = set.card_versions().iter().next().unwrap();
-        store.set_owned_count("Main", cv.id(), 1).unwrap();
+        store.set_owned_count("Main", CardVersionId(cv.id()), 1).unwrap();
 
         let cfg = FilterConfig::default();
         let settings = AppSettings::default();
@@ -523,7 +526,7 @@ mod tests {
 
         let mut store = empty_store();
         // Own only the duplicate version.
-        store.set_owned_count("Main", dup.id(), 1).unwrap();
+        store.set_owned_count("Main", CardVersionId(dup.id()), 1).unwrap();
 
         let cfg = FilterConfig {
             goal: 1,
