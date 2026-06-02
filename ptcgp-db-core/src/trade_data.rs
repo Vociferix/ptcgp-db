@@ -402,3 +402,304 @@ pub fn build_candidates<S: Storage + Clone>(
     });
     recs
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::NaiveDate;
+    use ptcgp_db_data::CardVersion;
+
+    use crate::AppSettings;
+    use crate::profile_store::ProfileStore;
+    use crate::save_data::FilterConfig;
+    use crate::storage::Storage;
+
+    // ---------------------------------------------------------------------------
+    // Minimal in-memory storage stub
+    // ---------------------------------------------------------------------------
+
+    #[derive(Clone, Debug, Default)]
+    struct MemStorage {
+        profiles: std::rc::Rc<std::cell::RefCell<Option<crate::save_data::ProfilesSaveData>>>,
+    }
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("mem storage error")]
+    struct MemError;
+
+    impl Storage for MemStorage {
+        type Error = MemError;
+        async fn load_profiles(
+            &self,
+        ) -> Result<Option<crate::save_data::ProfilesSaveData>, Self::Error> {
+            Ok(self.profiles.borrow().clone())
+        }
+        async fn save_profiles(
+            &self,
+            data: &crate::save_data::ProfilesSaveData,
+        ) -> Result<(), Self::Error> {
+            *self.profiles.borrow_mut() = Some(data.clone());
+            Ok(())
+        }
+        async fn load_settings(
+            &self,
+        ) -> Result<Option<crate::save_data::AppSettingsSaveData>, Self::Error> {
+            Ok(None)
+        }
+        async fn save_settings(
+            &self,
+            _: &crate::save_data::AppSettingsSaveData,
+        ) -> Result<(), Self::Error> {
+            Ok(())
+        }
+        async fn load_saved_queries(
+            &self,
+        ) -> Result<Option<crate::save_data::SavedQueriesSaveData>, Self::Error> {
+            Ok(None)
+        }
+        async fn save_saved_queries(
+            &self,
+            _: &crate::save_data::SavedQueriesSaveData,
+        ) -> Result<(), Self::Error> {
+            Ok(())
+        }
+    }
+
+    fn store_with_two_profiles() -> ProfileStore<MemStorage> {
+        let mut store = ProfileStore::new(MemStorage::default());
+        store.create_profile("Dest".to_string()).unwrap();
+        store.create_profile("Source".to_string()).unwrap();
+        store
+    }
+
+    fn today() -> NaiveDate {
+        NaiveDate::from_ymd_opt(2024, 1, 1).unwrap()
+    }
+
+    // ---------------------------------------------------------------------------
+    // raw_dest_count
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn raw_dest_count_zero_when_nothing_owned() {
+        let store = store_with_two_profiles();
+        let cv = CardVersion::ALL.iter().next().expect("at least one card");
+        assert_eq!(raw_dest_count(cv, &store, false, false), 0);
+    }
+
+    #[test]
+    fn raw_dest_count_reads_active_profile() {
+        let mut store = store_with_two_profiles();
+        let cv = CardVersion::ALL.iter().next().expect("at least one card");
+        // "Dest" is the primary/active profile; "Source" is inactive.
+        store.set_owned_count("Dest", cv.id(), 3).unwrap();
+        store.set_owned_count("Source", cv.id(), 7).unwrap();
+        // Only the active ("Dest") count should be reflected.
+        assert_eq!(raw_dest_count(cv, &store, false, false), 3);
+    }
+
+    #[test]
+    fn raw_dest_count_merge_dupes_sums_duplicates() {
+        let Some(original) = CardVersion::ALL.iter().find(|c| !c.duplicates().is_empty()) else {
+            return;
+        };
+        let dup = original.duplicates().iter().next().unwrap();
+        let mut store = store_with_two_profiles();
+        store.set_owned_count("Dest", original.id(), 2).unwrap();
+        store.set_owned_count("Dest", dup.id(), 3).unwrap();
+
+        // With merge_dupes=true the counts across duplicate versions should sum.
+        assert_eq!(raw_dest_count(original, &store, true, false), 5);
+    }
+
+    #[test]
+    fn raw_dest_count_any_version_sums_all_versions_of_card() {
+        // Find a card version whose abstract card has more than one version.
+        let Some(cv) = CardVersion::ALL
+            .iter()
+            .find(|c| c.card().versions().len() > 1)
+        else {
+            return;
+        };
+        let other_ver = cv
+            .card()
+            .versions()
+            .iter()
+            .find(|v| v.id() != cv.id())
+            .unwrap();
+
+        let mut store = store_with_two_profiles();
+        store.set_owned_count("Dest", cv.id(), 1).unwrap();
+        store.set_owned_count("Dest", other_ver.id(), 2).unwrap();
+
+        assert_eq!(raw_dest_count(cv, &store, false, true), 3);
+    }
+
+    // ---------------------------------------------------------------------------
+    // raw_source_count
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn raw_source_count_zero_when_nothing_owned() {
+        let store = store_with_two_profiles();
+        let cv = CardVersion::ALL.iter().next().expect("at least one card");
+        assert_eq!(raw_source_count(cv, &store, "Source", false), 0);
+    }
+
+    #[test]
+    fn raw_source_count_reads_named_profile() {
+        let mut store = store_with_two_profiles();
+        let cv = CardVersion::ALL.iter().next().expect("at least one card");
+        store.set_owned_count("Source", cv.id(), 5).unwrap();
+        assert_eq!(raw_source_count(cv, &store, "Source", false), 5);
+        // Active profile ("Dest") should not bleed into source count.
+        assert_eq!(raw_source_count(cv, &store, "Dest", false), 0);
+    }
+
+    #[test]
+    fn raw_source_count_merge_dupes_sums_duplicates() {
+        let Some(original) = CardVersion::ALL.iter().find(|c| !c.duplicates().is_empty()) else {
+            return;
+        };
+        let dup = original.duplicates().iter().next().unwrap();
+        let mut store = store_with_two_profiles();
+        store.set_owned_count("Source", original.id(), 2).unwrap();
+        store.set_owned_count("Source", dup.id(), 4).unwrap();
+
+        assert_eq!(raw_source_count(original, &store, "Source", true), 6);
+    }
+
+    // ---------------------------------------------------------------------------
+    // build_shares — smoke tests
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn build_shares_empty_inactive_names_returns_empty() {
+        let store = store_with_two_profiles();
+        let settings = AppSettings::default();
+        let cfg = FilterConfig::default();
+        let result = build_shares(&store, &settings, &cfg, today(), &[], None);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn build_shares_all_dest_owned_returns_empty() {
+        let mut store = store_with_two_profiles();
+        let goal: u32 = 1;
+        for cv in CardVersion::ALL.iter() {
+            store.set_owned_count("Dest", cv.id(), goal).unwrap();
+        }
+        let settings = AppSettings::default();
+        let cfg = FilterConfig {
+            goal,
+            ..Default::default()
+        };
+        let inactive = vec!["Source".to_string()];
+        let result = build_shares(&store, &settings, &cfg, today(), &inactive, None);
+        // Nothing is needed, so no shares should be returned.
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn build_shares_source_has_card_dest_needs_returns_recommendation() {
+        let mut store = store_with_two_profiles();
+        // Find a tradable diamond-rarity card version.
+        let Some(cv) = CardVersion::ALL
+            .iter()
+            .find(|c| c.is_tradable() && c.rarity().group().name().as_str() == "Diamond")
+        else {
+            return;
+        };
+        // Source has the card; Dest does not.
+        store.set_owned_count("Source", cv.id(), 1).unwrap();
+
+        let settings = AppSettings::default();
+        let cfg = FilterConfig {
+            goal: 1,
+            ..Default::default()
+        };
+        let inactive = vec!["Source".to_string()];
+        let result = build_shares(&store, &settings, &cfg, today(), &inactive, None);
+        assert!(!result.is_empty());
+        // The first rec should reference our cv (or at least some rec should).
+        assert!(result.iter().any(|r| r.cv.id() == cv.id()));
+    }
+
+    // ---------------------------------------------------------------------------
+    // build_trades — smoke tests
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn build_trades_empty_inactive_names_returns_empty() {
+        let store = store_with_two_profiles();
+        let settings = AppSettings::default();
+        let cfg = FilterConfig::default();
+        let result = build_trades(&store, &settings, &cfg, today(), &[], None);
+        assert!(result.is_empty());
+    }
+
+    // ---------------------------------------------------------------------------
+    // build_candidates — smoke tests
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn build_candidates_no_excess_returns_empty() {
+        let store = store_with_two_profiles();
+        let settings = AppSettings::default();
+        let cfg = FilterConfig {
+            goal: 1,
+            ..Default::default()
+        };
+        let result = build_candidates(&store, &settings, &cfg, today(), None, true);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn build_candidates_excess_pack_card_is_included() {
+        let mut store = store_with_two_profiles();
+        // Find a non-promo pack card (has a non-zero max pull rate).
+        let Some(cv) = CardVersion::ALL
+            .iter()
+            .find(|c| !c.packs().is_empty() && !c.set().is_promo())
+        else {
+            return;
+        };
+        // Own 2 copies with goal=1 → excess=1.
+        store.set_owned_count("Dest", cv.id(), 2).unwrap();
+
+        let settings = AppSettings::default();
+        let cfg = FilterConfig {
+            goal: 1,
+            ..Default::default()
+        };
+        let result = build_candidates(&store, &settings, &cfg, today(), None, true);
+        assert!(result.iter().any(|r| r.cv.id() == cv.id()));
+    }
+
+    #[test]
+    fn build_candidates_sorted_by_scarcity_ascending() {
+        // Verify the returned list is in ascending scarcity order (lowest 1/rate×excess first).
+        let mut store = store_with_two_profiles();
+        // Give Dest 2 copies of every pack card (goal=1 → excess=1 for all).
+        for cv in CardVersion::ALL.iter().filter(|c| !c.packs().is_empty()) {
+            store.set_owned_count("Dest", cv.id(), 2).unwrap();
+        }
+
+        let settings = AppSettings::default();
+        let cfg = FilterConfig {
+            goal: 1,
+            ..Default::default()
+        };
+        let result = build_candidates(&store, &settings, &cfg, today(), None, true);
+
+        // Each consecutive pair should have non-decreasing scarcity value.
+        for window in result.windows(2) {
+            let va = 1.0 / (window[0].max_rate.as_f64() * window[0].excess as f64);
+            let vb = 1.0 / (window[1].max_rate.as_f64() * window[1].excess as f64);
+            assert!(
+                va <= vb + f64::EPSILON,
+                "build_candidates not sorted: {va} > {vb}"
+            );
+        }
+    }
+}
