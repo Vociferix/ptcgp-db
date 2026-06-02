@@ -75,9 +75,7 @@ fn passes_filter(
     {
         return false;
     }
-    if !cfg.elements.is_empty()
-        && pkmn.is_none_or(|p| !cfg.elements.contains(&p.element().id()))
-    {
+    if !cfg.elements.is_empty() && pkmn.is_none_or(|p| !cfg.elements.contains(&p.element().id())) {
         return false;
     }
     if cfg.foil.is_some_and(|f| cv.is_foil() != f) {
@@ -228,7 +226,14 @@ fn build_shares(
             .iter()
             .filter_map(|name| {
                 let cnt = raw_source_count(cv, store, name, merge_dupes);
-                if cnt > 0 { Some(SourceInfo { name: name.clone(), count: cnt }) } else { None }
+                if cnt > 0 {
+                    Some(SourceInfo {
+                        name: name.clone(),
+                        count: cnt,
+                    })
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -243,7 +248,15 @@ fn build_shares(
         let max_rate = max_card_pull_rate(cv.id());
         let is_zero_rate = max_rate == Prob::ZERO;
 
-        recs.push(ShareRec { cv, dest_count: raw, needed, max_rate, is_zero_rate, best_source, alt_sources });
+        recs.push(ShareRec {
+            cv,
+            dest_count: raw,
+            needed,
+            max_rate,
+            is_zero_rate,
+            best_source,
+            alt_sources,
+        });
     }
 
     recs.sort_by(|a, b| match (a.is_zero_rate, b.is_zero_rate) {
@@ -304,7 +317,11 @@ fn build_trades(
 
         let rarity_class_ids: Vec<usize> = {
             let mut seen: HashSet<usize> = HashSet::new();
-            card_data.iter().map(|d| d.rarity_class_id).filter(|&id| seen.insert(id)).collect()
+            card_data
+                .iter()
+                .map(|d| d.rarity_class_id)
+                .filter(|&id| seen.insert(id))
+                .collect()
         };
 
         for rarity_class_id in rarity_class_ids {
@@ -334,7 +351,9 @@ fn build_trades(
                     }
                 });
 
-            let Some((b_data, b_src_count_ref)) = best_b else { continue };
+            let Some((b_data, b_src_count_ref)) = best_b else {
+                continue;
+            };
             let b_src_count = *b_src_count_ref;
 
             let b_receive_value = if b_data.max_rate == Prob::ZERO {
@@ -358,7 +377,9 @@ fn build_trades(
                     va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
                 });
 
-            let Some((a_data, a_src_count_ref)) = best_a else { continue };
+            let Some((a_data, a_src_count_ref)) = best_a else {
+                continue;
+            };
             let a_src_count = *a_src_count_ref;
 
             recs.push(TradeRec {
@@ -421,7 +442,13 @@ fn build_candidates(
             continue;
         }
 
-        recs.push(CandidateRec { cv, dest_count: raw, excess, max_rate, is_unobtainable });
+        recs.push(CandidateRec {
+            cv,
+            dest_count: raw,
+            excess,
+            max_rate,
+            is_unobtainable,
+        });
     }
 
     recs.sort_by(|a, b| {
@@ -512,7 +539,11 @@ fn CardPanel(cv_id: usize) -> Element {
 }
 
 fn pull_rate_label(rate: Prob) -> String {
-    if rate == Prob::ZERO { "—".to_string() } else { format!("{:.3}%", rate.as_f64() * 100.0) }
+    if rate == Prob::ZERO {
+        "—".to_string()
+    } else {
+        format!("{:.3}%", rate.as_f64() * 100.0)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -932,6 +963,10 @@ pub fn TradePage() -> Element {
     });
     drop(init);
 
+    let mut shares_limit = use_signal(|| 10usize);
+    let mut trades_limit = use_signal(|| 10usize);
+    let mut candidates_limit = use_signal(|| 10usize);
+
     use_drop(move || {
         let mut state = trade_state_ctx.write();
         state.config = config.read().clone();
@@ -983,19 +1018,33 @@ pub fn TradePage() -> Element {
         .filter(|q| !q.trim().is_empty())
         .map(|q| Card::NAMES.search(q).map(|e| e.id()).collect());
 
-    let shares = if has_sources {
-        build_shares(store_ref, &settings_guard, &cfg, today, &inactive_names, matched_name_ids.as_deref())
+    let mut shares = if has_sources {
+        build_shares(
+            store_ref,
+            &settings_guard,
+            &cfg,
+            today,
+            &inactive_names,
+            matched_name_ids.as_deref(),
+        )
     } else {
         Vec::new()
     };
 
-    let trades = if has_sources {
-        build_trades(store_ref, &settings_guard, &cfg, today, &inactive_names, matched_name_ids.as_deref())
+    let mut trades = if has_sources {
+        build_trades(
+            store_ref,
+            &settings_guard,
+            &cfg,
+            today,
+            &inactive_names,
+            matched_name_ids.as_deref(),
+        )
     } else {
         Vec::new()
     };
 
-    let candidates = build_candidates(
+    let mut candidates = build_candidates(
         store_ref,
         &settings_guard,
         &cfg,
@@ -1008,8 +1057,21 @@ pub fn TradePage() -> Element {
     drop(settings_guard);
     drop(store_guard);
 
+    let shares_total = shares.len();
+    shares.truncate(*shares_limit.read());
+    let shares_remaining = shares_total - shares.len();
+
+    let trades_total = trades.len();
+    trades.truncate(*trades_limit.read());
+    let trades_remaining = trades_total - trades.len();
+
+    let candidates_total = candidates.len();
+    candidates.truncate(*candidates_limit.read());
+    let candidates_remaining = candidates_total - candidates.len();
+
     let card_cls =
         "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700";
+    let show_more_cls = "w-full px-4 py-3 text-center text-sm text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50 border-t border-gray-100 dark:border-gray-700";
 
     rsx! {
         div { class: "max-w-4xl mx-auto p-4 sm:p-6 space-y-4",
@@ -1050,6 +1112,14 @@ pub fn TradePage() -> Element {
                                     disabled: multi_active,
                                 }
                             }
+                            if shares_remaining > 0 {
+                                button {
+                                    r#type: "button",
+                                    class: "{show_more_cls}",
+                                    onclick: move |_| *shares_limit.write() += 10,
+                                    "Show more ({shares_remaining} remaining)"
+                                }
+                            }
                         }
                     }
                 },
@@ -1069,6 +1139,14 @@ pub fn TradePage() -> Element {
                                     rec,
                                     dest_name: dest_name.clone(),
                                     disabled: multi_active,
+                                }
+                            }
+                            if trades_remaining > 0 {
+                                button {
+                                    r#type: "button",
+                                    class: "{show_more_cls}",
+                                    onclick: move |_| *trades_limit.write() += 10,
+                                    "Show more ({trades_remaining} remaining)"
                                 }
                             }
                         }
@@ -1096,6 +1174,14 @@ pub fn TradePage() -> Element {
                                         rank: rank + 1,
                                         rec,
                                         dest_name: dest_name.clone(),
+                                    }
+                                }
+                                if candidates_remaining > 0 {
+                                    button {
+                                        r#type: "button",
+                                        class: "{show_more_cls}",
+                                        onclick: move |_| *candidates_limit.write() += 10,
+                                        "Show more ({candidates_remaining} remaining)"
                                     }
                                 }
                             }

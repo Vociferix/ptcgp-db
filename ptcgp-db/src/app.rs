@@ -41,7 +41,10 @@ pub(crate) struct TradePageState {
 impl Default for TradePageState {
     fn default() -> Self {
         Self {
-            config: FilterConfig { goal: 1, ..FilterConfig::default() },
+            config: FilterConfig {
+                goal: 1,
+                ..FilterConfig::default()
+            },
             show_unobtainable: false,
             active_tab: 0,
         }
@@ -147,8 +150,7 @@ pub fn App() -> Element {
     // write to this before navigating to the catalog to pre-set a filter.
     let _: Signal<FilterConfig> = use_context_provider(|| Signal::new(FilterConfig::default()));
     // Per-page persistent states — each page reads on mount and writes on unmount.
-    let _: Signal<TradePageState> =
-        use_context_provider(|| Signal::new(TradePageState::default()));
+    let _: Signal<TradePageState> = use_context_provider(|| Signal::new(TradePageState::default()));
     let _: Signal<SummaryPageState> =
         use_context_provider(|| Signal::new(SummaryPageState::default()));
     // Tracks which page the user navigated to CardDetailPage from, for the back button label/route.
