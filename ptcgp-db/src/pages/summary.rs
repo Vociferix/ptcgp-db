@@ -1,11 +1,13 @@
 use chrono::NaiveDate;
 use dioxus::prelude::*;
-use ptcgp_db_core::save_data::{CardKindFilter, CardVersionId, FilterConfig};
+use ptcgp_db_core::save_data::{CardKindFilter, CardVersionId, FilterConfig, SavedQueriesSaveData};
 use ptcgp_db_core::{
     AppSettings, ProfileStore, SavedQueries, completion, completion_merged, desired_pull_rate,
 };
-use ptcgp_db_core::storage::Storage as _;
 use ptcgp_db_data::{CardVersion, Pack, Prob, Set};
+
+#[cfg(target_arch = "wasm32")]
+use ptcgp_db_core::storage::Storage as _;
 
 use crate::app::AppStorage;
 use crate::components::icons::{ChevronDown, ChevronUp};
@@ -176,21 +178,31 @@ struct SetRowData {
 fn default_filter_config() -> FilterConfig {
     FilterConfig {
         goal: 1,
+        obtainable: Some(true),
         ..FilterConfig::default()
     }
 }
 
-/// Persist saved queries by cloning the data while the write guard is held,
-/// then spawning an async save. Call after any mutation to the queries signal.
-fn save_queries_data(data: ptcgp_db_core::save_data::SavedQueriesSaveData, store: Signal<Option<ProfileStore<AppStorage>>>) {
+/// Persist saved queries after any mutation. Uses a synchronous write on desktop
+/// (FileStorage is sync under the hood) and spawn_local on WASM (IndexedDB is async).
+#[cfg(not(target_arch = "wasm32"))]
+fn save_queries_data(data: SavedQueriesSaveData, store: Signal<Option<ProfileStore<AppStorage>>>) {
     let storage = store.read().as_ref().map(|s| s.storage().clone());
-    if let Some(storage) = storage {
-        spawn(async move {
-            if let Err(e) = storage.save_saved_queries(&data).await {
-                tracing::error!("saved queries save failed: {e}");
-            }
-        });
+    let Some(storage) = storage else { return };
+    if let Err(e) = storage.save_saved_queries_sync(&data) {
+        tracing::error!("saved queries save failed: {e}");
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn save_queries_data(data: SavedQueriesSaveData, store: Signal<Option<ProfileStore<AppStorage>>>) {
+    let storage = store.read().as_ref().map(|s| s.storage().clone());
+    let Some(storage) = storage else { return };
+    wasm_bindgen_futures::spawn_local(async move {
+        if let Err(e) = storage.save_saved_queries(&data).await {
+            tracing::error!("saved queries save failed: {e}");
+        }
+    });
 }
 
 #[component]
