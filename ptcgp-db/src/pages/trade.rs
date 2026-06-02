@@ -1,8 +1,868 @@
+use std::cmp::Reverse;
+use std::collections::HashSet;
+
+use chrono::NaiveDate;
 use dioxus::prelude::*;
+use ptcgp_db_core::{
+    AppSettings, ProfileStore, max_card_pull_rate,
+    save_data::{CardKindFilter, FilterConfig},
+};
+use ptcgp_db_data::{Card, CardVersion, Prob};
+
+use crate::app::{AppStorage, schedule_save};
+use crate::components::toggle::Toggle;
+use crate::components::{FilterMode, FilterToolbar};
+
+// ---------------------------------------------------------------------------
+// Filter + count helpers
+// ---------------------------------------------------------------------------
+
+fn today_naive() -> NaiveDate {
+    chrono::Utc::now().date_naive()
+}
+
+fn passes_filter(
+    cv: &CardVersion,
+    cfg: &FilterConfig,
+    settings: &AppSettings,
+    today: NaiveDate,
+    matched_name_ids: Option<&[usize]>,
+) -> bool {
+    if settings.ignore_unobtainable_sets() && cv.set().retirement_date().is_some_and(|d| d <= today)
+    {
+        return false;
+    }
+    if settings.ignore_premium_mission() && cv.source().name().as_str() == "Premium Mission" {
+        return false;
+    }
+    if settings.ignore_gold_shop() && cv.source().name().as_str() == "Gold Shop" {
+        return false;
+    }
+    if matched_name_ids.is_some_and(|ids| !ids.contains(&cv.card().name().id())) {
+        return false;
+    }
+    if cfg.series.is_some_and(|sid| cv.series().id() != sid) {
+        return false;
+    }
+    if !cfg.sets.is_empty() && !cfg.sets.contains(&cv.set().id()) {
+        return false;
+    }
+    if !cfg.packs.is_empty() && !cv.packs().iter().any(|p| cfg.packs.contains(&p.id())) {
+        return false;
+    }
+    if !cfg.rarities.is_empty() && !cfg.rarities.contains(&cv.rarity().class().id()) {
+        return false;
+    }
+    match cfg.card_kind {
+        Some(CardKindFilter::Pokemon) if !cv.card().is_pokemon() => return false,
+        Some(CardKindFilter::Trainer) if !cv.card().is_trainer() => return false,
+        _ => {}
+    }
+    let pkmn = cv.card().pokemon();
+    if let Some(ex_only) = cfg.ex
+        && pkmn.is_none_or(|p| p.is_ex() != ex_only)
+    {
+        return false;
+    }
+    if let Some(mega_only) = cfg.mega
+        && pkmn.is_none_or(|p| p.is_mega() != mega_only)
+    {
+        return false;
+    }
+    if let Some(stage_id) = cfg.stage
+        && pkmn.is_none_or(|p| p.stage().id() != stage_id)
+    {
+        return false;
+    }
+    if !cfg.elements.is_empty()
+        && pkmn.is_none_or(|p| !cfg.elements.contains(&p.element().id()))
+    {
+        return false;
+    }
+    if cfg.foil.is_some_and(|f| cv.is_foil() != f) {
+        return false;
+    }
+    if !cfg.sources.is_empty() && !cfg.sources.contains(&cv.source().id()) {
+        return false;
+    }
+    if let Some(obtainable) = cfg.obtainable {
+        let is_obtainable = cv.set().retirement_date().is_none_or(|d| d > today);
+        if is_obtainable != obtainable {
+            return false;
+        }
+    }
+    true
+}
+
+/// Raw aggregate count for destination (active profiles), with optional merge/any-version.
+fn raw_dest_count(
+    cv: &CardVersion,
+    store: &ProfileStore<AppStorage>,
+    merge_dupes: bool,
+    any_version: bool,
+) -> u32 {
+    if any_version {
+        cv.card()
+            .versions()
+            .iter()
+            .map(|v| store.aggregate_count(v.id()))
+            .fold(0u32, u32::saturating_add)
+    } else if merge_dupes {
+        let mut total = store.aggregate_count(cv.id());
+        for dup in cv.duplicates() {
+            total = total.saturating_add(store.aggregate_count(dup.id()));
+        }
+        total
+    } else {
+        store.aggregate_count(cv.id())
+    }
+}
+
+/// Raw count for a specific (source) profile, with optional merge_dupes.
+fn raw_source_count(
+    cv: &CardVersion,
+    store: &ProfileStore<AppStorage>,
+    profile_name: &str,
+    merge_dupes: bool,
+) -> u32 {
+    if merge_dupes {
+        let mut total = store.owned_count(profile_name, cv.id());
+        for dup in cv.duplicates() {
+            total = total.saturating_add(store.owned_count(profile_name, dup.id()));
+        }
+        total
+    } else {
+        store.owned_count(profile_name, cv.id())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Data structures
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, PartialEq)]
+struct SourceInfo {
+    name: String,
+    count: u32,
+}
+
+/// A recommended share: one card the destination needs, with a source profile.
+#[derive(Clone, PartialEq)]
+struct ShareRec {
+    cv: &'static CardVersion,
+    needed: u32,
+    /// True when max_pull_rate == 0 (top-priority tier).
+    is_zero_rate: bool,
+    /// 1.0 / (max_pull_rate × needed); only meaningful when !is_zero_rate.
+    receive_value: f64,
+    best_source: SourceInfo,
+    alt_sources: Vec<SourceInfo>,
+}
+
+/// A recommended trade: two-sided exchange between source profile and destination.
+#[derive(Clone, PartialEq)]
+struct TradeRec {
+    source_name: String,
+    /// Card the destination receives from the source.
+    card_b: &'static CardVersion,
+    card_b_source_count: u32,
+    card_b_receive_value: f64,
+    /// Card the destination gives to the source.
+    card_a: &'static CardVersion,
+    card_a_dest_count: u32,
+    card_a_source_count: u32,
+}
+
+/// A card from the destination collection that is a good candidate to give in trades.
+#[derive(Clone, PartialEq)]
+struct CandidateRec {
+    cv: &'static CardVersion,
+    dest_count: u32,
+    excess: u32,
+    trade_value: f64,
+    is_unobtainable: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Computation
+// ---------------------------------------------------------------------------
+
+fn build_shares(
+    store: &ProfileStore<AppStorage>,
+    settings: &AppSettings,
+    cfg: &FilterConfig,
+    today: NaiveDate,
+    inactive_names: &[String],
+    matched_name_ids: Option<&[usize]>,
+) -> Vec<ShareRec> {
+    let goal = cfg.goal.max(1);
+    let merge_dupes = settings.merge_duplicate_printings();
+    let any_version = cfg.any_version_owned;
+    let mut recs: Vec<ShareRec> = Vec::new();
+
+    for cv in CardVersion::ALL {
+        if merge_dupes && !cv.is_original() && !cv.duplicates().is_empty() {
+            continue;
+        }
+        if !cv.is_tradable() {
+            continue;
+        }
+        if cv.rarity().group().name().as_str() != "Diamond" {
+            continue;
+        }
+        if !passes_filter(cv, cfg, settings, today, matched_name_ids) {
+            continue;
+        }
+
+        let raw = raw_dest_count(cv, store, merge_dupes, any_version);
+        if raw >= goal {
+            continue; // dest already has enough
+        }
+        let needed = goal - raw;
+
+        // Find all inactive profiles that have this card.
+        let mut sources: Vec<SourceInfo> = inactive_names
+            .iter()
+            .filter_map(|name| {
+                let cnt = raw_source_count(cv, store, name, merge_dupes);
+                if cnt > 0 {
+                    Some(SourceInfo { name: name.clone(), count: cnt })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if sources.is_empty() {
+            continue;
+        }
+
+        // Sort by count descending; pick best, rest are alts.
+        sources.sort_by_key(|s| Reverse(s.count));
+        let best_source = sources.remove(0);
+        let alt_sources = sources;
+
+        let max_rate = max_card_pull_rate(cv.id());
+        let is_zero_rate = max_rate == Prob::ZERO;
+        let receive_value = if is_zero_rate {
+            0.0
+        } else {
+            1.0 / (max_rate.as_f64() * needed as f64)
+        };
+
+        recs.push(ShareRec { cv, needed, is_zero_rate, receive_value, best_source, alt_sources });
+    }
+
+    // Sort: zero-rate tier first (sort by needed asc within tier),
+    // then ranked tier by receive_value desc.
+    recs.sort_by(|a, b| {
+        match (a.is_zero_rate, b.is_zero_rate) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            (true, true) => a.needed.cmp(&b.needed),
+            (false, false) => b.receive_value.partial_cmp(&a.receive_value).unwrap_or(std::cmp::Ordering::Equal),
+        }
+    });
+    recs
+}
+
+fn build_trades(
+    store: &ProfileStore<AppStorage>,
+    settings: &AppSettings,
+    cfg: &FilterConfig,
+    today: NaiveDate,
+    inactive_names: &[String],
+    matched_name_ids: Option<&[usize]>,
+) -> Vec<TradeRec> {
+    let goal = cfg.goal.max(1);
+    let merge_dupes = settings.merge_duplicate_printings();
+    let any_version = cfg.any_version_owned;
+
+    // Collect all qualifying tradable card versions with their destination counts.
+    struct CardData {
+        cv: &'static CardVersion,
+        dest_raw: u32,
+        rarity_class_id: usize,
+        max_rate: Prob,
+    }
+
+    let card_data: Vec<CardData> = CardVersion::ALL
+        .iter()
+        .filter(|cv| {
+            if merge_dupes && !cv.is_original() && !cv.duplicates().is_empty() {
+                return false;
+            }
+            cv.is_tradable() && passes_filter(cv, cfg, settings, today, matched_name_ids)
+        })
+        .map(|cv| CardData {
+            cv,
+            dest_raw: raw_dest_count(cv, store, merge_dupes, any_version),
+            rarity_class_id: cv.rarity().class().id(),
+            max_rate: max_card_pull_rate(cv.id()),
+        })
+        .collect();
+
+    let mut recs: Vec<TradeRec> = Vec::new();
+
+    for source_name in inactive_names {
+        // Collect source counts for this profile.
+        let src_counts: Vec<u32> = card_data
+            .iter()
+            .map(|d| raw_source_count(d.cv, store, source_name, merge_dupes))
+            .collect();
+
+        // Collect all rarity class IDs present in card_data.
+        let rarity_class_ids: Vec<usize> = {
+            let mut seen: HashSet<usize> = HashSet::new();
+            card_data.iter().map(|d| d.rarity_class_id).filter(|&id| seen.insert(id)).collect()
+        };
+
+        for rarity_class_id in rarity_class_ids {
+            // Card B: dest needs it (raw < goal), source has it (src_count > 0).
+            // Pick highest receive_value = 1 / (max_rate × needed).
+            let best_b = card_data
+                .iter()
+                .zip(src_counts.iter())
+                .filter(|(d, src_cnt)| {
+                    d.rarity_class_id == rarity_class_id
+                        && d.dest_raw < goal
+                        && **src_cnt > 0
+                })
+                .max_by(|(da, _), (db, _)| {
+                    // Higher receive_value = better. Zero-rate cards rank highest.
+                    match (da.max_rate == Prob::ZERO, db.max_rate == Prob::ZERO) {
+                        (true, false) => std::cmp::Ordering::Greater,
+                        (false, true) => std::cmp::Ordering::Less,
+                        _ => {
+                            let needed_a = (goal - da.dest_raw) as f64;
+                            let needed_b = (goal - db.dest_raw) as f64;
+                            let va = if da.max_rate == Prob::ZERO {
+                                f64::INFINITY
+                            } else {
+                                1.0 / (da.max_rate.as_f64() * needed_a)
+                            };
+                            let vb = if db.max_rate == Prob::ZERO {
+                                f64::INFINITY
+                            } else {
+                                1.0 / (db.max_rate.as_f64() * needed_b)
+                            };
+                            va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
+                        }
+                    }
+                });
+
+            let Some((b_data, b_src_count_ref)) = best_b else {
+                continue;
+            };
+
+            let b_src_count = *b_src_count_ref;
+            let b_needed = goal - b_data.dest_raw;
+            let b_receive_value = if b_data.max_rate == Prob::ZERO {
+                f64::INFINITY
+            } else {
+                1.0 / (b_data.max_rate.as_f64() * b_needed as f64)
+            };
+
+            // Card A: dest has excess (raw > goal), source needs it (src_count < goal).
+            // Pick lowest trade_candidate_value = 1 / (max_rate × excess).
+            // max_rate must be > 0 (spec: trade candidates require max_pull_rate > 0... actually
+            // let me re-check - the trade candidate spec requires max_pull_rate > 0 for
+            // trade-candidates page, but for Card A in recommended trades the spec just says
+            // "lowest trade-candidate value". The value formula requires max_rate != 0 to avoid
+            // division by zero. Cards with max_rate = 0 cannot be expressed by the formula,
+            // so exclude them from Card A candidates per the trade-candidate value definition.
+            let best_a = card_data
+                .iter()
+                .zip(src_counts.iter())
+                .filter(|(d, src_cnt)| {
+                    d.rarity_class_id == rarity_class_id
+                        && d.dest_raw > goal
+                        && **src_cnt < goal
+                        && d.max_rate != Prob::ZERO
+                })
+                .min_by(|(da, _), (db, _)| {
+                    let excess_a = (da.dest_raw - goal) as f64;
+                    let excess_b = (db.dest_raw - goal) as f64;
+                    let va = 1.0 / (da.max_rate.as_f64() * excess_a);
+                    let vb = 1.0 / (db.max_rate.as_f64() * excess_b);
+                    va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
+                });
+
+            let Some((a_data, a_src_count_ref)) = best_a else {
+                continue;
+            };
+
+            let a_src_count = *a_src_count_ref;
+            recs.push(TradeRec {
+                source_name: source_name.clone(),
+                card_b: b_data.cv,
+                card_b_source_count: b_src_count,
+                card_b_receive_value: b_receive_value,
+                card_a: a_data.cv,
+                card_a_dest_count: a_data.dest_raw,
+                card_a_source_count: a_src_count,
+            });
+        }
+    }
+
+    // Sort by card B receive_value descending.
+    recs.sort_by(|a, b| {
+        b.card_b_receive_value
+            .partial_cmp(&a.card_b_receive_value)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    recs
+}
+
+fn build_candidates(
+    store: &ProfileStore<AppStorage>,
+    settings: &AppSettings,
+    cfg: &FilterConfig,
+    today: NaiveDate,
+    matched_name_ids: Option<&[usize]>,
+    show_unobtainable: bool,
+) -> Vec<CandidateRec> {
+    let goal = cfg.goal.max(1);
+    let merge_dupes = settings.merge_duplicate_printings();
+    let any_version = cfg.any_version_owned;
+    let mut recs: Vec<CandidateRec> = Vec::new();
+
+    for cv in CardVersion::ALL {
+        if merge_dupes && !cv.is_original() && !cv.duplicates().is_empty() {
+            continue;
+        }
+        if !passes_filter(cv, cfg, settings, today, matched_name_ids) {
+            continue;
+        }
+
+        let raw = raw_dest_count(cv, store, merge_dupes, any_version);
+        if raw <= goal {
+            continue; // no excess
+        }
+        let excess = raw - goal;
+
+        let max_rate = max_card_pull_rate(cv.id());
+        if max_rate == Prob::ZERO {
+            continue; // unobtainable from packs — omit entirely
+        }
+
+        let is_unobtainable = cv.set().retirement_date().is_some_and(|d| d <= today);
+        if is_unobtainable && !show_unobtainable {
+            continue;
+        }
+
+        let trade_value = 1.0 / (max_rate.as_f64() * excess as f64);
+        recs.push(CandidateRec { cv, dest_count: raw, excess, trade_value, is_unobtainable });
+    }
+
+    recs.sort_by(|a, b| {
+        a.trade_value
+            .partial_cmp(&b.trade_value)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    recs
+}
+
+// ---------------------------------------------------------------------------
+// UI helpers
+// ---------------------------------------------------------------------------
+
+const SECTION_HDR: &str =
+    "text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3";
+const CARD_CLS: &str =
+    "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700";
+const BTN_PRIMARY: &str =
+    "px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 \
+     disabled:opacity-40 disabled:cursor-not-allowed";
+const BADGE_PROFILE: &str =
+    "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium \
+     bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200";
+
+/// Compact card thumbnail used in trade recommendations.
+#[component]
+fn CardThumb(cv_id: usize) -> Element {
+    let Some(cv) = CardVersion::from_id(cv_id) else {
+        return rsx! {};
+    };
+    let card_name = cv.card().name();
+    let rarity_icon = cv.rarity().class().icon();
+    let set_icon = cv.set().icon();
+    let card_image = cv.image();
+    rsx! {
+        div { class: "flex items-center gap-2 min-w-0",
+            img {
+                src: "{card_image}",
+                alt: "{card_name}",
+                class: "h-14 w-auto rounded object-contain shrink-0",
+            }
+            div { class: "min-w-0",
+                div { class: "flex items-center gap-1 mb-0.5",
+                    img {
+                        src: "{set_icon}",
+                        alt: "",
+                        class: "h-3.5 w-auto max-w-10 object-contain shrink-0",
+                    }
+                    img {
+                        src: "{rarity_icon}",
+                        alt: "",
+                        class: "h-3.5 w-auto max-w-8 object-contain shrink-0",
+                    }
+                }
+                span { class: "text-sm font-medium text-gray-900 dark:text-gray-100 block truncate",
+                    "{card_name}"
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Shares section
+// ---------------------------------------------------------------------------
+
+#[component]
+fn ShareRow(rec: ShareRec, primary_name: String, disabled: bool) -> Element {
+    let mut store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
+    let cv_id = rec.cv.id();
+    let source_name = rec.best_source.name.clone();
+    let on_record = move |_| {
+        let mut s = store.write();
+        if let Some(st) = s.as_mut() {
+            let src_c = st.owned_count(&source_name, cv_id);
+            let _ = st.set_owned_count(&source_name, cv_id, src_c.saturating_sub(1));
+            let dst_c = st.owned_count(&primary_name, cv_id);
+            let _ = st.set_owned_count(&primary_name, cv_id, dst_c + 1);
+        }
+        schedule_save();
+    };
+
+    let value_label = if rec.is_zero_rate {
+        "Priority".to_string()
+    } else {
+        format!("{:.4}", rec.receive_value)
+    };
+
+    rsx! {
+        div { class: "flex items-center gap-3 p-3 border-b border-gray-100 dark:border-gray-700 last:border-0",
+            // Card thumbnail
+            div { class: "flex-1 min-w-0",
+                CardThumb { cv_id: rec.cv.id() }
+            }
+            // Metadata
+            div { class: "shrink-0 flex flex-col items-end gap-1",
+                if rec.is_zero_rate {
+                    span { class: "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200",
+                        "Priority"
+                    }
+                }
+                span { class: "text-xs text-gray-500 dark:text-gray-400",
+                    "Need {rec.needed} · Value {value_label}"
+                }
+                span { class: BADGE_PROFILE, "{rec.best_source.name} ({rec.best_source.count})" }
+                if !rec.alt_sources.is_empty() {
+                    span { class: "text-xs text-gray-400 dark:text-gray-500",
+                        "Also: "
+                        for (i, alt) in rec.alt_sources.iter().enumerate() {
+                            if i > 0 {
+                                ", "
+                            }
+                            "{alt.name} ({alt.count})"
+                        }
+                    }
+                }
+                button {
+                    r#type: "button",
+                    class: BTN_PRIMARY,
+                    disabled,
+                    onclick: on_record,
+                    "Record transfer"
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Trades section
+// ---------------------------------------------------------------------------
+
+#[component]
+fn TradeRow(rec: TradeRec, primary_name: String, disabled: bool) -> Element {
+    let mut store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
+    let cv_b_id = rec.card_b.id();
+    let cv_a_id = rec.card_a.id();
+    let source = rec.source_name.clone();
+    let primary = primary_name.clone();
+
+    let on_record = move |_| {
+        let mut s = store.write();
+        if let Some(st) = s.as_mut() {
+            // Source gives card_b to dest
+            let b_src = st.owned_count(&source, cv_b_id);
+            let _ = st.set_owned_count(&source, cv_b_id, b_src.saturating_sub(1));
+            let b_dst = st.owned_count(&primary, cv_b_id);
+            let _ = st.set_owned_count(&primary, cv_b_id, b_dst + 1);
+            // Dest gives card_a to source
+            let a_dst = st.owned_count(&primary, cv_a_id);
+            let _ = st.set_owned_count(&primary, cv_a_id, a_dst.saturating_sub(1));
+            let a_src = st.owned_count(&source, cv_a_id);
+            let _ = st.set_owned_count(&source, cv_a_id, a_src + 1);
+        }
+        schedule_save();
+    };
+
+    let rarity_class = rec.card_b.rarity().class();
+    let rarity_name = format!("{} ×{}", rarity_class.group().name(), rarity_class.count());
+    let value_label = if rec.card_b_receive_value.is_infinite() {
+        "Priority".to_string()
+    } else {
+        format!("{:.4}", rec.card_b_receive_value)
+    };
+
+    rsx! {
+        div { class: "p-3 border-b border-gray-100 dark:border-gray-700 last:border-0",
+            // Header: source + rarity class
+            div { class: "flex items-center justify-between mb-2",
+                div { class: "flex items-center gap-2",
+                    span { class: BADGE_PROFILE, "{rec.source_name}" }
+                    span { class: "text-xs text-gray-500 dark:text-gray-400",
+                        "{rarity_name} · Value {value_label}"
+                    }
+                }
+                button {
+                    r#type: "button",
+                    class: BTN_PRIMARY,
+                    disabled,
+                    onclick: on_record,
+                    "Record transfer"
+                }
+            }
+            // Both sides of the trade
+            div { class: "grid grid-cols-2 gap-2",
+                div { class: "bg-green-50 dark:bg-green-950/20 rounded-md p-2",
+                    p { class: "text-xs font-medium text-green-700 dark:text-green-400 mb-1",
+                        "You receive"
+                    }
+                    CardThumb { cv_id: rec.card_b.id() }
+                }
+                div { class: "bg-red-50 dark:bg-red-950/20 rounded-md p-2",
+                    p { class: "text-xs font-medium text-red-700 dark:text-red-400 mb-1",
+                        "You give"
+                    }
+                    CardThumb { cv_id: rec.card_a.id() }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Candidates section
+// ---------------------------------------------------------------------------
+
+#[component]
+fn CandidateRow(rec: CandidateRec) -> Element {
+    rsx! {
+        div { class: "flex items-center gap-3 p-3 border-b border-gray-100 dark:border-gray-700 last:border-0",
+            div { class: "flex-1 min-w-0",
+                CardThumb { cv_id: rec.cv.id() }
+            }
+            div { class: "shrink-0 flex flex-col items-end gap-1",
+                if rec.is_unobtainable {
+                    span { class: "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200",
+                        "Retired set"
+                    }
+                }
+                span { class: "text-xs text-gray-500 dark:text-gray-400",
+                    "Own {rec.dest_count} · Excess {rec.excess}"
+                }
+                span { class: "text-xs font-medium text-gray-700 dark:text-gray-200",
+                    "Value {rec.trade_value:.4}"
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Trade page
+// ---------------------------------------------------------------------------
+
+fn default_filter_config() -> FilterConfig {
+    FilterConfig { goal: 1, ..FilterConfig::default() }
+}
 
 #[component]
 pub fn TradePage() -> Element {
+    let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
+    let settings = use_context::<Signal<AppSettings>>();
+    let config: Signal<FilterConfig> = use_signal(default_filter_config);
+    let mut show_unobtainable = use_signal(|| false);
+
+    let store_guard = store.read();
+    let settings_guard = settings.read();
+    let cfg = config.read();
+
+    let Some(store_ref) = store_guard.as_ref() else {
+        return rsx! {
+            div { class: "p-4 text-gray-500 dark:text-gray-400", "Loading…" }
+        };
+    };
+
+    let today = today_naive();
+
+    // Active vs inactive profiles.
+    let active_set: HashSet<&str> = store_ref
+        .active_profile_names()
+        .iter()
+        .map(|s| s.as_str())
+        .collect();
+    let inactive_names: Vec<String> = store_ref
+        .profiles()
+        .iter()
+        .filter(|p| !active_set.contains(p.name.as_str()))
+        .map(|p| p.name.clone())
+        .collect();
+
+    let has_sources = !inactive_names.is_empty();
+    let single_profile = store_ref.profiles().len() == 1;
+    let primary_name = store_ref.primary_profile_name().to_string();
+    let multi_active = store_ref.active_profile_names().len() > 1;
+
+    // Name filter support.
+    let matched_name_ids: Option<Vec<usize>> = cfg
+        .name_query
+        .as_deref()
+        .filter(|q| !q.trim().is_empty())
+        .map(|q| Card::NAMES.search(q).map(|e| e.id()).collect());
+
+    let shares = if has_sources {
+        build_shares(
+            store_ref,
+            &settings_guard,
+            &cfg,
+            today,
+            &inactive_names,
+            matched_name_ids.as_deref(),
+        )
+    } else {
+        Vec::new()
+    };
+
+    let trades = if has_sources {
+        build_trades(
+            store_ref,
+            &settings_guard,
+            &cfg,
+            today,
+            &inactive_names,
+            matched_name_ids.as_deref(),
+        )
+    } else {
+        Vec::new()
+    };
+
+    let candidates = build_candidates(
+        store_ref,
+        &settings_guard,
+        &cfg,
+        today,
+        matched_name_ids.as_deref(),
+        *show_unobtainable.read(),
+    );
+
+    drop(cfg);
+    drop(settings_guard);
+    drop(store_guard);
+
     rsx! {
-        div { class: "p-4", "Trade — coming soon" }
+        div { class: "max-w-4xl mx-auto p-4 sm:p-6 space-y-6",
+            h1 { class: "text-2xl font-bold text-gray-900 dark:text-gray-100", "Trade" }
+
+            // Filter toolbar
+            FilterToolbar { config, mode: FilterMode::Trade }
+
+            // ── Recommended Shares ────────────────────────────────────────────
+            section {
+                h2 { class: SECTION_HDR, "Recommended Shares" }
+                div { class: "{CARD_CLS}",
+                    if !has_sources {
+                        div { class: "p-4 text-sm text-gray-500 dark:text-gray-400",
+                            if single_profile {
+                                "Create a second profile to see sharing recommendations. Shares are one-way transfers from an inactive profile to your active profiles."
+                            } else {
+                                "Deselect at least one profile to use it as a source. Active profiles are the destination; inactive profiles are sources."
+                            }
+                        }
+                    } else if shares.is_empty() {
+                        p { class: "p-4 text-sm text-gray-500 dark:text-gray-400",
+                            "No sharing recommendations match the current filters."
+                        }
+                    } else {
+                        for rec in shares {
+                            ShareRow {
+                                key: "{rec.cv.id()}",
+                                rec,
+                                primary_name: primary_name.clone(),
+                                disabled: multi_active,
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Recommended Trades ────────────────────────────────────────────
+            section {
+                h2 { class: SECTION_HDR, "Recommended Trades" }
+                div { class: "{CARD_CLS}",
+                    if !has_sources {
+                        div { class: "p-4 text-sm text-gray-500 dark:text-gray-400",
+                            if single_profile {
+                                "Create a second profile to see trading recommendations."
+                            } else {
+                                "Deselect at least one profile to use it as a source."
+                            }
+                        }
+                    } else if trades.is_empty() {
+                        p { class: "p-4 text-sm text-gray-500 dark:text-gray-400",
+                            "No trading recommendations match the current filters."
+                        }
+                    } else {
+                        for rec in trades {
+                            TradeRow {
+                                key: "{rec.source_name}-{rec.card_b.id()}-{rec.card_a.id()}",
+                                rec,
+                                primary_name: primary_name.clone(),
+                                disabled: multi_active,
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Trade Candidates ──────────────────────────────────────────────
+            section {
+                h2 { class: SECTION_HDR, "Trade Candidates" }
+                // Unobtainable toggle
+                div { class: "flex items-center gap-2 mb-3",
+                    Toggle {
+                        checked: *show_unobtainable.read(),
+                        on_change: move |v| show_unobtainable.set(v),
+                    }
+                    span { class: "text-sm text-gray-700 dark:text-gray-300", "Show retired-set cards" }
+                }
+                div { class: "{CARD_CLS}",
+                    if candidates.is_empty() {
+                        p { class: "p-4 text-sm text-gray-500 dark:text-gray-400",
+                            "No trade candidates match the current filters."
+                        }
+                    } else {
+                        for rec in candidates {
+                            CandidateRow { key: "{rec.cv.id()}", rec }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
