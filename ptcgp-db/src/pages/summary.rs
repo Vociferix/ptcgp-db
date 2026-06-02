@@ -213,7 +213,10 @@ fn SavedQueryItem(
     mut queries: Signal<SavedQueries>,
     store: Signal<Option<ProfileStore<AppStorage>>>,
     mut open: Signal<bool>,
+    mut active_query: Signal<Option<String>>,
 ) -> Element {
+    // Clone for the load closure; `name` itself is moved into the delete closure below.
+    let name_for_load = name.clone();
     rsx! {
         div { class: "flex items-center gap-1 px-3 py-2 select-none hover:bg-gray-50 dark:hover:bg-gray-700",
             // Name area — clicking loads the query
@@ -221,6 +224,7 @@ fn SavedQueryItem(
                 class: "flex-1 min-w-0 cursor-pointer",
                 onclick: move |_| {
                     config.set(cfg_snapshot.clone());
+                    active_query.set(Some(name_for_load.clone()));
                     open.set(false);
                 },
                 span { class: "text-sm text-gray-700 dark:text-gray-300 truncate block",
@@ -237,12 +241,16 @@ fn SavedQueryItem(
                 title: "Delete",
                 onclick: move |e| {
                     e.stop_propagation();
+                    let was_active = active_query.read().as_deref() == Some(name.as_str());
                     let data = {
                         let mut q = queries.write();
                         q.remove(&name);
                         q.as_save_data().clone()
                     };
                     save_queries_data(data, store);
+                    if was_active {
+                        active_query.set(None);
+                    }
                 },
                 "×"
             }
@@ -251,7 +259,10 @@ fn SavedQueryItem(
 }
 
 #[component]
-fn SavedQueriesDropdown(config: Signal<FilterConfig>) -> Element {
+fn SavedQueriesDropdown(
+    config: Signal<FilterConfig>,
+    mut active_query: Signal<Option<String>>,
+) -> Element {
     let queries = use_context::<Signal<SavedQueries>>();
     let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
     let mut open = use_signal(|| false);
@@ -264,14 +275,35 @@ fn SavedQueriesDropdown(config: Signal<FilterConfig>) -> Element {
         .collect();
     let count = query_list.len();
 
+    // Determine the trigger label and whether the loaded query has been modified.
+    let active_name = active_query.read().clone();
+    let (label, is_modified) = match &active_name {
+        None => ("Queries".to_string(), false),
+        Some(name) => {
+            let cfg = config.read();
+            let modified = queries
+                .read()
+                .queries()
+                .iter()
+                .find(|q| &q.name == name)
+                .map(|q| q.config != *cfg)
+                .unwrap_or(false);
+            (name.clone(), modified)
+        }
+    };
+    let is_named = active_name.is_some();
+
     rsx! {
         div { class: "relative",
             button {
                 r#type: "button",
                 class: "{TRIGGER_CLS}",
                 onclick: move |_| open.toggle(),
-                "Queries"
-                if count > 0 {
+                "{label}"
+                if is_modified {
+                    span { class: "text-amber-500 font-medium", " *" }
+                }
+                if !is_named && count > 0 {
                     span { class: "px-1.5 py-0.5 text-xs rounded-full bg-blue-600 text-white",
                         "{count}"
                     }
@@ -294,12 +326,13 @@ fn SavedQueriesDropdown(config: Signal<FilterConfig>) -> Element {
                               overflow-x-hidden rounded-md border border-gray-200 \
                               dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg py-1 \
                               min-w-48",
-                    // Default — always first; resets config to defaults
+                    // Default — always first; resets config and active query
                     div {
                         class: "flex items-center px-3 py-2 cursor-pointer select-none \
                                 hover:bg-gray-50 dark:hover:bg-gray-700",
                         onclick: move |_| {
                             config.set(default_filter_config());
+                            active_query.set(None);
                             open.set(false);
                         },
                         span { class: "text-sm text-gray-500 dark:text-gray-400 italic",
@@ -319,6 +352,7 @@ fn SavedQueriesDropdown(config: Signal<FilterConfig>) -> Element {
                                     queries,
                                     store,
                                     open,
+                                    active_query,
                                 }
                             }
                         }
@@ -334,7 +368,11 @@ fn SavedQueriesDropdown(config: Signal<FilterConfig>) -> Element {
 // ---------------------------------------------------------------------------
 
 #[component]
-fn SaveQueryDialog(config: Signal<FilterConfig>, on_close: EventHandler<()>) -> Element {
+fn SaveQueryDialog(
+    config: Signal<FilterConfig>,
+    mut active_query: Signal<Option<String>>,
+    on_close: EventHandler<()>,
+) -> Element {
     let mut queries = use_context::<Signal<SavedQueries>>();
     let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
     let mut name = use_signal(String::new);
@@ -373,12 +411,14 @@ fn SaveQueryDialog(config: Signal<FilterConfig>, on_close: EventHandler<()>) -> 
                                         error.set(Some("Name cannot be empty"));
                                         return;
                                     }
+                                    let n_saved = n.clone();
                                     let cfg = config.read().clone();
                                     let result = {
                                         let mut q = queries.write();
                                         if q.add(n, cfg) { Some(q.as_save_data().clone()) } else { None }
                                     };
                                     if let Some(data) = result {
+                                        active_query.set(Some(n_saved));
                                         save_queries_data(data, store);
                                         on_close.call(());
                                     } else {
@@ -416,12 +456,14 @@ fn SaveQueryDialog(config: Signal<FilterConfig>, on_close: EventHandler<()>) -> 
                                 error.set(Some("Name cannot be empty"));
                                 return;
                             }
+                            let n_saved = n.clone();
                             let cfg = config.read().clone();
                             let result = {
                                 let mut q = queries.write();
                                 if q.add(n, cfg) { Some(q.as_save_data().clone()) } else { None }
                             };
                             if let Some(data) = result {
+                                active_query.set(Some(n_saved));
                                 save_queries_data(data, store);
                                 on_close.call(());
                             } else {
@@ -604,6 +646,7 @@ pub fn SummaryPage() -> Element {
     let catalog_filter = use_context::<Signal<FilterConfig>>();
     let nav = use_navigator();
     let mut dialog_open = use_signal(|| false);
+    let active_query: Signal<Option<String>> = use_signal(|| None);
 
     let config: Signal<FilterConfig> = use_signal(default_filter_config);
 
@@ -805,7 +848,7 @@ pub fn SummaryPage() -> Element {
             div { class: "flex flex-col gap-1.5",
                 FilterToolbar { config, mode: FilterMode::Summary }
                 div { class: "flex items-center gap-1.5",
-                    SavedQueriesDropdown { config }
+                    SavedQueriesDropdown { config, active_query }
                     button {
                         r#type: "button",
                         class: "{TRIGGER_CLS}",
@@ -815,6 +858,7 @@ pub fn SummaryPage() -> Element {
                     if *dialog_open.read() {
                         SaveQueryDialog {
                             config,
+                            active_query,
                             on_close: move |_| dialog_open.set(false),
                         }
                     }
