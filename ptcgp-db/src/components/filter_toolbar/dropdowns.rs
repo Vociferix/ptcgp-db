@@ -437,10 +437,15 @@ fn toggle_set(config: &mut FilterConfig, id: usize, was_checked: bool) {
 }
 
 fn select_only_set(config: &mut FilterConfig, id: usize) {
-    config.sets = vec![id];
-    config
-        .packs
-        .retain(|&pid| Pack::from_id(pid).is_some_and(|p| p.set().id() == id));
+    if config.sets.as_slice() == [id] {
+        config.sets.clear();
+        config.packs.clear();
+    } else {
+        config.sets = vec![id];
+        config
+            .packs
+            .retain(|&pid| Pack::from_id(pid).is_some_and(|p| p.set().id() == id));
+    }
 }
 
 fn toggle_pack(config: &mut FilterConfig, id: usize, was_checked: bool) {
@@ -452,7 +457,11 @@ fn toggle_pack(config: &mut FilterConfig, id: usize, was_checked: bool) {
 }
 
 fn select_only_pack(config: &mut FilterConfig, id: usize) {
-    config.packs = vec![id];
+    if config.packs.as_slice() == [id] {
+        config.packs.clear();
+    } else {
+        config.packs = vec![id];
+    }
 }
 
 fn toggle_source(config: &mut FilterConfig, id: usize, was_checked: bool) {
@@ -464,5 +473,9 @@ fn toggle_source(config: &mut FilterConfig, id: usize, was_checked: bool) {
 }
 
 fn select_only_source(config: &mut FilterConfig, id: usize) {
-    config.sources = vec![id];
+    if config.sources.as_slice() == [id] {
+        config.sources.clear();
+    } else {
+        config.sources = vec![id];
+    }
 }
