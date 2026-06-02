@@ -31,12 +31,12 @@ fn DropdownPanel(open: Signal<bool>, extra_cls: &'static str, children: Element)
     }
 }
 
-/// Footer hint shown at the bottom of every multi-select dropdown.
-/// The `border-t` provides a visual separator from the item list (and optional Clear button).
+/// Header hint shown at the top of every multi-select dropdown.
+/// The `border-b` provides a visual separator from the item list below.
 #[component]
 fn DropdownHint() -> Element {
     rsx! {
-        div { class: "px-3 pt-1 pb-0.5 border-t border-gray-100 dark:border-gray-700 \
+        div { class: "px-3 pt-0.5 pb-1 border-b border-gray-100 dark:border-gray-700 \
                       text-xs text-gray-400 dark:text-gray-500",
             "Ctrl+Click to select multiple"
         }
@@ -94,6 +94,7 @@ pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
             }
 
             DropdownPanel { open, extra_cls: "w-72",
+                DropdownHint {}
                 for set in &visible_sets {
                     SetItem {
                         key: "{set.id()}",
@@ -112,7 +113,6 @@ pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
                         },
                     }
                 }
-                DropdownHint {}
             }
         }
     }
@@ -211,6 +211,7 @@ pub fn PackDropdown(config: Signal<FilterConfig>) -> Element {
             }
 
             DropdownPanel { open, extra_cls: "w-60",
+                DropdownHint {}
                 for (set_id, pack_ids) in groups {
                     PackGroup {
                         key: "{set_id}",
@@ -223,7 +224,6 @@ pub fn PackDropdown(config: Signal<FilterConfig>) -> Element {
                 if !packs.is_empty() {
                     DropdownClearBtn { on_clear: move |_| config.write().packs.clear() }
                 }
-                DropdownHint {}
             }
         }
     }
@@ -334,6 +334,7 @@ pub fn SourceDropdown(config: Signal<FilterConfig>) -> Element {
             }
 
             DropdownPanel { open, extra_cls: "min-w-48",
+                DropdownHint {}
                 for source in CardSource::ALL {
                     SourceItem {
                         key: "{source.id()}",
@@ -346,7 +347,6 @@ pub fn SourceDropdown(config: Signal<FilterConfig>) -> Element {
                 if !sources.is_empty() {
                     DropdownClearBtn { on_clear: move |_| config.write().sources.clear() }
                 }
-                DropdownHint {}
             }
         }
     }
