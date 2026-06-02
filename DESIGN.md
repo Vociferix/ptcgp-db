@@ -22,17 +22,7 @@ but it will be made publicly available via GitHub.
 - **Language**: Rust
 - **UI Framework**: Dioxus — provides a unified compile target for web (WASM), desktop, and mobile
   from a single codebase
-- **Styling**: Tailwind CSS exclusively. Do not write custom CSS beyond Tailwind theming
-  configuration. All visual styling goes through Tailwind utility classes.
-- **UI Component Crates**: Avoid third-party UI component crates to ensure consistent style
-  throughout the app. The `dioxus-primitives` crate is the one permitted exception — it may be
-  used for unstyled primitive components, as long as the component can be styled to match the rest
-  of the app. Do not use `dx components add`; those generated components do not use Tailwind and
-  will not match the app's style.
-- **Other Dependencies**: Only use crates that are widely used (≥ 100,000 downloads) and actively
-  maintained (updated within the past year). The user can grant exceptions on request. Crates are
-  occaisionally inactive due to being in a "done" state. Such crates are strong candidates for an
-  exception.
+- **Styling**: Tailwind CSS exclusively. No custom CSS beyond Tailwind theming configuration.
 
 ---
 
@@ -61,10 +51,6 @@ structures generated at build time. The build script lives in `codegen/` (entryp
 hand-written wrappers that make the generated code convenient to use. The crate has no runtime
 dependencies on JSON parsing or databases. Initial compilation may take up to 10 minutes;
 subsequent builds are incremental.
-
-This crate has already been implemented by the user. Claude's role is limited to adding doc
-comments and tests. Do not restructure, rename, or otherwise modify the implementation without
-explicit discussion and approval from the user.
 
 **Ordering guarantees on data sequences**: all sequences exposed by this crate are pre-sorted.
 Sequences with a canonical display order (e.g., `CardVersion::ALL`) are already in that order as
@@ -480,103 +466,7 @@ Business logic (probability calculations, collection aggregation, migration) liv
 
 ---
 
-## Coding Standards
-
-- **Formatting and lints**: Before committing, all code must be formatted (`cargo fmt`), free of
-  clippy warnings (`cargo clippy`), and passing all tests.
-- **File size**: Keep Rust files under 800 lines. Types and their implementations typically get
-  their own file. Complex types may split their implementation across multiple files. Multiple
-  small related types may share a file.
-- **UI components**: Define each component in its own file, in a module separate from business
-  logic. Prefer reusable components. Do not artificially split simple components.
-- **Documentation**: All public functions, types, traits, and constants should have doc comments
-  explaining what they do. Most modules should have a module-level comment. Inline comments
-  should explain non-obvious logic — assume the reader is an experienced Rust developer.
-- **Allocations**: Avoid unnecessary allocations. UI code will inevitably allocate more than
-  typical Rust, but don't allocate when a non-allocating alternative is straightforward.
-- **Idiomatic Rust**: Prefer iterator pipelines over imperative loops. Use `?` for error
-  propagation. Prefer `Option`/`Result` over panics.
-- **Error handling**: Outside of tests, never use `.unwrap()`. Avoid `.expect(...)` unless the
-  panic is genuinely impossible and the reason is obvious. Functions should return `Result` or
-  `Option` rather than panicking. Use `.get(...)` when slice bounds are not obviously in range;
-  plain indexing is fine when the bounds are provably safe from context.
-- **Unsafe**: Do not write `unsafe` code without prior approval from the user. When approved,
-  unsafe blocks must be minimal in scope and include a `// SAFETY:` comment explaining soundness.
-  Functions with UB-inducing preconditions must be marked `unsafe`.
-- **Code duplication**: Outside of tests, avoid duplicating logic. Refactor similar code into
-  shared abstractions, using generics and traits where appropriate. Some repetition in tests is
-  acceptable.
-- **Tests**: Test non-obvious behavior comprehensively, but omit tests for trivial logic and
-  for behavior that is the responsibility of a dependency to guarantee. Place tests either in a
-  `#[cfg(test)] mod tests { ... }` block at the end of the file under test, or in a separate
-  file (e.g., `src/foo/tests.rs`). Do not interleave test code with production code in the
-  middle of a file. Colocating tests with the code they test is encouraged.
-- **Performance vs. build time**: App runtime performance takes priority over build time. Long
-  build times (e.g., the data generation crate) are acceptable if isolated to their own crate
-  for incremental compilation.
-
----
-
 ## UI Guidelines
-
-### Tailwind Conventions
-
-- Use a consistent, small set of spacing values throughout the app. Choose a spacing scale (e.g.,
-  a handful of `p-*` and `m-*` values) and apply it consistently rather than using arbitrary
-  sizes everywhere. This is a guideline, not a strict rule.
-- Dark and light mode must both look correct. Use Tailwind's `dark:` variant.
-
-### Element Theme Colors
-
-Each of the ten Pokémon elements has a theme color used for row tints, Full Art borders, and
-other element-coded UI. These colors must be defined as custom Tailwind theme colors in
-`tailwind.config.js` (e.g., under `theme.extend.colors.element`) so they can be referenced
-consistently throughout the app rather than hardcoded per component. The exact color values
-should be derived from the element's visual identity in PTCGP (the element icon colors in
-`ptcgp-images/elements/icons/` are a reliable reference).
-
-Elements and their general color character:
-
-| Element | Color character |
-|---|---|
-| Grass | Green |
-| Fire | Red / orange |
-| Water | Blue |
-| Lightning | Yellow |
-| Fighting | Brown / orange-brown |
-| Psychic | Pink / purple |
-| Darkness | Dark purple / near-black |
-| Metal | Silver / gray |
-| Dragon | Yellowy-brown / gold |
-| Colorless | Light gray |
-
-### Custom Widgets
-
-Never use native browser form elements that have browser-styled decorations that cannot be
-overridden. For example, `<input type="number">` renders browser-native up/down arrows that
-cannot be styled consistently. Reimplement such widgets as custom Dioxus components, or use
-`dioxus-primitives` components if applicable.
-
-The app should feel visually and behaviorally consistent. Avoid having two components that look
-or behave slightly differently but serve the same purpose. Build shared components and use them
-everywhere.
-
-#### Count Spinner
-
-The owned card count editor is used in multiple places (Card Catalog rows, Card Details view).
-It must be implemented as a single shared component used consistently everywhere. Spec:
-
-- **Minimum**: 0. Decrement at 0 is a no-op. When "Merge duplicate printings" is enabled, the
-  displayed value is the merged sum across the duplicate group, but the minimum is enforced
-  against the individual card version's underlying count — decrement is a no-op when that
-  version's count is 0, even if the merged sum is > 0.
-- **Maximum**: the maximum value of the underlying integer type (e.g., `u32::MAX`). In practice
-  no user will approach this limit, but the component must clamp rather than overflow or panic.
-- **Interactions**: increment and decrement buttons (±1), plus direct numeric text input.
-- **Validation**: typed input must be validated and clamped to `[0, MAX]` on commit (e.g., on
-  blur or Enter). Invalid non-numeric input should be rejected or reset to the previous value.
-- **Disabled state**: when multiple profiles are active, the component renders as disabled and
-  read-only, displaying the aggregate sum. The disabled appearance must be visually distinct.
 
 ### Image Usage
 
@@ -919,28 +809,6 @@ aggregate sum and the count editor is disabled.
 - Effect text (replace element placeholders with symbol images)
 
 The layout of these fields is left to implementation judgment.
-
----
-
-## Analysis Page
-
-The Analysis page has been merged into the Summary page. There is no separate Analysis page or
-`/analysis` route. See §Summary Page for the filter toolbar, goal input, any-version toggle,
-saved queries, and completion formula that power these queries.
-
-**Do not implement this as separate per-use-case tools.** Hardcoded tools for specific scenarios
-(e.g., a dedicated "Diamond completion" button) will be rejected.
-
-### Example Queries
-
-These are all handled through the Summary page filter toolbar:
-
-| Goal | Filter Configuration |
-|---|---|
-| Pull a card I own 0 of | Goal = 1 (default) |
-| Pull a card I own fewer than 2 of (deck building) | Goal = 2 |
-| Pull an unowned Diamond card | Rarity class = any Diamond class (◆–◆◆◆◆), goal = 1 |
-| Pull any unowned version of a Pokémon I have none of | Enable "any version owned", goal = 1 |
 
 ---
 

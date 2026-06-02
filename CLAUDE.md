@@ -30,6 +30,24 @@ These override any general defaults:
   scope and include a `// SAFETY:` comment.
 - **Panics**: No `.unwrap()` outside tests. Avoid `.expect()` unless the panic is genuinely
   impossible and self-evident from context.
+- **Native form elements**: Never use `<input type="number">` or other browser-native widgets with
+  styled decorations that can't be overridden. Implement custom Dioxus components instead.
+
+## Code quality
+
+- **File size**: Keep Rust files under 800 lines. Each type and its implementation typically gets
+  its own file. Complex types may split across multiple files. Multiple small related types may
+  share a file.
+- **Documentation**: All public functions, types, traits, and constants must have doc comments.
+  Most modules should have a module-level comment. Inline comments explain non-obvious logic only.
+- **Code duplication**: Outside tests, avoid duplicating logic. Refactor with generics and traits.
+- **Tests**: Test non-obvious behavior; omit tests for trivial logic. Place tests in a
+  `#[cfg(test)] mod tests { ... }` block at the end of the file under test, or in a separate file
+  (e.g., `src/foo/tests.rs`). Never interleave test code with production code.
+- **Performance vs. build time**: Runtime performance takes priority. Long build times isolated to
+  their own crate (like `ptcgp-db-data`) are acceptable.
+- **Consistency**: Avoid two components that look or behave slightly differently but serve the same
+  purpose. Build shared components and use them everywhere.
 
 ## Running the app
 
@@ -248,9 +266,9 @@ reverts on Escape or non-numeric input.
 
 ## PR process
 
-Each task from the roadmap gets its own branch and pull request.
+Each task gets its own branch and pull request.
 
-1. **Branch** — name after the task ID in lowercase (e.g. T07 → `t07`)
+1. **Branch** — use a short kebab-case name (e.g. `fix-filter-crash`, `feature-history-graphs`)
 2. **Work** — implement the task, commit
 3. **Format** — run `dx fmt -p ptcgp-db` before pushing. CI runs `dx fmt --check` and will fail
    if RSX macros are not formatted. `cargo fmt` does not cover RSX.
