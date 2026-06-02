@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::NaiveDate;
 use dioxus::prelude::*;
 use ptcgp_db_core::save_data::{CardKindFilter, CardVersionId, FilterConfig, SavedQueriesSaveData};
@@ -697,6 +699,10 @@ pub fn SummaryPage() -> Element {
     let counts = |id: CardVersionId| store_ref.aggregate_count(id);
 
     // ── Per-set rows ────────────────────────────────────────────────────────
+    // Desired IDs are accumulated here so the best-pack section below avoids a
+    // separate third pass over all card data.
+    let mut all_desired_ids: std::collections::HashSet<CardVersionId> =
+        std::collections::HashSet::new();
 
     let set_rows: Vec<SetRowData> = Set::ALL
         .iter()
@@ -711,13 +717,18 @@ pub fn SummaryPage() -> Element {
                 return None;
             }
 
+            // Build a per-card effective-count cache in one pass. The map also
+            // serves as an O(1) membership check for pack-card filtering, replacing
+            // repeated passes_filter calls inside pack_rows below.
+            let eff_counts: HashMap<CardVersionId, u32> = matching_cvs
+                .iter()
+                .map(|cv| (cv.id(), effective_count(cv.id(), &cfg, store_ref)))
+                .collect();
+
             // Completion formula: numerator = Σ min(effective_count, goal),
             // denominator = n × goal. This correctly weights partial progress
             // (e.g. owning 1 copy with goal=2 contributes 0.5 completion).
-            let owned: usize = matching_cvs
-                .iter()
-                .map(|cv| effective_count(cv.id(), &cfg, store_ref) as usize)
-                .sum();
+            let owned: usize = eff_counts.values().map(|&c| c as usize).sum();
             let total = matching_cvs.len() * goal as usize;
 
             let comp = if merge_dupes {
@@ -728,62 +739,62 @@ pub fn SummaryPage() -> Element {
 
             let obtainable = set_is_obtainable(set, today);
 
-            let desired_ids_for_set: Vec<CardVersionId> = matching_cvs
-                .iter()
-                .filter(|cv| effective_count(cv.id(), &cfg, store_ref) < goal)
-                .map(|cv| cv.id())
-                .collect();
+            // Accumulate desired IDs for the global best-pack pass.
+            all_desired_ids
+                .extend(eff_counts.iter().filter(|&(_, &c)| c < goal).map(|(&id, _)| id));
+            let has_desired = eff_counts.values().any(|&c| c < goal);
 
-            let (best_pack, best_rate_pct) =
-                if set.is_promo() || desired_ids_for_set.is_empty() {
-                    (None, 0.0)
-                } else {
-                    let result = set
-                        .packs()
-                        .iter()
-                        .filter_map(|p| {
-                            let rate =
-                                desired_pull_rate(p, |id| desired_ids_for_set.contains(&id));
-                            if rate == Prob::ZERO {
-                                None
-                            } else {
-                                Some((p, rate))
-                            }
-                        })
-                        .max_by(|(_, a), (_, b)| a.cmp(b));
-                    match result {
-                        Some((pack, rate)) => (Some(pack), rate.as_f64() * 100.0),
-                        None => (None, 0.0),
-                    }
-                };
+            let (best_pack, best_rate_pct) = if set.is_promo() || !has_desired {
+                (None, 0.0)
+            } else {
+                let result = set
+                    .packs()
+                    .iter()
+                    .filter_map(|p| {
+                        let rate = desired_pull_rate(p, |id| {
+                            eff_counts.get(&id).is_some_and(|&c| c < goal)
+                        });
+                        if rate == Prob::ZERO {
+                            None
+                        } else {
+                            Some((p, rate))
+                        }
+                    })
+                    .max_by(|(_, a), (_, b)| a.cmp(b));
+                match result {
+                    Some((pack, rate)) => (Some(pack), rate.as_f64() * 100.0),
+                    None => (None, 0.0),
+                }
+            };
 
             let pack_rows: Vec<PackRowData> = set
                 .packs()
                 .iter()
                 .map(|p| {
-                    let p_matching: Vec<&CardVersion> = p
+                    // Filter pack cards via eff_counts membership (O(1) HashMap lookup)
+                    // instead of re-running passes_filter on each card.
+                    let p_matching_ids: Vec<CardVersionId> = p
                         .card_versions()
                         .iter()
-                        .filter(|cv| passes_filter(cv, &cfg, &settings_guard, today))
-                        .collect();
-                    let p_owned: usize = p_matching
-                        .iter()
-                        .map(|cv| effective_count(cv.id(), &cfg, store_ref) as usize)
-                        .sum();
-                    let p_total = p_matching.len() * goal as usize;
-
-                    let p_comp = if merge_dupes {
-                        completion_merged(counts, goal, p_matching.iter().map(|cv| cv.id()))
-                    } else {
-                        completion(counts, goal, p_matching.iter().map(|cv| cv.id()))
-                    };
-
-                    let p_desired: Vec<CardVersionId> = p_matching
-                        .iter()
-                        .filter(|cv| effective_count(cv.id(), &cfg, store_ref) < goal)
+                        .filter(|cv| eff_counts.contains_key(&cv.id()))
                         .map(|cv| cv.id())
                         .collect();
-                    let p_rate = desired_pull_rate(p, |id| p_desired.contains(&id));
+
+                    let p_owned: usize = p_matching_ids
+                        .iter()
+                        .map(|id| eff_counts.get(id).copied().unwrap_or(0) as usize)
+                        .sum();
+                    let p_total = p_matching_ids.len() * goal as usize;
+
+                    let p_comp = if merge_dupes {
+                        completion_merged(counts, goal, p_matching_ids.iter().copied())
+                    } else {
+                        completion(counts, goal, p_matching_ids.iter().copied())
+                    };
+
+                    let p_rate = desired_pull_rate(p, |id| {
+                        eff_counts.get(&id).is_some_and(|&c| c < goal)
+                    });
 
                     PackRowData {
                         pack: p,
@@ -820,42 +831,23 @@ pub fn SummaryPage() -> Element {
     };
 
     // ── Best pack overall ────────────────────────────────────────────────────
-
-    let all_desired_ids: Vec<CardVersionId> = set_rows
-        .iter()
-        .flat_map(|row| {
-            row.set
-                .card_versions()
-                .iter()
-                .filter(|cv| {
-                    passes_filter(cv, &cfg, &settings_guard, today)
-                        && effective_count(cv.id(), &cfg, store_ref) < goal
-                })
-                .map(|cv| cv.id())
-        })
-        .collect();
-
-    let best_rate = Pack::ALL
+    // all_desired_ids was accumulated during the set_rows pass above. Compute all
+    // non-promo pack rates in a single pass, then find ties at the maximum.
+    let all_pack_rates: Vec<(&'static Pack, Prob)> = Pack::ALL
         .iter()
         .filter(|p| !p.set().is_promo())
         .filter_map(|p| {
             let rate = desired_pull_rate(p, |id| all_desired_ids.contains(&id));
             if rate == Prob::ZERO { None } else { Some((p, rate)) }
         })
-        .max_by(|(_, a), (_, b)| a.cmp(b));
+        .collect();
 
-    let best_packs: Vec<(&'static Pack, Prob)> = if let Some((_, best)) = best_rate {
-        Pack::ALL
-            .iter()
-            .filter(|p| !p.set().is_promo())
-            .filter_map(|p| {
-                let rate = desired_pull_rate(p, |id| all_desired_ids.contains(&id));
-                if rate == best { Some((p, rate)) } else { None }
-            })
-            .collect()
-    } else {
-        vec![]
-    };
+    let best_packs: Vec<(&'static Pack, Prob)> =
+        if let Some(&(_, best)) = all_pack_rates.iter().max_by(|(_, a), (_, b)| a.cmp(b)) {
+            all_pack_rates.into_iter().filter(|(_, r)| *r == best).collect()
+        } else {
+            vec![]
+        };
 
     let collection_complete =
         best_packs.is_empty() && total_denom > 0 && total_owned == total_denom;
