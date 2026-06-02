@@ -3,6 +3,7 @@
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod file_storage;
+pub mod filter;
 pub mod migration;
 pub mod probability;
 pub mod profile_store;
@@ -10,11 +11,14 @@ pub mod queries;
 pub mod save_data;
 pub mod settings;
 pub mod storage;
+pub mod summary_data;
+pub mod trade_data;
 #[cfg(target_arch = "wasm32")]
 pub mod web_storage;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use file_storage::{FileStorage, FileStorageError};
+pub use filter::filter_card;
 pub use migration::{MigrationError, migrate_profiles, migrate_saved_queries, migrate_settings};
 pub use probability::{
     CARD_PULL_RATES, best_pack_for_desired, card_pull_rate, completion, completion_merged,
@@ -28,5 +32,9 @@ pub use save_data::{
     SETTINGS_FORMAT_VERSION, SavedQueriesSaveData, SavedQuery, Theme,
 };
 pub use settings::AppSettings;
+pub use summary_data::{PackRowData, SetRowData, SummaryData, compute_summary};
+pub use trade_data::{
+    CandidateRec, ShareRec, SourceInfo, TradeRec, build_candidates, build_shares, build_trades,
+};
 #[cfg(target_arch = "wasm32")]
 pub use web_storage::{WebStorage, WebStorageError};
