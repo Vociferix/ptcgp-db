@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use chrono::NaiveDate;
 use dioxus::prelude::*;
@@ -12,7 +12,7 @@ use ptcgp_db_data::{CardVersion, Pack, Prob, Set};
 use ptcgp_db_core::storage::Storage as _;
 
 use crate::app::AppStorage;
-use crate::components::icons::{ChevronDown, ChevronUp};
+use crate::components::icons::{ChevronDown, ChevronUp, XMark};
 use crate::components::{FilterMode, FilterToolbar};
 use crate::routes::Route;
 
@@ -266,7 +266,7 @@ fn SavedQueryItem(
                 class: "shrink-0 w-5 h-5 flex items-center justify-center rounded \
                         text-gray-300 dark:text-gray-600 \
                         hover:text-red-500 dark:hover:text-red-400 \
-                        hover:bg-red-50 dark:hover:bg-red-950/30 text-xs",
+                        hover:bg-red-50 dark:hover:bg-red-950/30",
                 title: "Delete",
                 onclick: move |e| {
                     e.stop_propagation();
@@ -281,7 +281,7 @@ fn SavedQueryItem(
                         active_query.set(None);
                     }
                 },
-                "×"
+                XMark { class: "w-3.5 h-3.5" }
             }
         }
     }
@@ -407,6 +407,27 @@ fn SaveQueryDialog(
     let mut name = use_signal(String::new);
     let mut error = use_signal(|| None::<&'static str>);
 
+    let mut try_save = move || {
+        let n = name.read().trim().to_string();
+        if n.is_empty() {
+            error.set(Some("Name cannot be empty"));
+            return;
+        }
+        let n_saved = n.clone();
+        let cfg = config.read().clone();
+        let result = {
+            let mut q = queries.write();
+            if q.add(n, cfg) { Some(q.as_save_data().clone()) } else { None }
+        };
+        if let Some(data) = result {
+            active_query.set(Some(n_saved));
+            save_queries_data(data, store);
+            on_close.call(());
+        } else {
+            error.set(Some("A query with that name already exists"));
+        }
+    };
+
     rsx! {
         div {
             class: "fixed inset-0 z-50 flex items-center justify-center bg-black/40",
@@ -432,31 +453,10 @@ fn SaveQueryDialog(
                             name.set(e.value());
                             error.set(None);
                         },
-                        onkeydown: move |e| {
-                            match e.key() {
-                                Key::Enter => {
-                                    let n = name.read().trim().to_string();
-                                    if n.is_empty() {
-                                        error.set(Some("Name cannot be empty"));
-                                        return;
-                                    }
-                                    let n_saved = n.clone();
-                                    let cfg = config.read().clone();
-                                    let result = {
-                                        let mut q = queries.write();
-                                        if q.add(n, cfg) { Some(q.as_save_data().clone()) } else { None }
-                                    };
-                                    if let Some(data) = result {
-                                        active_query.set(Some(n_saved));
-                                        save_queries_data(data, store);
-                                        on_close.call(());
-                                    } else {
-                                        error.set(Some("A query with that name already exists"));
-                                    }
-                                }
-                                Key::Escape => on_close.call(()),
-                                _ => {}
-                            }
+                        onkeydown: move |e| match e.key() {
+                            Key::Enter => try_save(),
+                            Key::Escape => on_close.call(()),
+                            _ => {}
                         },
                     }
                     if let Some(err) = *error.read() {
@@ -479,26 +479,7 @@ fn SaveQueryDialog(
                                 bg-blue-600 text-white hover:bg-blue-700 \
                                 disabled:opacity-50 disabled:cursor-not-allowed",
                         disabled: name.read().trim().is_empty(),
-                        onclick: move |_| {
-                            let n = name.read().trim().to_string();
-                            if n.is_empty() {
-                                error.set(Some("Name cannot be empty"));
-                                return;
-                            }
-                            let n_saved = n.clone();
-                            let cfg = config.read().clone();
-                            let result = {
-                                let mut q = queries.write();
-                                if q.add(n, cfg) { Some(q.as_save_data().clone()) } else { None }
-                            };
-                            if let Some(data) = result {
-                                active_query.set(Some(n_saved));
-                                save_queries_data(data, store);
-                                on_close.call(());
-                            } else {
-                                error.set(Some("A query with that name already exists"));
-                            }
-                        },
+                        onclick: move |_| try_save(),
                         "Save"
                     }
                 }
@@ -701,8 +682,7 @@ pub fn SummaryPage() -> Element {
     // ── Per-set rows ────────────────────────────────────────────────────────
     // Desired IDs are accumulated here so the best-pack section below avoids a
     // separate third pass over all card data.
-    let mut all_desired_ids: std::collections::HashSet<CardVersionId> =
-        std::collections::HashSet::new();
+    let mut all_desired_ids: HashSet<CardVersionId> = HashSet::new();
 
     let set_rows: Vec<SetRowData> = Set::ALL
         .iter()
