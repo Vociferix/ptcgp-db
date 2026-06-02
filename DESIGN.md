@@ -390,7 +390,7 @@ card in the denominator regardless of how many versions fall within scope.
 The app stores the following user data locally:
 - **Collection data**: owned count per card version, per profile
 - **Profile metadata**: profile names, primary profile designation
-- **Saved Analysis queries**: named filter configurations (not profile-specific)
+- **Saved queries**: named Summary page filter configurations (not profile-specific)
 - **App settings**: active profile(s), and all AppSettings preferences (dark/light mode, ignore
   unobtainable sets, ignore Premium Mission cards, ignore Gold Shop cards, merge duplicate printings)
 
@@ -468,7 +468,7 @@ The following contexts must be provided at the app root:
   and change the primary profile. Also owns the storage backend instance and triggers auto-saves.
 - **`AppSettings`** — dark/light mode preference and any other app-wide settings. Persisted via
   the storage backend.
-- **`SavedQueries`** — the list of saved Analysis page filter configurations. Persisted via the
+- **`SavedQueries`** — the list of saved Summary page filter configurations. Persisted via the
   storage backend.
 
 Components read from these contexts reactively — any component that reads a context value will
@@ -635,15 +635,16 @@ The **Summary page** is the default. It is the first page shown when the app ope
 
 ### Pages
 
-- Summary (default/home)
+- Summary (default/home; includes Analysis query features)
 - Card Catalog
-- Analysis
 - Trade
 - Profile Manager
 - Import / Export
 - Settings
 
 Card Details is not a standalone page — see the Card Catalog section.
+
+There is no separate Analysis page. The Summary page includes the full filter toolbar, goal input, saved queries, and completion calculations originally specified for Analysis.
 
 ### Profile Selector
 
@@ -662,35 +663,65 @@ active profile does not affect their content.
 
 ## Summary Page
 
-The Summary page is the default home screen. It always supports multiple active profiles.
+The Summary page is the default home screen. It always supports multiple active profiles. It
+combines collection overview (set completion, best pack to open) with the query features
+originally planned for a separate Analysis page — no separate Analysis page exists.
+
+### Filter Toolbar
+
+The Summary page includes the shared filter toolbar in Summary mode. It supports all filter
+dimensions (set, pack, series, rarity, element, stage, ex, mega, foil, card source, card kind,
+obtainable) except name search, which is omitted because the summary view shows set/pack rows
+rather than individual cards.
+
+Additional controls specific to Summary mode:
+
+- **Goal number input** (T, default 1): cards where `count < T` are "desired" and drive pack
+  probability calculations; all matching cards count toward the completion denominator. This
+  replaces the Card Catalog's owned-count threshold filter.
+- **Any version owned** toggle: when on, a card version is treated as owned if the aggregate
+  count of *any* version of the same abstract card is > 0.
+- **Obtainable** defaults to "obtainable only": unlike the Card Catalog where this defaults to
+  unset, Summary defaults to restricting the card pool to cards from obtainable sets. Hidden when
+  the global "Ignore unobtainable sets" setting is on.
+
+### Saved Queries
+
+Users can save the current filter configuration under a user-defined name and reload it from a
+dropdown. Saved queries are stored as part of local app data and are **not** profile-specific.
+The query dropdown trigger displays the name of the currently loaded query and shows an asterisk
+when the active filter has been modified since the query was loaded.
 
 ### Content
 
 **Next pack to open**
-The non-promo pack with the highest probability of yielding a card version whose aggregate
-owned count (summed across active profiles) is 0. Display the pack name and the probability as
-a percentage. If no such card exists (all cards are owned), display a message indicating
-collection completion rather than a pack recommendation.
+The non-promo pack with the highest probability of yielding a desired card (aggregate count < T)
+from the filtered card pool. Display the pack name and the probability as a percentage. If no
+desired cards exist (all matching cards satisfy T), display a collection-complete message.
+Clicking a pack navigates to the Card Catalog with the active Summary filters applied.
 
-Unobtainable packs are **excluded by default**. If the global "Ignore unobtainable sets" setting
-is off, a toggle is shown to optionally include unobtainable packs in the recommendation. When
-that setting is on, unobtainable packs are always excluded and the toggle is hidden.
+Unobtainable packs are excluded by default (the Obtainable filter defaults to "obtainable
+only"). When the "Ignore unobtainable sets" setting is off, the Obtainable filter may be cleared
+to include unobtainable packs. When the setting is on, the filter is hidden and unobtainable
+packs are always excluded.
 
 **Set completion**
-For each set, and an overall total:
-- Completion % = (number of card versions with count > 0) / (total card versions in set)
-- Every card version counts, including promos, identified by their collector number within the set
-- Also show the probability of pulling a new card (count = 0) from the best pack for that set
-- Per-pack breakdown is a nice-to-have, not required
-- Promo sets show completion % but no probability data
+For each set matching the active filters:
+- Completion % using the completion formula with goal T and the filtered card pool
+- Best pack probability for desired cards in that set (expandable per-pack breakdown)
+- Promo sets: completion % only, no probability data
+- Sets and packs are identified by their logo and icon images
+- Clicking a set navigates to the Catalog with active Summary filters applied; the clicked set
+  overrides any active set filter (packs cleared). Clicking a pack overrides any active pack
+  filter (sets cleared). Goal, any-version, owned-count, and name filters are reset in the
+  Catalog regardless.
 
 **Overall totals**
-Total owned card versions and total card versions across all sets, with an overall completion %.
+Completion % across all matching sets, with owned/total counts and a progress bar.
 
 **Collection history graphs** (nice-to-have)
 Line graphs showing collection completion % over time — one overall and one per set. Requires
-storing a timestamp whenever a card count changes, along with the previous count, to reconstruct
-history. Implement only after the core features are working.
+storing a timestamp whenever a card count changes. Implement only after core features are working.
 
 ---
 
@@ -893,64 +924,23 @@ The layout of these fields is left to implementation judgment.
 
 ## Analysis Page
 
-The Analysis page allows users to define a custom "desired card" pool and see which non-promo
-pack has the best probability of yielding a card from that pool.
+The Analysis page has been merged into the Summary page. There is no separate Analysis page or
+`/analysis` route. See §Summary Page for the filter toolbar, goal input, any-version toggle,
+saved queries, and completion formula that power analysis queries.
 
-**Do not implement this as separate per-use-case tools.** Implementing hardcoded tools for
-specific scenarios (e.g., a dedicated "Diamond completion" button) will be rejected.
-
-### Design
-
-The page uses a **filter toolbar** — the same filtering system as the Card Catalog — to define
-the desired card pool. The toolbar results define which card versions count as "desired," and the
-page shows each non-promo pack's probability of yielding one of those cards.
-
-The filter toolbar supports all the same dimensions as the Card Catalog, with three differences:
-
-- **Owned count is replaced by a goal number input** — instead of a threshold expression, the
-  user sets a minimum desired count directly (default: 1). This value becomes T: cards where
-  count < T are considered still-needed and drive pack probability calculations; all cards
-  matching the other filters are included in the completion denominator regardless. The Card
-  Catalog's threshold-style owned count filter does not appear on this page.
-- **Any version owned** (additional toggle) — when enabled, a card version is treated as "owned"
-  if the aggregate count of *any* version of the same abstract card is > 0. This lets users
-  query based on whether they own the Pokémon at all, regardless of which version.
-- **Obtainable defaults to "obtainable only"** — unlike the Card Catalog where this filter
-  defaults to unset, the Analysis page defaults to restricting the card pool to cards from
-  obtainable sets. Since each card version belongs to exactly one set, filtering out unobtainable
-  cards naturally produces zero probability for unobtainable packs, removing them from results
-  without a separate toggle. The filter is hidden when the global "Ignore unobtainable sets"
-  setting is on, since unobtainable sets are already excluded app-wide.
+**Do not implement this as separate per-use-case tools.** Hardcoded tools for specific scenarios
+(e.g., a dedicated "Diamond completion" button) will be rejected.
 
 ### Example Queries
 
+These are all handled through the Summary page filter toolbar:
+
 | Goal | Filter Configuration |
 |---|---|
-| Pull a card I own 0 of | Goal = 1 |
+| Pull a card I own 0 of | Goal = 1 (default) |
 | Pull a card I own fewer than 2 of (deck building) | Goal = 2 |
 | Pull an unowned Diamond card | Rarity class = any Diamond class (◆–◆◆◆◆), goal = 1 |
 | Pull any unowned version of a Pokémon I have none of | Enable "any version owned", goal = 1 |
-
-### Completion Display
-
-In addition to per-pack probabilities, the page shows a completion percentage for the current
-query. If the query matches no desired cards (all matching cards already satisfy the target
-count), display a message indicating the query target is fully met rather than showing pack
-probabilities.
-
-- **Target** (T): the goal number input value. Always defined since the goal input is always present.
-- **Numerator**: `Σ min(count(c), T)` for all card versions `c` matching the filters
-- **Denominator**: `(matching card versions) × T`
-
-Example — Diamond rarity, goal = 2 (T = 2):
-- Numerator: sum of `min(count, 2)` for all Diamond cards
-- Denominator: (total Diamond card versions) × 2
-
-### Saved Queries
-
-Users can save the current filter configuration under a user-defined name and reload it from a
-list. Saved queries are stored as part of local app data and are **not** profile-specific —
-they are shared across all profiles.
 
 ---
 

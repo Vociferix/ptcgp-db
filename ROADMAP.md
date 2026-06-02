@@ -340,7 +340,7 @@ Implement the Summary page at the `/` route (the default home). Per DESIGN.md §
 
 All displayed data reacts to the active profiles via `ProfileStore` context. The "Merge duplicate printings" setting (T15) affects completion counts per DESIGN.md §Completion Formula.
 
-- [ ] **T19**
+- [x] **T19**
 
 ---
 
@@ -375,7 +375,7 @@ No animations — all effects are static CSS only.
 
 **Responsive**: at narrow widths, tapping a row navigates to Card Details (T21) as a full-screen page. At wide widths, selecting a row updates the detail panel without navigation.
 
-- [ ] **T20**
+- [x] **T20**
 
 ---
 
@@ -397,28 +397,29 @@ Implement the card details display. Per DESIGN.md §Card Details View:
 
 The layout of fields within the panel is left to implementation judgment.
 
-- [ ] **T21**
+- [x] **T21**
 
 ---
 
-### T22 — Analysis page
+### T22 — Summary + Analysis combined page
 
-**Depends on**: T09, T10, T11, T14, T08
+**Depends on**: T19, T09, T10, T11, T14, T08
 
-Implement the Analysis page at the `/analysis` route. Per DESIGN.md §Analysis Page.
+Enhance the Summary page to incorporate the Analysis page's filter toolbar and query features. Rather than a separate Analysis page, the Summary page itself becomes filterable. The separate `/analysis` route is removed. Per DESIGN.md §Summary Page.
 
-**Filter toolbar**: reuse T14 configured for Analysis mode:
-- Replace the owned-count threshold filter with a **goal number input** (T, default 1). Cards where `count < T` are "desired" and drive pack probabilities; all matching cards count toward the completion denominator regardless.
-- Add an **"Any version owned" toggle**: when on, a card version is treated as owned if any version of the same abstract card has aggregate count > 0.
-- Default the **Obtainable** filter to "obtainable only". Hide it when the global "Ignore unobtainable sets" setting is on.
+**Filter toolbar**: add the shared FilterToolbar in Summary mode to the Summary page:
+- Goal number input (T, default 1). Cards where `count < T` are "desired" and drive pack probability calculations; all matching cards count toward the completion denominator.
+- Any version owned toggle.
+- All other filter dimensions (set, pack, series, rarity, element, stage, ex, mega, foil, card source, card kind). Name search is omitted — Summary shows set/pack rows, not individual cards.
+- Obtainable defaults to "obtainable only". Hidden when the global "Ignore unobtainable sets" setting is on.
 
-**Results**: for each non-promo pack that can yield at least one desired card, show the pack name and probability (descending). Use T08's union probability formula.
+**Goal-aware display**: completion percentages, "next pack to open", and per-set best pack probability all use the filtered card pool and goal T.
 
-**Completion display**: show completion % for the current query using the formula in DESIGN.md §Completion Display. If no desired cards exist (all matching cards already satisfy T), show a "fully met" message instead of pack probabilities.
+**Saved queries**: Save button + name dialog; Queries dropdown with load/delete. Dropdown trigger shows the active query name and an asterisk when modified.
 
-**Saved queries**: a "Save" button prompts for a name and stores the current filter configuration in `SavedQueries` context (T07). A "Saved" dropdown or list allows loading or deleting previously saved queries.
+**Navigation carry-through**: clicking a set or pack row navigates to the Catalog with active Summary filters applied. The clicked set/pack overrides the active set/pack filter; goal, any-version, owned-count, and name are reset.
 
-- [ ] **T22**
+- [~] **T22**
 
 ---
 
@@ -428,7 +429,7 @@ Implement the Analysis page at the `/analysis` route. Per DESIGN.md §Analysis P
 
 Implement the Trade page at the `/trade` route. Per DESIGN.md §Trade Page.
 
-**Filter toolbar + goal input**: same configuration as the Analysis page (T22) — defines what cards the destination "wants" and the target T. Default T = 1.
+**Filter toolbar + goal input**: same configuration as the Summary page filter toolbar (T22) — defines what cards the destination "wants" and the target T. Default T = 1.
 
 Active profiles = the destination. Inactive profiles = sources. All sections respect the "Merge duplicate printings", "Ignore unobtainable sets", "Ignore Premium Mission", and "Ignore Gold Shop" settings.
 
