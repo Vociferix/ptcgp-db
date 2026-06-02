@@ -132,8 +132,7 @@ fn passes_filter(
     {
         return false;
     }
-    if !cfg.elements.is_empty() && pkmn.is_none_or(|p| !cfg.elements.contains(&p.element().id()))
-    {
+    if !cfg.elements.is_empty() && pkmn.is_none_or(|p| !cfg.elements.contains(&p.element().id())) {
         return false;
     }
     if cfg.foil.is_some_and(|f| cv.is_foil() != f) {
@@ -417,7 +416,11 @@ fn SaveQueryDialog(
         let cfg = config.read().clone();
         let result = {
             let mut q = queries.write();
-            if q.add(n, cfg) { Some(q.as_save_data().clone()) } else { None }
+            if q.add(n, cfg) {
+                Some(q.as_save_data().clone())
+            } else {
+                None
+            }
         };
         if let Some(data) = result {
             active_query.set(Some(n_saved));
@@ -720,8 +723,12 @@ pub fn SummaryPage() -> Element {
             let obtainable = set_is_obtainable(set, today);
 
             // Accumulate desired IDs for the global best-pack pass.
-            all_desired_ids
-                .extend(eff_counts.iter().filter(|&(_, &c)| c < goal).map(|(&id, _)| id));
+            all_desired_ids.extend(
+                eff_counts
+                    .iter()
+                    .filter(|&(_, &c)| c < goal)
+                    .map(|(&id, _)| id),
+            );
             let has_desired = eff_counts.values().any(|&c| c < goal);
 
             let (best_pack, best_rate_pct) = if set.is_promo() || !has_desired {
@@ -772,9 +779,8 @@ pub fn SummaryPage() -> Element {
                         completion(counts, goal, p_matching_ids.iter().copied())
                     };
 
-                    let p_rate = desired_pull_rate(p, |id| {
-                        eff_counts.get(&id).is_some_and(|&c| c < goal)
-                    });
+                    let p_rate =
+                        desired_pull_rate(p, |id| eff_counts.get(&id).is_some_and(|&c| c < goal));
 
                     PackRowData {
                         pack: p,
@@ -818,13 +824,20 @@ pub fn SummaryPage() -> Element {
         .filter(|p| !p.set().is_promo())
         .filter_map(|p| {
             let rate = desired_pull_rate(p, |id| all_desired_ids.contains(&id));
-            if rate == Prob::ZERO { None } else { Some((p, rate)) }
+            if rate == Prob::ZERO {
+                None
+            } else {
+                Some((p, rate))
+            }
         })
         .collect();
 
     let best_packs: Vec<(&'static Pack, Prob)> =
         if let Some(&(_, best)) = all_pack_rates.iter().max_by(|(_, a), (_, b)| a.cmp(b)) {
-            all_pack_rates.into_iter().filter(|(_, r)| *r == best).collect()
+            all_pack_rates
+                .into_iter()
+                .filter(|(_, r)| *r == best)
+                .collect()
         } else {
             vec![]
         };
