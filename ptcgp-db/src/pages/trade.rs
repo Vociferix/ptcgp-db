@@ -527,7 +527,7 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
     let cv_id = rec.cv.id();
     let source_name = rec.best_source.name.clone();
     let dest_for_xfer = dest_name.clone();
-    let on_transfer = move |e: Event<MouseData>| {
+    let on_transfer = use_callback(move |e: Event<MouseData>| {
         e.stop_propagation();
         let mut s = store.write();
         if let Some(st) = s.as_mut() {
@@ -537,13 +537,14 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
             let _ = st.set_owned_count(&dest_for_xfer, cv_id, dst_c + 1);
         }
         schedule_save();
-    };
+    });
+    let btn_cls = "px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white \
+                   hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed";
 
     rsx! {
         div {
-            class: "flex flex-col gap-3 p-4 border-b border-gray-100 dark:border-gray-700 \
-                    last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 \
-                    sm:flex-row sm:items-start",
+            class: "p-4 border-b border-gray-100 dark:border-gray-700 \
+                    last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50",
             onclick: move |_| {
                 back_origin.set(CardDetailOrigin::Trade);
                 drop(
@@ -553,53 +554,92 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
                         }),
                 );
             },
-            // Rank + card panel (always horizontal)
-            div { class: "flex gap-3 items-center flex-1 min-w-0",
+            // Mobile header (hidden sm+): rank + source→dest + Transfer
+            div { class: "sm:hidden flex items-center gap-2 mb-3",
                 span { class: "shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
+                    "#{rank}"
+                }
+                div { class: "flex-1 min-w-0 text-xs",
+                    span { class: "font-medium text-gray-800 dark:text-gray-200",
+                        "{rec.best_source.name}"
+                    }
+                    span { class: "text-gray-400 dark:text-gray-500", " → " }
+                    span { class: "font-medium text-gray-800 dark:text-gray-200", "{dest_name}" }
+                }
+                button {
+                    r#type: "button",
+                    class: "{btn_cls}",
+                    disabled,
+                    onclick: move |e| on_transfer.call(e),
+                    "Transfer"
+                }
+            }
+            // Body: desktop rank badge + card panel + desktop stats sidebar
+            div { class: "flex items-start gap-3",
+                span { class: "hidden sm:flex shrink-0 w-8 h-8 items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
                     "#{rank}"
                 }
                 div { class: "flex-1 min-w-0",
                     CardPanel { cv_id: rec.cv.id() }
+                    // Pull rate under card (mobile only)
+                    div { class: "sm:hidden mt-1 text-xs text-gray-500 dark:text-gray-400",
+                        "Pull rate: {pull_rate_label(rec.max_rate)}"
+                    }
+                    // Alt sources under card (mobile only)
+                    if !rec.alt_sources.is_empty() {
+                        div { class: "sm:hidden mt-0.5 text-xs text-gray-400 dark:text-gray-500 break-words",
+                            "Also: "
+                            for (i, alt) in rec.alt_sources.iter().enumerate() {
+                                if i > 0 {
+                                    ", "
+                                }
+                                "{alt.name} ({alt.count})"
+                            }
+                        }
+                    }
                     if rec.is_zero_rate {
                         span { class: "inline-flex items-center mt-1.5 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200",
                             "Priority — not obtainable from packs"
                         }
                     }
                 }
-            }
-            // Stats + transfer (full-width on mobile, fixed sidebar on sm+)
-            div { class: "flex flex-col items-end gap-1.5 sm:shrink-0 sm:min-w-[11rem]",
-                button {
-                    r#type: "button",
-                    class: "px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white \
-                            hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed",
-                    disabled,
-                    onclick: on_transfer,
-                    "Transfer"
-                }
-                div { class: "text-xs text-right",
-                    span { class: "text-gray-500 dark:text-gray-400", "Source: " }
-                    span { class: "font-medium text-gray-800 dark:text-gray-200",
-                        "{rec.best_source.name}"
+                // Desktop stats sidebar (hidden on mobile)
+                div { class: "hidden sm:flex flex-col items-end gap-1.5 shrink-0 min-w-[11rem]",
+                    button {
+                        r#type: "button",
+                        class: "{btn_cls}",
+                        disabled,
+                        onclick: move |e| on_transfer.call(e),
+                        "Transfer"
                     }
-                    span { class: "text-gray-500 dark:text-gray-400", " ({rec.best_source.count} owned)" }
-                }
-                div { class: "text-xs text-right",
-                    span { class: "text-gray-500 dark:text-gray-400", "Dest: " }
-                    span { class: "font-medium text-gray-800 dark:text-gray-200", "{dest_name}" }
-                    span { class: "text-gray-500 dark:text-gray-400", " ({rec.dest_count} owned)" }
-                }
-                div { class: "text-xs text-right text-gray-500 dark:text-gray-400",
-                    "Pull rate: {pull_rate_label(rec.max_rate)}"
-                }
-                if !rec.alt_sources.is_empty() {
-                    div { class: "text-xs text-right text-gray-400 dark:text-gray-500 break-words",
-                        "Also: "
-                        for (i, alt) in rec.alt_sources.iter().enumerate() {
-                            if i > 0 {
-                                ", "
+                    div { class: "text-xs text-right",
+                        span { class: "text-gray-500 dark:text-gray-400", "Source: " }
+                        span { class: "font-medium text-gray-800 dark:text-gray-200",
+                            "{rec.best_source.name}"
+                        }
+                        span { class: "text-gray-500 dark:text-gray-400",
+                            " ({rec.best_source.count} owned)"
+                        }
+                    }
+                    div { class: "text-xs text-right",
+                        span { class: "text-gray-500 dark:text-gray-400", "Dest: " }
+                        span { class: "font-medium text-gray-800 dark:text-gray-200",
+                            "{dest_name}"
+                        }
+                        span { class: "text-gray-500 dark:text-gray-400", " ({rec.dest_count} owned)" }
+                    }
+                    div { class: "text-xs text-right text-gray-500 dark:text-gray-400",
+                        "Pull rate: {pull_rate_label(rec.max_rate)}"
+                    }
+                    if !rec.alt_sources.is_empty() {
+                        div { class: "text-xs text-right text-gray-400 dark:text-gray-500 break-words",
+                            "Also: "
+                            for (i, alt) in rec.alt_sources.iter().enumerate() {
+                                if i > 0 {
+                                    ", "
+                                }
+                                "{alt.name} ({alt.count})"
                             }
-                            "{alt.name} ({alt.count})"
                         }
                     }
                 }
@@ -794,9 +834,8 @@ fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
     let cv_id = rec.cv.id();
     rsx! {
         div {
-            class: "flex flex-col gap-3 p-4 border-b border-gray-100 dark:border-gray-700 \
-                    last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 \
-                    sm:flex-row sm:items-start",
+            class: "flex flex-col p-4 border-b border-gray-100 dark:border-gray-700 \
+                    last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50",
             onclick: move |_| {
                 back_origin.set(CardDetailOrigin::Trade);
                 drop(
@@ -806,8 +845,27 @@ fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
                         }),
                 );
             },
-            div { class: "flex gap-3 items-center flex-1 min-w-0",
+            // Mobile header (hidden sm+): rank left, owned/pull rate right
+            div { class: "sm:hidden flex items-start justify-between gap-2 mb-3",
                 span { class: "shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
+                    "#{rank}"
+                }
+                div { class: "flex flex-col items-end gap-1",
+                    div { class: "text-xs text-right",
+                        span { class: "text-gray-500 dark:text-gray-400", "{dest_name}: " }
+                        span { class: "font-medium text-gray-800 dark:text-gray-200",
+                            "{rec.dest_count} owned"
+                        }
+                        span { class: "text-gray-500 dark:text-gray-400", " ({rec.excess} excess)" }
+                    }
+                    div { class: "text-xs text-right text-gray-500 dark:text-gray-400",
+                        "Pull rate: {pull_rate_label(rec.max_rate)}"
+                    }
+                }
+            }
+            // Body: desktop rank badge + card panel + desktop stats sidebar
+            div { class: "flex items-start gap-3",
+                span { class: "hidden sm:flex shrink-0 w-8 h-8 items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
                     "#{rank}"
                 }
                 div { class: "flex-1 min-w-0",
@@ -818,17 +876,18 @@ fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
                         }
                     }
                 }
-            }
-            div { class: "flex flex-col items-end gap-1.5 sm:shrink-0",
-                div { class: "text-xs text-right",
-                    span { class: "text-gray-500 dark:text-gray-400", "{dest_name}: " }
-                    span { class: "font-medium text-gray-800 dark:text-gray-200",
-                        "{rec.dest_count} owned"
+                // Desktop stats sidebar (hidden on mobile)
+                div { class: "hidden sm:flex flex-col items-end gap-1.5 shrink-0",
+                    div { class: "text-xs text-right",
+                        span { class: "text-gray-500 dark:text-gray-400", "{dest_name}: " }
+                        span { class: "font-medium text-gray-800 dark:text-gray-200",
+                            "{rec.dest_count} owned"
+                        }
+                        span { class: "text-gray-500 dark:text-gray-400", " ({rec.excess} excess)" }
                     }
-                    span { class: "text-gray-500 dark:text-gray-400", " ({rec.excess} excess)" }
-                }
-                div { class: "text-xs text-right text-gray-500 dark:text-gray-400",
-                    "Pull rate: {pull_rate_label(rec.max_rate)}"
+                    div { class: "text-xs text-right text-gray-500 dark:text-gray-400",
+                        "Pull rate: {pull_rate_label(rec.max_rate)}"
+                    }
                 }
             }
         }
