@@ -492,8 +492,12 @@ mod tests {
         let mut store = store_with_two_profiles();
         let cv = CardVersion::ALL.iter().next().expect("at least one card");
         // "Dest" is the primary/active profile; "Source" is inactive.
-        store.set_owned_count("Dest", CardVersionId(cv.id()), 3).unwrap();
-        store.set_owned_count("Source", CardVersionId(cv.id()), 7).unwrap();
+        store
+            .set_owned_count("Dest", CardVersionId(cv.id()), 3)
+            .unwrap();
+        store
+            .set_owned_count("Source", CardVersionId(cv.id()), 7)
+            .unwrap();
         // Only the active ("Dest") count should be reflected.
         assert_eq!(raw_dest_count(cv, &store, false, false), 3);
     }
@@ -505,8 +509,12 @@ mod tests {
         };
         let dup = original.duplicates().iter().next().unwrap();
         let mut store = store_with_two_profiles();
-        store.set_owned_count("Dest", CardVersionId(original.id()), 2).unwrap();
-        store.set_owned_count("Dest", CardVersionId(dup.id()), 3).unwrap();
+        store
+            .set_owned_count("Dest", CardVersionId(original.id()), 2)
+            .unwrap();
+        store
+            .set_owned_count("Dest", CardVersionId(dup.id()), 3)
+            .unwrap();
 
         // With merge_dupes=true the counts across duplicate versions should sum.
         assert_eq!(raw_dest_count(original, &store, true, false), 5);
@@ -529,8 +537,12 @@ mod tests {
             .unwrap();
 
         let mut store = store_with_two_profiles();
-        store.set_owned_count("Dest", CardVersionId(cv.id()), 1).unwrap();
-        store.set_owned_count("Dest", CardVersionId(other_ver.id()), 2).unwrap();
+        store
+            .set_owned_count("Dest", CardVersionId(cv.id()), 1)
+            .unwrap();
+        store
+            .set_owned_count("Dest", CardVersionId(other_ver.id()), 2)
+            .unwrap();
 
         assert_eq!(raw_dest_count(cv, &store, false, true), 3);
     }
@@ -550,7 +562,9 @@ mod tests {
     fn raw_source_count_reads_named_profile() {
         let mut store = store_with_two_profiles();
         let cv = CardVersion::ALL.iter().next().expect("at least one card");
-        store.set_owned_count("Source", CardVersionId(cv.id()), 5).unwrap();
+        store
+            .set_owned_count("Source", CardVersionId(cv.id()), 5)
+            .unwrap();
         assert_eq!(raw_source_count(cv, &store, "Source", false), 5);
         // Active profile ("Dest") should not bleed into source count.
         assert_eq!(raw_source_count(cv, &store, "Dest", false), 0);
@@ -563,8 +577,12 @@ mod tests {
         };
         let dup = original.duplicates().iter().next().unwrap();
         let mut store = store_with_two_profiles();
-        store.set_owned_count("Source", CardVersionId(original.id()), 2).unwrap();
-        store.set_owned_count("Source", CardVersionId(dup.id()), 4).unwrap();
+        store
+            .set_owned_count("Source", CardVersionId(original.id()), 2)
+            .unwrap();
+        store
+            .set_owned_count("Source", CardVersionId(dup.id()), 4)
+            .unwrap();
 
         assert_eq!(raw_source_count(original, &store, "Source", true), 6);
     }
@@ -587,7 +605,9 @@ mod tests {
         let mut store = store_with_two_profiles();
         let goal: u32 = 1;
         for cv in CardVersion::ALL.iter() {
-            store.set_owned_count("Dest", CardVersionId(cv.id()), goal).unwrap();
+            store
+                .set_owned_count("Dest", CardVersionId(cv.id()), goal)
+                .unwrap();
         }
         let settings = AppSettings::default();
         let cfg = FilterConfig {
@@ -611,7 +631,9 @@ mod tests {
             return;
         };
         // Source has the card; Dest does not.
-        store.set_owned_count("Source", CardVersionId(cv.id()), 1).unwrap();
+        store
+            .set_owned_count("Source", CardVersionId(cv.id()), 1)
+            .unwrap();
 
         let settings = AppSettings::default();
         let cfg = FilterConfig {
@@ -665,7 +687,9 @@ mod tests {
             return;
         };
         // Own 2 copies with goal=1 → excess=1.
-        store.set_owned_count("Dest", CardVersionId(cv.id()), 2).unwrap();
+        store
+            .set_owned_count("Dest", CardVersionId(cv.id()), 2)
+            .unwrap();
 
         let settings = AppSettings::default();
         let cfg = FilterConfig {
@@ -682,7 +706,9 @@ mod tests {
         let mut store = store_with_two_profiles();
         // Give Dest 2 copies of every pack card (goal=1 → excess=1 for all).
         for cv in CardVersion::ALL.iter().filter(|c| !c.packs().is_empty()) {
-            store.set_owned_count("Dest", CardVersionId(cv.id()), 2).unwrap();
+            store
+                .set_owned_count("Dest", CardVersionId(cv.id()), 2)
+                .unwrap();
         }
 
         let settings = AppSettings::default();

@@ -316,7 +316,9 @@ fn set_same_value_is_noop() {
 #[test]
 fn set_owned_count_unknown_profile_fails() {
     let mut store = store_with_profiles(&["Main"]);
-    let err = store.set_owned_count("Ghost", CardVersionId(0), 1).unwrap_err();
+    let err = store
+        .set_owned_count("Ghost", CardVersionId(0), 1)
+        .unwrap_err();
     assert!(matches!(err, ProfileStoreError::NotFound(_)));
 }
 

@@ -131,9 +131,17 @@ pub fn compute_summary<S: Storage + Clone>(
             let total = matching_cvs.len() * goal as usize;
 
             let comp = if merge_dupes {
-                completion_merged(counts, goal, matching_cvs.iter().map(|cv| CardVersionId(cv.id())))
+                completion_merged(
+                    counts,
+                    goal,
+                    matching_cvs.iter().map(|cv| CardVersionId(cv.id())),
+                )
             } else {
-                completion(counts, goal, matching_cvs.iter().map(|cv| CardVersionId(cv.id())))
+                completion(
+                    counts,
+                    goal,
+                    matching_cvs.iter().map(|cv| CardVersionId(cv.id())),
+                )
             };
 
             let obtainable = set.retirement_date().is_none_or(|r| r > today);
@@ -383,7 +391,9 @@ mod tests {
     fn total_owned_increases_when_card_owned() {
         let mut store = empty_store();
         let cv = CardVersion::ALL.iter().next().expect("at least one card");
-        store.set_owned_count("Main", CardVersionId(cv.id()), 1).unwrap();
+        store
+            .set_owned_count("Main", CardVersionId(cv.id()), 1)
+            .unwrap();
 
         let cfg = FilterConfig::default();
         let settings = AppSettings::default();
@@ -396,7 +406,9 @@ mod tests {
         let mut store = empty_store();
         let cv = CardVersion::ALL.iter().next().expect("at least one card");
         // Own 5 copies but goal is 1 — contribution to owned/denom must be clamped to 1.
-        store.set_owned_count("Main", CardVersionId(cv.id()), 5).unwrap();
+        store
+            .set_owned_count("Main", CardVersionId(cv.id()), 5)
+            .unwrap();
 
         let cfg = FilterConfig {
             goal: 1,
@@ -427,7 +439,9 @@ mod tests {
         let mut store = empty_store();
         let goal: u32 = 1;
         for cv in CardVersion::ALL.iter() {
-            store.set_owned_count("Main", CardVersionId(cv.id()), goal).unwrap();
+            store
+                .set_owned_count("Main", CardVersionId(cv.id()), goal)
+                .unwrap();
         }
 
         let cfg = FilterConfig {
@@ -497,7 +511,9 @@ mod tests {
             return;
         };
         let cv = set.card_versions().iter().next().unwrap();
-        store.set_owned_count("Main", CardVersionId(cv.id()), 1).unwrap();
+        store
+            .set_owned_count("Main", CardVersionId(cv.id()), 1)
+            .unwrap();
 
         let cfg = FilterConfig::default();
         let settings = AppSettings::default();
@@ -526,7 +542,9 @@ mod tests {
 
         let mut store = empty_store();
         // Own only the duplicate version.
-        store.set_owned_count("Main", CardVersionId(dup.id()), 1).unwrap();
+        store
+            .set_owned_count("Main", CardVersionId(dup.id()), 1)
+            .unwrap();
 
         let cfg = FilterConfig {
             goal: 1,
