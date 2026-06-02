@@ -12,6 +12,7 @@ use ptcgp_db_data::{Card, CardVersion, Prob};
 use crate::app::{AppStorage, schedule_save};
 use crate::components::toggle::Toggle;
 use crate::components::{FilterMode, FilterToolbar};
+use crate::routes::Route;
 
 // ---------------------------------------------------------------------------
 // Filter + count helpers
@@ -502,7 +503,7 @@ fn CardPanel(cv_id: usize) -> Element {
                     img {
                         src: "{rarity_icon}",
                         alt: "",
-                        class: "h-5 w-auto max-w-8 object-contain flex-shrink-0",
+                        class: "h-5 w-auto object-contain flex-shrink-0",
                     }
                 }
             }
@@ -521,10 +522,12 @@ fn pull_rate_label(rate: Prob) -> String {
 #[component]
 fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> Element {
     let mut store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
+    let nav = use_navigator();
     let cv_id = rec.cv.id();
     let source_name = rec.best_source.name.clone();
     let dest_for_xfer = dest_name.clone();
-    let on_transfer = move |_| {
+    let on_transfer = move |e: Event<MouseData>| {
+        e.stop_propagation();
         let mut s = store.write();
         if let Some(st) = s.as_mut() {
             let src_c = st.owned_count(&source_name, cv_id);
@@ -536,7 +539,17 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
     };
 
     rsx! {
-        div { class: "flex gap-3 p-4 border-b border-gray-100 dark:border-gray-700 last:border-0",
+        div {
+            class: "flex gap-3 p-4 border-b border-gray-100 dark:border-gray-700 last:border-0 \
+                    cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50",
+            onclick: move |_| {
+                drop(
+                    nav
+                        .push(Route::CardDetailPage {
+                            card_id: cv_id,
+                        }),
+                );
+            },
             // Rank badge
             span { class: "shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 mt-6",
                 "#{rank}"
@@ -640,7 +653,7 @@ fn TradeCardHalf(
                     img {
                         src: "{rarity_icon}",
                         alt: "",
-                        class: "h-5 w-auto max-w-8 object-contain flex-shrink-0",
+                        class: "h-5 w-auto object-contain flex-shrink-0",
                     }
                 }
                 p { class: "text-xs text-gray-600 dark:text-gray-300",
@@ -660,12 +673,14 @@ fn TradeCardHalf(
 #[component]
 fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> Element {
     let mut store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
+    let nav = use_navigator();
     let cv_b_id = rec.card_b.id();
     let cv_a_id = rec.card_a.id();
     let source = rec.source_name.clone();
     let dest_for_xfer = dest_name.clone();
 
-    let on_transfer = move |_| {
+    let on_transfer = move |e: Event<MouseData>| {
+        e.stop_propagation();
         let mut s = store.write();
         if let Some(st) = s.as_mut() {
             let b_src = st.owned_count(&source, cv_b_id);
@@ -700,7 +715,7 @@ fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> El
                     img {
                         src: "{rarity_icon}",
                         alt: "",
-                        class: "h-5 w-auto max-w-8 object-contain flex-shrink-0 ml-1",
+                        class: "h-5 w-auto object-contain flex-shrink-0 ml-1",
                     }
                 }
                 button {
@@ -713,9 +728,19 @@ fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> El
                     "Transfer"
                 }
             }
-            // Two-column card layout
+            // Two-column card layout — each box navigates to that card's detail page
             div { class: "grid grid-cols-2 gap-3",
-                div { class: "bg-green-50 dark:bg-green-950/20 rounded-md p-2",
+                div {
+                    class: "bg-green-50 dark:bg-green-950/20 rounded-md p-2 cursor-pointer \
+                            hover:brightness-95 dark:hover:brightness-110",
+                    onclick: move |_| {
+                        drop(
+                            nav
+                                .push(Route::CardDetailPage {
+                                    card_id: cv_b_id,
+                                }),
+                        );
+                    },
                     p { class: "text-xs font-semibold text-green-700 dark:text-green-400 mb-2",
                         "You receive"
                     }
@@ -728,7 +753,17 @@ fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> El
                         max_rate: rec.card_b_max_rate,
                     }
                 }
-                div { class: "bg-red-50 dark:bg-red-950/20 rounded-md p-2",
+                div {
+                    class: "bg-red-50 dark:bg-red-950/20 rounded-md p-2 cursor-pointer \
+                            hover:brightness-95 dark:hover:brightness-110",
+                    onclick: move |_| {
+                        drop(
+                            nav
+                                .push(Route::CardDetailPage {
+                                    card_id: cv_a_id,
+                                }),
+                        );
+                    },
                     p { class: "text-xs font-semibold text-red-700 dark:text-red-400 mb-2",
                         "You give"
                     }
@@ -752,8 +787,20 @@ fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> El
 
 #[component]
 fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
+    let nav = use_navigator();
+    let cv_id = rec.cv.id();
     rsx! {
-        div { class: "flex gap-3 p-4 border-b border-gray-100 dark:border-gray-700 last:border-0",
+        div {
+            class: "flex gap-3 p-4 border-b border-gray-100 dark:border-gray-700 last:border-0 \
+                    cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50",
+            onclick: move |_| {
+                drop(
+                    nav
+                        .push(Route::CardDetailPage {
+                            card_id: cv_id,
+                        }),
+                );
+            },
             span { class: "shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 mt-6",
                 "#{rank}"
             }
