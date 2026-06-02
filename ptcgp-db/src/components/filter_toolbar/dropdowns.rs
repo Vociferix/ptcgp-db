@@ -31,6 +31,18 @@ fn DropdownPanel(open: Signal<bool>, extra_cls: &'static str, children: Element)
     }
 }
 
+/// Footer hint shown at the bottom of every multi-select dropdown.
+/// The `border-t` provides a visual separator from the item list (and optional Clear button).
+#[component]
+fn DropdownHint() -> Element {
+    rsx! {
+        div { class: "px-3 pt-1 pb-0.5 border-t border-gray-100 dark:border-gray-700 \
+                      text-xs text-gray-400 dark:text-gray-500",
+            "Ctrl+Click to select multiple"
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Set dropdown — trigger shows set icon when exactly 1 is selected;
 // each row shows icon (left) + logo (right).
@@ -88,6 +100,7 @@ pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
                         set,
                         checked: sets.contains(&set.id()),
                         config,
+                        open,
                     }
                 }
                 if !sets.is_empty() {
@@ -99,21 +112,36 @@ pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
                         },
                     }
                 }
+                DropdownHint {}
             }
         }
     }
 }
 
 /// One set row: compact icon on the left, full logo on the right.
+///
+/// Regular click selects only this set; Ctrl+Click toggles it in/out.
 #[component]
-fn SetItem(set: &'static Set, checked: bool, config: Signal<FilterConfig>) -> Element {
+fn SetItem(
+    set: &'static Set,
+    checked: bool,
+    config: Signal<FilterConfig>,
+    mut open: Signal<bool>,
+) -> Element {
     let id = set.id();
     let row_cls = dropdown_row_cls(checked);
 
+    let on_click = move |e: MouseEvent| {
+        if e.modifiers().ctrl() {
+            toggle_set(&mut config.write(), id, checked);
+        } else {
+            select_only_set(&mut config.write(), id);
+            open.set(false);
+        }
+    };
+
     rsx! {
-        div {
-            class: "{row_cls}",
-            onclick: move |_| toggle_set(&mut config.write(), id, checked),
+        div { class: "{row_cls}", onclick: on_click,
             img {
                 src: "{set.icon()}",
                 alt: "{set.code()}",
@@ -189,11 +217,13 @@ pub fn PackDropdown(config: Signal<FilterConfig>) -> Element {
                         set_id,
                         pack_ids,
                         config,
+                        open,
                     }
                 }
                 if !packs.is_empty() {
                     DropdownClearBtn { on_clear: move |_| config.write().packs.clear() }
                 }
+                DropdownHint {}
             }
         }
     }
@@ -201,7 +231,12 @@ pub fn PackDropdown(config: Signal<FilterConfig>) -> Element {
 
 /// One set-group: header with set icon, then each pack in the group.
 #[component]
-fn PackGroup(set_id: usize, pack_ids: Vec<usize>, config: Signal<FilterConfig>) -> Element {
+fn PackGroup(
+    set_id: usize,
+    pack_ids: Vec<usize>,
+    config: Signal<FilterConfig>,
+    open: Signal<bool>,
+) -> Element {
     let cfg = config.read();
     let checked_packs = cfg.packs.as_slice();
     rsx! {
@@ -222,21 +257,37 @@ fn PackGroup(set_id: usize, pack_ids: Vec<usize>, config: Signal<FilterConfig>) 
                     pack,
                     checked: checked_packs.contains(&pack_id),
                     config,
+                    open,
                 }
             }
         }
     }
 }
 
+/// One pack row.
+///
+/// Regular click selects only this pack; Ctrl+Click toggles it in/out.
 #[component]
-fn PackItem(pack: &'static Pack, checked: bool, config: Signal<FilterConfig>) -> Element {
+fn PackItem(
+    pack: &'static Pack,
+    checked: bool,
+    config: Signal<FilterConfig>,
+    mut open: Signal<bool>,
+) -> Element {
     let id = pack.id();
     let row_cls = dropdown_row_cls(checked);
 
+    let on_click = move |e: MouseEvent| {
+        if e.modifiers().ctrl() {
+            toggle_pack(&mut config.write(), id, checked);
+        } else {
+            select_only_pack(&mut config.write(), id);
+            open.set(false);
+        }
+    };
+
     rsx! {
-        div {
-            class: "{row_cls}",
-            onclick: move |_| toggle_pack(&mut config.write(), id, checked),
+        div { class: "{row_cls}", onclick: on_click,
             img {
                 src: "{pack.logo()}",
                 alt: "{pack.title()}",
@@ -289,25 +340,42 @@ pub fn SourceDropdown(config: Signal<FilterConfig>) -> Element {
                         source,
                         checked: sources.contains(&source.id()),
                         config,
+                        open,
                     }
                 }
                 if !sources.is_empty() {
                     DropdownClearBtn { on_clear: move |_| config.write().sources.clear() }
                 }
+                DropdownHint {}
             }
         }
     }
 }
 
+/// One source row.
+///
+/// Regular click selects only this source; Ctrl+Click toggles it in/out.
 #[component]
-fn SourceItem(source: &'static CardSource, checked: bool, config: Signal<FilterConfig>) -> Element {
+fn SourceItem(
+    source: &'static CardSource,
+    checked: bool,
+    config: Signal<FilterConfig>,
+    mut open: Signal<bool>,
+) -> Element {
     let id = source.id();
     let row_cls = dropdown_row_cls(checked);
 
+    let on_click = move |e: MouseEvent| {
+        if e.modifiers().ctrl() {
+            toggle_source(&mut config.write(), id, checked);
+        } else {
+            select_only_source(&mut config.write(), id);
+            open.set(false);
+        }
+    };
+
     rsx! {
-        div {
-            class: "{row_cls}",
-            onclick: move |_| toggle_source(&mut config.write(), id, checked),
+        div { class: "{row_cls}", onclick: on_click,
             img {
                 src: "{source.icon()}",
                 alt: "{source.name()}",
@@ -340,7 +408,7 @@ fn dropdown_row_cls(checked: bool) -> &'static str {
 #[component]
 fn DropdownClearBtn(on_clear: EventHandler<MouseEvent>) -> Element {
     rsx! {
-        div { class: "border-t border-gray-100 dark:border-gray-700 px-3 py-1.5",
+        div { class: "px-3 py-1.5",
             button {
                 r#type: "button",
                 class: "text-xs text-gray-400 dark:text-gray-500 \
@@ -368,6 +436,13 @@ fn toggle_set(config: &mut FilterConfig, id: usize, was_checked: bool) {
     }
 }
 
+fn select_only_set(config: &mut FilterConfig, id: usize) {
+    config.sets = vec![id];
+    config
+        .packs
+        .retain(|&pid| Pack::from_id(pid).is_some_and(|p| p.set().id() == id));
+}
+
 fn toggle_pack(config: &mut FilterConfig, id: usize, was_checked: bool) {
     if was_checked {
         config.packs.retain(|&x| x != id);
@@ -376,10 +451,18 @@ fn toggle_pack(config: &mut FilterConfig, id: usize, was_checked: bool) {
     }
 }
 
+fn select_only_pack(config: &mut FilterConfig, id: usize) {
+    config.packs = vec![id];
+}
+
 fn toggle_source(config: &mut FilterConfig, id: usize, was_checked: bool) {
     if was_checked {
         config.sources.retain(|&x| x != id);
     } else {
         config.sources.push(id);
     }
+}
+
+fn select_only_source(config: &mut FilterConfig, id: usize) {
+    config.sources = vec![id];
 }
