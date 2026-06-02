@@ -26,17 +26,44 @@ const TRIGGER_CLS: &str = "flex items-center gap-1 px-2 h-8 rounded-md text-sm f
 // Navigation helpers
 // ---------------------------------------------------------------------------
 
-fn apply_pack_filter(pack_id: usize, mut filter: Signal<FilterConfig>) {
-    *filter.write() = FilterConfig {
+/// Navigate to the catalog with the given pack selected, preserving the
+/// summary's active filters (series, rarities, elements, etc.) but dropping
+/// goal, any-version, owned-count, and name-query (which are summary-only).
+/// The clicked pack overrides any pack filter; sets are cleared (pack implies set).
+fn apply_pack_filter(
+    pack_id: usize,
+    summary_config: Signal<FilterConfig>,
+    mut catalog_filter: Signal<FilterConfig>,
+) {
+    let summary = summary_config.read();
+    *catalog_filter.write() = FilterConfig {
         packs: vec![pack_id],
-        ..FilterConfig::default()
+        sets: vec![],
+        goal: 1,
+        any_version_owned: false,
+        owned_count: None,
+        name_query: None,
+        ..summary.clone()
     };
 }
 
-fn apply_set_filter(set_id: usize, mut filter: Signal<FilterConfig>) {
-    *filter.write() = FilterConfig {
+/// Navigate to the catalog with the given set selected, preserving the
+/// summary's active filters. The clicked set overrides any set filter;
+/// packs are cleared (set is the broader scope).
+fn apply_set_filter(
+    set_id: usize,
+    summary_config: Signal<FilterConfig>,
+    mut catalog_filter: Signal<FilterConfig>,
+) {
+    let summary = summary_config.read();
+    *catalog_filter.write() = FilterConfig {
         sets: vec![set_id],
-        ..FilterConfig::default()
+        packs: vec![],
+        goal: 1,
+        any_version_owned: false,
+        owned_count: None,
+        name_query: None,
+        ..summary.clone()
     };
 }
 
@@ -489,12 +516,13 @@ fn PackSubRow(
     owned: usize,
     total: usize,
     rate_pct: f64,
+    summary_config: Signal<FilterConfig>,
 ) -> Element {
     let nav = use_navigator();
     let catalog_filter = use_context::<Signal<FilterConfig>>();
     let pack_id = pack.id();
     let on_click = move |_| {
-        apply_pack_filter(pack_id, catalog_filter);
+        apply_pack_filter(pack_id, summary_config, catalog_filter);
         drop(nav.push(Route::CatalogPage {}));
     };
     rsx! {
@@ -548,6 +576,7 @@ fn SetCompletionRow(
     best_pack: Option<&'static Pack>,
     best_rate_pct: f64,
     pack_rows: Vec<PackRowData>,
+    summary_config: Signal<FilterConfig>,
 ) -> Element {
     let mut expanded = use_signal(|| false);
     let nav = use_navigator();
@@ -557,7 +586,7 @@ fn SetCompletionRow(
     let is_expandable = !pack_rows.is_empty();
     let set_id = set.id();
     let on_click = move |_| {
-        apply_set_filter(set_id, catalog_filter);
+        apply_set_filter(set_id, summary_config, catalog_filter);
         drop(nav.push(Route::CatalogPage {}));
     };
 
@@ -627,6 +656,7 @@ fn SetCompletionRow(
                             owned: pack_row.owned,
                             total: pack_row.total,
                             rate_pct: pack_row.rate_pct,
+                            summary_config,
                         }
                     }
                 }
@@ -919,7 +949,7 @@ pub fn SummaryPage() -> Element {
                                     key: "{pack.id()}",
                                     class: "flex items-start gap-4 py-4 cursor-pointer rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/60",
                                     onclick: move |_| {
-                                        apply_pack_filter(pack.id(), catalog_filter);
+                                        apply_pack_filter(pack.id(), config, catalog_filter);
                                         drop(nav.push(Route::CatalogPage {}));
                                     },
                                     img {
@@ -976,6 +1006,7 @@ pub fn SummaryPage() -> Element {
                                 best_pack: row.best_pack,
                                 best_rate_pct: row.best_rate_pct,
                                 pack_rows: row.pack_rows,
+                                summary_config: config,
                             }
                         }
                     }
