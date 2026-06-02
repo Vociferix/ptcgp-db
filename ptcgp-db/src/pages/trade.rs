@@ -9,7 +9,7 @@ use ptcgp_db_core::{
 };
 use ptcgp_db_data::{Card, CardVersion, Prob};
 
-use crate::app::{AppStorage, schedule_save};
+use crate::app::{AppStorage, CardDetailOrigin, TradePageState, schedule_save};
 use crate::components::toggle::Toggle;
 use crate::components::{FilterMode, FilterToolbar};
 use crate::routes::Route;
@@ -522,6 +522,7 @@ fn pull_rate_label(rate: Prob) -> String {
 #[component]
 fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> Element {
     let mut store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
+    let mut back_origin = use_context::<Signal<CardDetailOrigin>>();
     let nav = use_navigator();
     let cv_id = rec.cv.id();
     let source_name = rec.best_source.name.clone();
@@ -543,6 +544,7 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
             class: "flex gap-3 p-4 border-b border-gray-100 dark:border-gray-700 last:border-0 \
                     cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50",
             onclick: move |_| {
+                back_origin.set(CardDetailOrigin::Trade);
                 drop(
                     nav
                         .push(Route::CardDetailPage {
@@ -673,6 +675,7 @@ fn TradeCardHalf(
 #[component]
 fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> Element {
     let mut store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
+    let mut back_origin = use_context::<Signal<CardDetailOrigin>>();
     let nav = use_navigator();
     let cv_b_id = rec.card_b.id();
     let cv_a_id = rec.card_a.id();
@@ -732,8 +735,9 @@ fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> El
             div { class: "grid grid-cols-2 gap-3",
                 div {
                     class: "bg-green-50 dark:bg-green-950/20 rounded-md p-2 cursor-pointer \
-                            hover:brightness-95 dark:hover:brightness-110",
+                            hover:bg-green-100 dark:hover:bg-green-900/50",
                     onclick: move |_| {
+                        back_origin.set(CardDetailOrigin::Trade);
                         drop(
                             nav
                                 .push(Route::CardDetailPage {
@@ -755,8 +759,9 @@ fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> El
                 }
                 div {
                     class: "bg-red-50 dark:bg-red-950/20 rounded-md p-2 cursor-pointer \
-                            hover:brightness-95 dark:hover:brightness-110",
+                            hover:bg-red-100 dark:hover:bg-red-900/50",
                     onclick: move |_| {
+                        back_origin.set(CardDetailOrigin::Trade);
                         drop(
                             nav
                                 .push(Route::CardDetailPage {
@@ -787,6 +792,7 @@ fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> El
 
 #[component]
 fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
+    let mut back_origin = use_context::<Signal<CardDetailOrigin>>();
     let nav = use_navigator();
     let cv_id = rec.cv.id();
     rsx! {
@@ -794,6 +800,7 @@ fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
             class: "flex gap-3 p-4 border-b border-gray-100 dark:border-gray-700 last:border-0 \
                     cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50",
             onclick: move |_| {
+                back_origin.set(CardDetailOrigin::Trade);
                 drop(
                     nav
                         .push(Route::CardDetailPage {
@@ -848,17 +855,32 @@ fn empty_state_sources(single_profile: bool) -> Element {
 // Trade page
 // ---------------------------------------------------------------------------
 
-fn default_filter_config() -> FilterConfig {
-    FilterConfig { goal: 1, ..FilterConfig::default() }
-}
-
 #[component]
 pub fn TradePage() -> Element {
     let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
     let settings = use_context::<Signal<AppSettings>>();
-    let config: Signal<FilterConfig> = use_signal(default_filter_config);
-    let mut show_unobtainable = use_signal(|| false);
-    let active_tab: Signal<Tab> = use_signal(|| Tab::Shares);
+
+    let mut trade_state_ctx = use_context::<Signal<TradePageState>>();
+    let init = trade_state_ctx.read();
+    let config: Signal<FilterConfig> = use_signal(|| init.config.clone());
+    let mut show_unobtainable = use_signal(|| init.show_unobtainable);
+    let active_tab: Signal<Tab> = use_signal(|| match init.active_tab {
+        1 => Tab::Trades,
+        2 => Tab::Candidates,
+        _ => Tab::Shares,
+    });
+    drop(init);
+
+    use_drop(move || {
+        let mut state = trade_state_ctx.write();
+        state.config = config.read().clone();
+        state.show_unobtainable = *show_unobtainable.read();
+        state.active_tab = match *active_tab.read() {
+            Tab::Shares => 0,
+            Tab::Trades => 1,
+            Tab::Candidates => 2,
+        };
+    });
 
     let store_guard = store.read();
     let settings_guard = settings.read();

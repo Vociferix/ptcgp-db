@@ -27,6 +27,55 @@ fn skip_onboarding() -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// Per-page persistent state — survives navigation
+// ---------------------------------------------------------------------------
+
+/// Persisted filter + UI state for the Trade page.
+#[derive(Clone)]
+pub(crate) struct TradePageState {
+    pub config: FilterConfig,
+    pub show_unobtainable: bool,
+    pub active_tab: u8, // 0=Shares, 1=Trades, 2=Candidates
+}
+
+impl Default for TradePageState {
+    fn default() -> Self {
+        Self {
+            config: FilterConfig { goal: 1, ..FilterConfig::default() },
+            show_unobtainable: false,
+            active_tab: 0,
+        }
+    }
+}
+
+/// Persisted filter config for the Summary page.
+#[derive(Clone)]
+pub(crate) struct SummaryPageState {
+    pub config: FilterConfig,
+}
+
+impl Default for SummaryPageState {
+    fn default() -> Self {
+        Self {
+            config: FilterConfig {
+                goal: 1,
+                obtainable: Some(true),
+                ..FilterConfig::default()
+            },
+        }
+    }
+}
+
+/// Where the user came from when navigating to the Card Detail page.
+/// Set immediately before each `nav.push(Route::CardDetailPage { ... })`.
+#[derive(Clone, PartialEq, Default)]
+pub(crate) enum CardDetailOrigin {
+    #[default]
+    Catalog,
+    Trade,
+}
+
+// ---------------------------------------------------------------------------
 // Platform-specific storage type
 // ---------------------------------------------------------------------------
 
@@ -97,6 +146,14 @@ pub fn App() -> Element {
     // Persistent catalog filter: survives navigation away and back. Other pages may
     // write to this before navigating to the catalog to pre-set a filter.
     let _: Signal<FilterConfig> = use_context_provider(|| Signal::new(FilterConfig::default()));
+    // Per-page persistent states — each page reads on mount and writes on unmount.
+    let _: Signal<TradePageState> =
+        use_context_provider(|| Signal::new(TradePageState::default()));
+    let _: Signal<SummaryPageState> =
+        use_context_provider(|| Signal::new(SummaryPageState::default()));
+    // Tracks which page the user navigated to CardDetailPage from, for the back button label/route.
+    let _: Signal<CardDetailOrigin> =
+        use_context_provider(|| Signal::new(CardDetailOrigin::default()));
     let mut load_error: Signal<Option<String>> = use_signal(|| None);
 
     // Auto-save coroutine: waits for ScheduleSave signals, debounces 2 s, then

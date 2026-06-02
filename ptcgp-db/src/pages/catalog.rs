@@ -5,7 +5,7 @@ use ptcgp_db_core::save_data::{CardKindFilter, CountThreshold, FilterConfig};
 use ptcgp_db_core::{AppSettings, CARD_PULL_RATES, ProfileStore};
 use ptcgp_db_data::{Card, CardVersion};
 
-use crate::app::{AppStorage, schedule_save};
+use crate::app::{AppStorage, CardDetailOrigin, schedule_save};
 use crate::components::count_spinner::CountSpinner;
 use crate::components::effect_text::EffectText;
 use crate::components::icons::{ArrowLeft, ChevronDown, ChevronUp};
@@ -574,6 +574,8 @@ fn SortBtn(
 fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool) -> Element {
     let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
     let settings = use_context::<Signal<AppSettings>>();
+    let mut back_origin = use_context::<Signal<CardDetailOrigin>>();
+    let nav = use_navigator();
 
     let cv = &CardVersion::ALL[cv_id];
     let pd = &CARD_PULL_RATES[cv_id];
@@ -653,10 +655,17 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
 
             // Narrow-viewport: transparent overlay that navigates to the full detail page.
             // Hidden at xl+ where the inline detail panel handles selection instead.
-            Link {
+            div {
                 class: "absolute inset-0 xl:hidden z-10",
-                to: Route::CardDetailPage {
-                    card_id: cv_id,
+                onclick: move |e| {
+                    e.stop_propagation();
+                    back_origin.set(CardDetailOrigin::Catalog);
+                    drop(
+                        nav
+                            .push(Route::CardDetailPage {
+                                card_id: cv_id,
+                            }),
+                    );
                 },
             }
 
@@ -721,7 +730,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                 }
             }
 
-            // Count spinner — z-20 keeps it above the xl:hidden Link overlay beneath.
+            // Count spinner — z-20 keeps it above the xl:hidden nav overlay beneath.
             div { class: "w-28 flex justify-end flex-shrink-0 relative z-20",
                 CountSpinner {
                     value,
@@ -1367,6 +1376,7 @@ fn DetailPanel(cv_id: Signal<Option<usize>>) -> Element {
 #[component]
 pub fn CardDetailPage(card_id: usize) -> Element {
     let nav = use_navigator();
+    let back_origin = use_context::<Signal<CardDetailOrigin>>();
     if card_id >= CardVersion::ALL.len() {
         return rsx! {
             div { class: "flex flex-col items-center justify-center h-full text-sm text-gray-400 dark:text-gray-600 p-6",
@@ -1374,6 +1384,10 @@ pub fn CardDetailPage(card_id: usize) -> Element {
             }
         };
     }
+    let (back_label, back_route) = match *back_origin.read() {
+        CardDetailOrigin::Trade => ("Trade", Route::TradePage {}),
+        CardDetailOrigin::Catalog => ("Catalog", Route::CatalogPage {}),
+    };
     rsx! {
         div { class: "flex flex-col h-full",
             div { class: "flex items-center shrink-0 px-3 py-2 border-b border-gray-200 dark:border-gray-700",
@@ -1381,10 +1395,10 @@ pub fn CardDetailPage(card_id: usize) -> Element {
                     r#type: "button",
                     class: "flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100",
                     onclick: move |_| {
-                        drop(nav.push(Route::CatalogPage {}));
+                        drop(nav.push(back_route.clone()));
                     },
                     ArrowLeft { class: "w-4 h-4".to_string() }
-                    "Catalog"
+                    "{back_label}"
                 }
             }
             div { class: "flex-1 min-h-0",

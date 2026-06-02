@@ -11,7 +11,7 @@ use ptcgp_db_data::{CardVersion, Pack, Prob, Set};
 #[cfg(target_arch = "wasm32")]
 use ptcgp_db_core::storage::Storage as _;
 
-use crate::app::AppStorage;
+use crate::app::{AppStorage, SummaryPageState};
 use crate::components::icons::{ChevronDown, ChevronUp, XMark};
 use crate::components::{FilterMode, FilterToolbar};
 use crate::routes::Route;
@@ -664,7 +664,12 @@ pub fn SummaryPage() -> Element {
     let mut dialog_open = use_signal(|| false);
     let active_query: Signal<Option<String>> = use_signal(|| None);
 
-    let config: Signal<FilterConfig> = use_signal(default_filter_config);
+    let mut summary_state_ctx = use_context::<Signal<SummaryPageState>>();
+    let config: Signal<FilterConfig> = use_signal(|| summary_state_ctx.read().config.clone());
+
+    use_drop(move || {
+        summary_state_ctx.write().config = config.read().clone();
+    });
 
     let store_guard = store.read();
     let settings_guard = settings.read();
