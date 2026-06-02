@@ -53,7 +53,7 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
     // Summary mode omits the name filter (~185px), so Set/Pack/Source and Series/Kind
     // can be revealed at narrower container widths.
     let (sps_row_cls, sps_panel_cls) = if mode == FilterMode::Summary {
-        ("hidden @xl:flex items-end gap-2", "flex flex-col gap-3 @xl:hidden")
+        ("hidden @lg:flex items-end gap-2", "flex flex-col gap-3 @lg:hidden")
     } else {
         ("hidden @2xl:flex items-end gap-2", "flex flex-col gap-3 @2xl:hidden")
     };
