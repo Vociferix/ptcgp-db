@@ -27,11 +27,6 @@ fn nav_items() -> impl IntoIterator<Item = NavItem> {
             short: "Cards",
         },
         NavItem {
-            label: "Analysis",
-            route: Route::AnalysisPage {},
-            short: "Analysis",
-        },
-        NavItem {
             label: "Trade",
             route: Route::TradePage {},
             short: "Trade",

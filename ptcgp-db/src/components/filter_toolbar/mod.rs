@@ -18,20 +18,21 @@ use ptcgp_db_data::{Series, Stage};
 
 #[derive(Clone, PartialEq)]
 pub enum FilterMode {
-    /// Card Catalog mode: owned-count threshold in advanced view.
+    /// Card Catalog mode: name search + owned-count threshold.
     Catalog,
-    /// Analysis / Trade mode: goal input always in primary row; no owned-count.
-    /// Callers should initialize `FilterConfig::obtainable = Some(true)`.
-    Analysis,
+    /// Trade mode: name search + goal input; no owned-count.
+    Trade,
+    /// Summary mode: goal input, no name search (saves primary-row space).
+    Summary,
 }
 
 /// Single-row filter toolbar with a floating advanced panel.
 ///
-/// Primary row (sm+): Name, [Goal if Analysis], Set, Pack, Source, Series, Kind.
-/// Narrow (< sm): Name, [Goal if Analysis] + "Filters" button that opens the panel
+/// Primary row (sm+): Name, [Goal if Trade/Summary], Set, Pack, Source, Series, Kind.
+/// Narrow (< sm): Name, [Goal if Trade/Summary] + "Filters" button that opens the panel
 /// with all filters including the primary ones.
 /// Advanced floating panel: Rarity, Element, Stage, Ex, Mega, Foil, Obtainable,
-/// Count (Catalog) / Any-version (Analysis) — plus primary filters on narrow.
+/// Count (Catalog) / Any-version (Trade/Summary) — plus primary filters on narrow.
 #[component]
 pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element {
     let settings = use_context::<Signal<AppSettings>>();
@@ -49,6 +50,31 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
         )
     };
 
+    // Summary mode omits the name filter (~185px), so Set/Pack/Source and Series/Kind
+    // can be revealed at narrower container widths.
+    let (sps_row_cls, sps_panel_cls) = if mode == FilterMode::Summary {
+        (
+            "hidden @lg:flex items-end gap-2",
+            "flex flex-col gap-3 @lg:hidden",
+        )
+    } else {
+        (
+            "hidden @2xl:flex items-end gap-2",
+            "flex flex-col gap-3 @2xl:hidden",
+        )
+    };
+    let (sk_row_cls, sk_panel_cls) = if mode == FilterMode::Summary {
+        (
+            "hidden @3xl:flex items-end gap-2",
+            "flex flex-col gap-3 @3xl:hidden",
+        )
+    } else {
+        (
+            "hidden @4xl:flex items-end gap-2",
+            "flex flex-col gap-3 @4xl:hidden",
+        )
+    };
+
     rsx! {
         // @container makes breakpoints respond to the available container width,
         // not the viewport width. This prevents toolbar overflow into the detail panel
@@ -58,27 +84,29 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
             // flex-nowrap prevents wrapping; filters that don't fit at a given
             // breakpoint are hidden here and surfaced in the floating panel.
             div { class: "flex flex-nowrap items-end gap-2",
-                // Name — always visible
-                div { class: "flex-shrink-0",
-                    NameFilter { config }
+                // Name — Catalog and Trade only; Summary omits it to save space
+                if mode != FilterMode::Summary {
+                    div { class: "flex-shrink-0",
+                        NameFilter { config }
+                    }
                 }
 
-                // Goal — Analysis mode only, always visible
-                if mode == FilterMode::Analysis {
+                // Goal — Trade and Summary modes
+                if mode == FilterMode::Trade || mode == FilterMode::Summary {
                     div { class: "flex-shrink-0",
                         GoalFilter { config }
                     }
                 }
 
-                // Set + Pack + Source — visible when container >= 42rem (672px)
-                div { class: "hidden @2xl:flex items-end gap-2",
+                // Set + Pack + Source
+                div { class: "{sps_row_cls}",
                     SetDropdown { config }
                     PackDropdown { config }
                     SourceDropdown { config }
                 }
 
-                // Series + Kind — visible when container >= 56rem (896px)
-                div { class: "hidden @4xl:flex items-end gap-2",
+                // Series + Kind
+                div { class: "{sk_row_cls}",
                     SeriesFilter { config }
                     KindFilter { config }
                 }
@@ -116,14 +144,12 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                             min-w-64 max-w-[min(640px,calc(100vw-1rem))]",
 
                     // ── Primary filters hidden from the row at narrow widths ──
-                    // Set/Pack/Source: in panel when container < 42rem (672px)
-                    div { class: "flex flex-col gap-3 @2xl:hidden",
+                    div { class: "{sps_panel_cls}",
                         SetDropdown { config }
                         PackDropdown { config }
                         SourceDropdown { config }
                     }
-                    // Series/Kind: in panel when container < 56rem (896px)
-                    div { class: "flex flex-col gap-3 @4xl:hidden",
+                    div { class: "{sk_panel_cls}",
                         SeriesFilter { config }
                         KindFilter { config }
                     }
@@ -166,7 +192,7 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                         FilterMode::Catalog => rsx! {
                             CountFilter { config }
                         },
-                        FilterMode::Analysis => rsx! {
+                        FilterMode::Trade | FilterMode::Summary => rsx! {
                             AnyVersionFilter { config }
                         },
                     }

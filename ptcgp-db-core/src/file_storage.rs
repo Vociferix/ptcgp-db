@@ -106,6 +106,16 @@ impl FileStorage {
     pub fn save_profiles_sync(&self, data: &ProfilesSaveData) -> Result<(), FileStorageError> {
         self.save(FILE_PROFILES, data)
     }
+
+    /// Saves saved queries synchronously without going through the async `Storage` trait.
+    ///
+    /// Intended for use from event handlers where async spawning is unreliable.
+    pub fn save_saved_queries_sync(
+        &self,
+        data: &SavedQueriesSaveData,
+    ) -> Result<(), FileStorageError> {
+        self.save(FILE_SAVED_QUERIES, data)
+    }
 }
 
 impl Storage for FileStorage {

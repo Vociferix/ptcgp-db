@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 use ptcgp_db_core::save_data::{CardKindFilter, CountThreshold, FilterConfig};
 
+use crate::components::icons::{Minus, Plus};
 use crate::components::toggle::Toggle;
 
 use super::seg_btn_cls;
@@ -230,27 +231,45 @@ fn CountOpBtn(
 }
 
 // ---------------------------------------------------------------------------
-// Goal input and any-version toggle (Analysis mode)
+// Goal input and any-version toggle (Trade / Summary modes)
 // ---------------------------------------------------------------------------
 
 #[component]
 pub fn GoalFilter(config: Signal<FilterConfig>) -> Element {
-    let goal = config.read().goal;
+    let goal = config.read().goal.max(1);
     rsx! {
         div { class: "flex flex-col gap-0.5",
             span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Goal" }
-            input {
-                r#type: "text",
-                value: "{goal}",
-                class: "w-14 px-2 py-1 text-sm text-center rounded-md border \
-                        border-gray-300 dark:border-gray-600 \
-                        bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 \
-                        focus:outline-none focus:ring-2 focus:ring-blue-500",
-                oninput: move |evt| {
-                    if let Ok(n) = evt.value().trim().parse::<u32>() {
-                        config.write().goal = n.max(1);
-                    }
-                },
+            div { class: "flex items-center divide-x divide-gray-300 dark:divide-gray-600 \
+                          border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden \
+                          bg-white dark:bg-gray-800",
+                button {
+                    r#type: "button",
+                    disabled: goal <= 1,
+                    class: "flex items-center justify-center w-7 h-8 shrink-0 \
+                            hover:bg-gray-100 dark:hover:bg-gray-700 \
+                            disabled:opacity-40 disabled:cursor-not-allowed",
+                    onclick: move |_| {
+                        let g = config.read().goal;
+                        if g > 1 {
+                            config.write().goal = g - 1;
+                        }
+                    },
+                    Minus { class: "w-3.5 h-3.5 text-gray-600 dark:text-gray-400" }
+                }
+                span { class: "w-8 text-center text-sm select-none text-gray-900 dark:text-gray-100",
+                    "{goal}"
+                }
+                button {
+                    r#type: "button",
+                    class: "flex items-center justify-center w-7 h-8 shrink-0 \
+                            hover:bg-gray-100 dark:hover:bg-gray-700",
+                    onclick: move |_| {
+                        let g = config.read().goal;
+                        config.write().goal = g.saturating_add(1);
+                    },
+                    Plus { class: "w-3.5 h-3.5 text-gray-600 dark:text-gray-400" }
+                }
             }
         }
     }
