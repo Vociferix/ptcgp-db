@@ -18,11 +18,12 @@ use ptcgp_db_data::{Series, Stage};
 
 #[derive(Clone, PartialEq)]
 pub enum FilterMode {
-    /// Card Catalog mode: owned-count threshold in advanced view.
+    /// Card Catalog mode: name search + owned-count threshold.
     Catalog,
-    /// Analysis / Trade mode: goal input always in primary row; no owned-count.
-    /// Callers should initialize `FilterConfig::obtainable = Some(true)`.
+    /// Analysis / Trade mode: name search + goal input; no owned-count.
     Analysis,
+    /// Summary mode: goal input, no name search (saves primary-row space).
+    Summary,
 }
 
 /// Single-row filter toolbar with a floating advanced panel.
@@ -58,13 +59,15 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
             // flex-nowrap prevents wrapping; filters that don't fit at a given
             // breakpoint are hidden here and surfaced in the floating panel.
             div { class: "flex flex-nowrap items-end gap-2",
-                // Name — always visible
-                div { class: "flex-shrink-0",
-                    NameFilter { config }
+                // Name — Catalog and Analysis only; Summary omits it to save space
+                if mode != FilterMode::Summary {
+                    div { class: "flex-shrink-0",
+                        NameFilter { config }
+                    }
                 }
 
-                // Goal — Analysis mode only, always visible
-                if mode == FilterMode::Analysis {
+                // Goal — Analysis and Summary modes
+                if mode == FilterMode::Analysis || mode == FilterMode::Summary {
                     div { class: "flex-shrink-0",
                         GoalFilter { config }
                     }
@@ -166,7 +169,7 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                         FilterMode::Catalog => rsx! {
                             CountFilter { config }
                         },
-                        FilterMode::Analysis => rsx! {
+                        FilterMode::Analysis | FilterMode::Summary => rsx! {
                             AnyVersionFilter { config }
                         },
                     }

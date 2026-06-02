@@ -4,6 +4,7 @@ use ptcgp_db_core::save_data::{CardKindFilter, CardVersionId, FilterConfig};
 use ptcgp_db_core::{
     AppSettings, ProfileStore, SavedQueries, completion, completion_merged, desired_pull_rate,
 };
+use ptcgp_db_core::storage::Storage as _;
 use ptcgp_db_data::{CardVersion, Pack, Prob, Set};
 
 use crate::app::AppStorage;
@@ -12,23 +13,12 @@ use crate::components::{FilterMode, FilterToolbar};
 use crate::routes::Route;
 
 // ---------------------------------------------------------------------------
-// Persistence
+// Dropdown trigger style — matches Set/Pack/Source dropdowns in the toolbar
 // ---------------------------------------------------------------------------
 
-fn persist_queries(
-    queries: Signal<SavedQueries>,
-    store: Signal<Option<ProfileStore<AppStorage>>>,
-) {
-    let current = queries.read().clone();
-    let storage = store.read().as_ref().map(|s| s.storage().clone());
-    if let Some(storage) = storage {
-        spawn(async move {
-            if let Err(e) = current.save(&storage).await {
-                tracing::error!("saved queries save failed: {e}");
-            }
-        });
-    }
-}
+const TRIGGER_CLS: &str = "flex items-center gap-1 px-2 h-8 rounded-md text-sm font-medium \
+    bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 \
+    text-gray-800 dark:text-gray-100";
 
 // ---------------------------------------------------------------------------
 // Navigation helpers
@@ -60,35 +50,13 @@ fn set_is_obtainable(set: &Set, today: NaiveDate) -> bool {
     set.retirement_date().is_none_or(|r| r > today)
 }
 
-/// Returns name IDs matching a text query (searches name and collector number).
-fn name_ids_for_query(query: &str) -> Option<Vec<usize>> {
-    let q = query.trim();
-    if q.is_empty() {
-        return None;
-    }
-    let q_lower = q.to_lowercase();
-    Some(
-        CardVersion::ALL
-            .iter()
-            .filter(|cv| {
-                cv.card().name().as_str().to_lowercase().contains(&q_lower)
-                    || format!("{} {}", cv.set().code(), cv.number())
-                        .to_lowercase()
-                        .contains(&q_lower)
-            })
-            .map(|cv| cv.card().name().id())
-            .collect(),
-    )
-}
-
 /// Returns true when a card version passes the current filter config.
-/// Does not check owned-count or goal — those are handled separately.
+/// Does not check goal — that is handled separately.
 fn passes_filter(
     cv: &CardVersion,
     cfg: &FilterConfig,
     settings: &AppSettings,
     today: NaiveDate,
-    name_ids: Option<&[usize]>,
 ) -> bool {
     if settings.ignore_unobtainable_sets() && cv.set().retirement_date().is_some_and(|d| d <= today)
     {
@@ -98,9 +66,6 @@ fn passes_filter(
         return false;
     }
     if settings.ignore_gold_shop() && cv.source().name().as_str() == "Gold Shop" {
-        return false;
-    }
-    if name_ids.is_some_and(|ids| !ids.contains(&cv.card().name().id())) {
         return false;
     }
     if cfg.series.is_some_and(|sid| cv.series().id() != sid) {
@@ -155,9 +120,7 @@ fn passes_filter(
     true
 }
 
-/// Returns the effective owned count for a card version under the current config.
-/// Handles `any_version_owned`: when set, counts all versions of the same abstract card.
-/// Result is clamped to `goal`.
+/// Effective owned count for a card version: handles `any_version_owned`, clamped to goal.
 fn effective_count(
     cv_id: CardVersionId,
     cfg: &FilterConfig,
@@ -186,8 +149,11 @@ fn effective_count(
 #[derive(Clone, PartialEq)]
 struct PackRowData {
     pack: &'static Pack,
+    /// Completion % from the formula: Σ min(count, goal) / (n × goal).
     completion_pct: f64,
+    /// Completion formula numerator: Σ min(effective_count, goal) for matching cards in pack.
     owned: usize,
+    /// Completion formula denominator: matching_cards_in_pack × goal.
     total: usize,
     rate_pct: f64,
 }
@@ -204,25 +170,168 @@ struct SetRowData {
 }
 
 // ---------------------------------------------------------------------------
+// Saved queries — custom dropdown matching the toolbar Set/Pack style
+// ---------------------------------------------------------------------------
+
+fn default_filter_config() -> FilterConfig {
+    FilterConfig {
+        goal: 1,
+        ..FilterConfig::default()
+    }
+}
+
+/// Persist saved queries by cloning the data while the write guard is held,
+/// then spawning an async save. Call after any mutation to the queries signal.
+fn save_queries_data(data: ptcgp_db_core::save_data::SavedQueriesSaveData, store: Signal<Option<ProfileStore<AppStorage>>>) {
+    let storage = store.read().as_ref().map(|s| s.storage().clone());
+    if let Some(storage) = storage {
+        spawn(async move {
+            if let Err(e) = storage.save_saved_queries(&data).await {
+                tracing::error!("saved queries save failed: {e}");
+            }
+        });
+    }
+}
+
+#[component]
+fn SavedQueryItem(
+    name: String,
+    cfg_snapshot: FilterConfig,
+    config: Signal<FilterConfig>,
+    mut queries: Signal<SavedQueries>,
+    store: Signal<Option<ProfileStore<AppStorage>>>,
+    mut open: Signal<bool>,
+) -> Element {
+    rsx! {
+        div { class: "flex items-center gap-1 px-3 py-2 select-none hover:bg-gray-50 dark:hover:bg-gray-700",
+            // Name area — clicking loads the query
+            div {
+                class: "flex-1 min-w-0 cursor-pointer",
+                onclick: move |_| {
+                    config.set(cfg_snapshot.clone());
+                    open.set(false);
+                },
+                span { class: "text-sm text-gray-700 dark:text-gray-300 truncate block",
+                    "{name}"
+                }
+            }
+            // Delete button
+            button {
+                r#type: "button",
+                class: "shrink-0 w-5 h-5 flex items-center justify-center rounded \
+                        text-gray-300 dark:text-gray-600 \
+                        hover:text-red-500 dark:hover:text-red-400 \
+                        hover:bg-red-50 dark:hover:bg-red-950/30 text-xs",
+                title: "Delete",
+                onclick: move |e| {
+                    e.stop_propagation();
+                    let data = {
+                        let mut q = queries.write();
+                        q.remove(&name);
+                        q.as_save_data().clone()
+                    };
+                    save_queries_data(data, store);
+                },
+                "×"
+            }
+        }
+    }
+}
+
+#[component]
+fn SavedQueriesDropdown(config: Signal<FilterConfig>) -> Element {
+    let queries = use_context::<Signal<SavedQueries>>();
+    let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
+    let mut open = use_signal(|| false);
+
+    let query_list: Vec<(String, FilterConfig)> = queries
+        .read()
+        .queries()
+        .iter()
+        .map(|q| (q.name.clone(), q.config.clone()))
+        .collect();
+    let count = query_list.len();
+
+    rsx! {
+        div { class: "relative",
+            button {
+                r#type: "button",
+                class: "{TRIGGER_CLS}",
+                onclick: move |_| open.toggle(),
+                "Queries"
+                if count > 0 {
+                    span { class: "px-1.5 py-0.5 text-xs rounded-full bg-blue-600 text-white",
+                        "{count}"
+                    }
+                }
+                if *open.read() {
+                    ChevronUp { class: "w-4 h-4 text-gray-500 dark:text-gray-400" }
+                } else {
+                    ChevronDown { class: "w-4 h-4 text-gray-500 dark:text-gray-400" }
+                }
+            }
+
+            if *open.read() {
+                // Dismiss backdrop
+                div {
+                    class: "fixed inset-0 z-10",
+                    onclick: move |_| open.set(false),
+                }
+                // Panel
+                div { class: "absolute left-0 top-full mt-1 z-20 max-h-80 overflow-y-auto \
+                              overflow-x-hidden rounded-md border border-gray-200 \
+                              dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg py-1 \
+                              min-w-48",
+                    // Default — always first; resets config to defaults
+                    div {
+                        class: "flex items-center px-3 py-2 cursor-pointer select-none \
+                                hover:bg-gray-50 dark:hover:bg-gray-700",
+                        onclick: move |_| {
+                            config.set(default_filter_config());
+                            open.set(false);
+                        },
+                        span { class: "text-sm text-gray-500 dark:text-gray-400 italic",
+                            "Default"
+                        }
+                    }
+
+                    // Saved queries
+                    if !query_list.is_empty() {
+                        div { class: "border-t border-gray-100 dark:border-gray-700 mt-1 pt-1",
+                            for (name, cfg_snapshot) in query_list {
+                                SavedQueryItem {
+                                    key: "{name}",
+                                    name,
+                                    cfg_snapshot,
+                                    config,
+                                    queries,
+                                    store,
+                                    open,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Save Query dialog
 // ---------------------------------------------------------------------------
 
 #[component]
-fn SaveQueryDialog(
-    config: Signal<FilterConfig>,
-    on_close: EventHandler<()>,
-) -> Element {
+fn SaveQueryDialog(config: Signal<FilterConfig>, on_close: EventHandler<()>) -> Element {
     let mut queries = use_context::<Signal<SavedQueries>>();
     let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
     let mut name = use_signal(String::new);
     let mut error = use_signal(|| None::<&'static str>);
 
     rsx! {
-        // Backdrop
         div {
             class: "fixed inset-0 z-50 flex items-center justify-center bg-black/40",
             onclick: move |_| on_close.call(()),
-            // Dialog box — stop propagation so clicks inside don't close
             div {
                 class: "bg-white dark:bg-gray-800 rounded-xl shadow-xl border \
                         border-gray-200 dark:border-gray-700 p-5 w-80 flex flex-col gap-4",
@@ -253,8 +362,12 @@ fn SaveQueryDialog(
                                         return;
                                     }
                                     let cfg = config.read().clone();
-                                    if queries.write().add(n, cfg) {
-                                        persist_queries(queries, store);
+                                    let result = {
+                                        let mut q = queries.write();
+                                        if q.add(n, cfg) { Some(q.as_save_data().clone()) } else { None }
+                                    };
+                                    if let Some(data) = result {
+                                        save_queries_data(data, store);
                                         on_close.call(());
                                     } else {
                                         error.set(Some("A query with that name already exists"));
@@ -292,8 +405,12 @@ fn SaveQueryDialog(
                                 return;
                             }
                             let cfg = config.read().clone();
-                            if queries.write().add(n, cfg) {
-                                persist_queries(queries, store);
+                            let result = {
+                                let mut q = queries.write();
+                                if q.add(n, cfg) { Some(q.as_save_data().clone()) } else { None }
+                            };
+                            if let Some(data) = result {
+                                save_queries_data(data, store);
                                 on_close.call(());
                             } else {
                                 error.set(Some("A query with that name already exists"));
@@ -302,76 +419,6 @@ fn SaveQueryDialog(
                         "Save"
                     }
                 }
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Saved queries controls (colocated with filter toolbar)
-// ---------------------------------------------------------------------------
-
-#[component]
-fn SavedQueriesControls(config: Signal<FilterConfig>) -> Element {
-    let queries = use_context::<Signal<SavedQueries>>();
-    let mut dialog_open = use_signal(|| false);
-
-    let query_names: Vec<String> = queries
-        .read()
-        .queries()
-        .iter()
-        .map(|q| q.name.clone())
-        .collect();
-
-    let has_queries = !query_names.is_empty();
-
-    rsx! {
-        div { class: "flex items-end gap-1.5 shrink-0",
-            // Load query dropdown — only shown when there are saved queries
-            if has_queries {
-                select {
-                    class: "h-8 rounded-md border border-gray-300 dark:border-gray-600 \
-                            bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 \
-                            text-xs px-2 pr-6 focus:outline-none focus:ring-2 focus:ring-blue-500 \
-                            cursor-pointer",
-                    value: "",
-                    onchange: move |e| {
-                        let selected = e.value();
-                        if selected.is_empty() {
-                            return;
-                        }
-                        let cfg = queries
-                            .read()
-                            .queries()
-                            .iter()
-                            .find(|q| q.name == selected)
-                            .map(|q| q.config.clone());
-                        if let Some(cfg) = cfg {
-                            config.set(cfg);
-                        }
-                    },
-                    option { value: "", disabled: true, "Load query…" }
-                    for name in query_names {
-                        option { key: "{name}", value: "{name}", "{name}" }
-                    }
-                }
-            }
-
-            // Save Query button
-            button {
-                r#type: "button",
-                class: "h-8 px-2.5 rounded-md text-xs font-medium \
-                        border border-gray-300 dark:border-gray-600 \
-                        bg-white dark:bg-gray-800 \
-                        text-gray-700 dark:text-gray-200 \
-                        hover:bg-gray-100 dark:hover:bg-gray-700 \
-                        whitespace-nowrap",
-                onclick: move |_| dialog_open.set(true),
-                "Save Query"
-            }
-
-            if *dialog_open.read() {
-                SaveQueryDialog { config, on_close: move |_| dialog_open.set(false) }
             }
         }
     }
@@ -544,12 +591,9 @@ pub fn SummaryPage() -> Element {
     let settings = use_context::<Signal<AppSettings>>();
     let catalog_filter = use_context::<Signal<FilterConfig>>();
     let nav = use_navigator();
+    let mut dialog_open = use_signal(|| false);
 
-    // Filter config for this page: goal=1, no other filters by default.
-    let config: Signal<FilterConfig> = use_signal(|| FilterConfig {
-        goal: 1,
-        ..FilterConfig::default()
-    });
+    let config: Signal<FilterConfig> = use_signal(default_filter_config);
 
     let store_guard = store.read();
     let settings_guard = settings.read();
@@ -558,11 +602,6 @@ pub fn SummaryPage() -> Element {
     let merge_dupes = settings_guard.merge_duplicate_printings();
     let goal = cfg.goal.max(1);
     let today = today_naive();
-
-    let name_ids = cfg
-        .name_query
-        .as_deref()
-        .and_then(|q| name_ids_for_query(q));
 
     let Some(store_ref) = store_guard.as_ref() else {
         return rsx! {
@@ -577,29 +616,27 @@ pub fn SummaryPage() -> Element {
     let set_rows: Vec<SetRowData> = Set::ALL
         .iter()
         .filter_map(|set| {
-            // Collect card versions in this set that pass the filter.
             let matching_cvs: Vec<&CardVersion> = set
                 .card_versions()
                 .iter()
-                .filter(|cv| passes_filter(cv, &cfg, &settings_guard, today, name_ids.as_deref()))
+                .filter(|cv| passes_filter(cv, &cfg, &settings_guard, today))
                 .collect();
 
             if matching_cvs.is_empty() {
                 return None;
             }
 
-            let total = matching_cvs.len();
-            let owned = matching_cvs
+            // Completion formula: numerator = Σ min(effective_count, goal),
+            // denominator = n × goal. This correctly weights partial progress
+            // (e.g. owning 1 copy with goal=2 contributes 0.5 completion).
+            let owned: usize = matching_cvs
                 .iter()
-                .filter(|cv| effective_count(cv.id(), &cfg, store_ref) >= goal)
-                .count();
+                .map(|cv| effective_count(cv.id(), &cfg, store_ref) as usize)
+                .sum();
+            let total = matching_cvs.len() * goal as usize;
 
             let comp = if merge_dupes {
-                completion_merged(
-                    counts,
-                    goal,
-                    matching_cvs.iter().map(|cv| cv.id()),
-                )
+                completion_merged(counts, goal, matching_cvs.iter().map(|cv| cv.id()))
             } else {
                 completion(counts, goal, matching_cvs.iter().map(|cv| cv.id()))
             };
@@ -612,22 +649,28 @@ pub fn SummaryPage() -> Element {
                 .map(|cv| cv.id())
                 .collect();
 
-            let (best_pack, best_rate_pct) = if set.is_promo() || desired_ids_for_set.is_empty() {
-                (None, 0.0)
-            } else {
-                let result = set
-                    .packs()
-                    .iter()
-                    .filter_map(|p| {
-                        let rate = desired_pull_rate(p, |id| desired_ids_for_set.contains(&id));
-                        if rate == Prob::ZERO { None } else { Some((p, rate)) }
-                    })
-                    .max_by(|(_, a), (_, b)| a.cmp(b));
-                match result {
-                    Some((pack, rate)) => (Some(pack), rate.as_f64() * 100.0),
-                    None => (None, 0.0),
-                }
-            };
+            let (best_pack, best_rate_pct) =
+                if set.is_promo() || desired_ids_for_set.is_empty() {
+                    (None, 0.0)
+                } else {
+                    let result = set
+                        .packs()
+                        .iter()
+                        .filter_map(|p| {
+                            let rate =
+                                desired_pull_rate(p, |id| desired_ids_for_set.contains(&id));
+                            if rate == Prob::ZERO {
+                                None
+                            } else {
+                                Some((p, rate))
+                            }
+                        })
+                        .max_by(|(_, a), (_, b)| a.cmp(b));
+                    match result {
+                        Some((pack, rate)) => (Some(pack), rate.as_f64() * 100.0),
+                        None => (None, 0.0),
+                    }
+                };
 
             let pack_rows: Vec<PackRowData> = set
                 .packs()
@@ -636,15 +679,13 @@ pub fn SummaryPage() -> Element {
                     let p_matching: Vec<&CardVersion> = p
                         .card_versions()
                         .iter()
-                        .filter(|cv| {
-                            passes_filter(cv, &cfg, &settings_guard, today, name_ids.as_deref())
-                        })
+                        .filter(|cv| passes_filter(cv, &cfg, &settings_guard, today))
                         .collect();
-                    let p_total = p_matching.len();
-                    let p_owned = p_matching
+                    let p_owned: usize = p_matching
                         .iter()
-                        .filter(|cv| effective_count(cv.id(), &cfg, store_ref) >= goal)
-                        .count();
+                        .map(|cv| effective_count(cv.id(), &cfg, store_ref) as usize)
+                        .sum();
+                    let p_total = p_matching.len() * goal as usize;
 
                     let p_comp = if merge_dupes {
                         completion_merged(counts, goal, p_matching.iter().map(|cv| cv.id()))
@@ -683,11 +724,12 @@ pub fn SummaryPage() -> Element {
         .collect();
 
     // ── Overall totals ───────────────────────────────────────────────────────
+    // Sum the per-set numerators/denominators for a globally consistent completion %.
 
     let total_owned: usize = set_rows.iter().map(|r| r.owned).sum();
-    let total_cards: usize = set_rows.iter().map(|r| r.total).sum();
-    let overall_pct = if total_cards > 0 {
-        total_owned as f64 / total_cards as f64 * 100.0
+    let total_denom: usize = set_rows.iter().map(|r| r.total).sum();
+    let overall_pct = if total_denom > 0 {
+        total_owned as f64 / total_denom as f64 * 100.0
     } else {
         0.0
     };
@@ -701,7 +743,7 @@ pub fn SummaryPage() -> Element {
                 .card_versions()
                 .iter()
                 .filter(|cv| {
-                    passes_filter(cv, &cfg, &settings_guard, today, name_ids.as_deref())
+                    passes_filter(cv, &cfg, &settings_guard, today)
                         && effective_count(cv.id(), &cfg, store_ref) < goal
                 })
                 .map(|cv| cv.id())
@@ -731,7 +773,7 @@ pub fn SummaryPage() -> Element {
     };
 
     let collection_complete =
-        best_packs.is_empty() && total_cards > 0 && total_owned == total_cards;
+        best_packs.is_empty() && total_denom > 0 && total_owned == total_denom;
 
     let next_pack_cls = if best_packs.len() > 2 {
         "divide-y divide-gray-200 dark:divide-gray-700 max-h-96 overflow-y-auto"
@@ -739,7 +781,6 @@ pub fn SummaryPage() -> Element {
         "divide-y divide-gray-200 dark:divide-gray-700"
     };
 
-    // Drop read guards before rendering to avoid holding them across RSX.
     drop(cfg);
     drop(settings_guard);
     drop(store_guard);
@@ -750,8 +791,22 @@ pub fn SummaryPage() -> Element {
 
             // ── Filter toolbar + saved queries controls ───────────────────────
             div { class: "flex flex-col gap-1.5",
-                FilterToolbar { config, mode: FilterMode::Analysis }
-                SavedQueriesControls { config }
+                FilterToolbar { config, mode: FilterMode::Summary }
+                div { class: "flex items-center gap-1.5",
+                    SavedQueriesDropdown { config }
+                    button {
+                        r#type: "button",
+                        class: "{TRIGGER_CLS}",
+                        onclick: move |_| dialog_open.set(true),
+                        "Save"
+                    }
+                    if *dialog_open.read() {
+                        SaveQueryDialog {
+                            config,
+                            on_close: move |_| dialog_open.set(false),
+                        }
+                    }
+                }
             }
 
             // ── Overall totals ────────────────────────────────────────────────
@@ -760,7 +815,7 @@ pub fn SummaryPage() -> Element {
                     "Overall"
                 }
                 div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3",
-                    if total_cards == 0 {
+                    if total_denom == 0 {
                         p { class: "text-sm text-gray-500 dark:text-gray-400",
                             "No cards match the current filters."
                         }
@@ -770,7 +825,7 @@ pub fn SummaryPage() -> Element {
                                 "{overall_pct:.1}%"
                             }
                             span { class: "text-sm text-gray-500 dark:text-gray-400",
-                                "{total_owned} / {total_cards} card versions"
+                                "{total_owned} / {total_denom}"
                             }
                         }
                         div { class: "h-2 rounded-full bg-gray-200 dark:bg-gray-700",
@@ -793,7 +848,7 @@ pub fn SummaryPage() -> Element {
                         p { class: "text-sm font-medium text-green-600 dark:text-green-400",
                             "Goal met for all matching cards!"
                         }
-                    } else if best_packs.is_empty() && total_cards > 0 {
+                    } else if best_packs.is_empty() && total_denom > 0 {
                         p { class: "text-sm text-gray-500 dark:text-gray-400",
                             "No packs can yield the desired cards."
                         }
