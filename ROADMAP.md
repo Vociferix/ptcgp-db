@@ -419,7 +419,7 @@ Enhance the Summary page to incorporate the Analysis page's filter toolbar and q
 
 **Navigation carry-through**: clicking a set or pack row navigates to the Catalog with active Summary filters applied. The clicked set/pack overrides the active set/pack filter; goal, any-version, owned-count, and name are reset.
 
-- [~] **T22**
+- [x] **T22**
 
 ---
 

@@ -211,7 +211,7 @@ at the set level).
 
 Unobtainable sets remain in the catalog and count toward completion by default. However,
 unobtainable packs are excluded from "next pack to open" recommendations everywhere in the app
-by default (see Summary Page and Analysis Page). A global setting can hide unobtainable sets
+by default (see §Summary Page). A global setting can hide unobtainable sets
 from the entire app; see Settings.
 
 ### Packs, Variants, and Slots
@@ -265,7 +265,7 @@ promo pack has a single slot, a single variant (`normal`) with rate 1 (100%), an
 around 5 possible cards.
 
 **Promo packs are excluded from all probability calculations in the app** — they do not appear in
-"next pack to open" recommendations or Analysis page results. Rationale: promo cards are
+"next pack to open" recommendations or Summary page query results. Rationale: promo cards are
 limited-time and unobtainable once their event ends; users do not make pack-opening decisions
 based on promo pull rates.
 
@@ -318,7 +318,7 @@ version is its collector number within the set.
 ## Probability Calculations
 
 This section defines how pull probabilities are computed. These calculations power the Summary
-page's "next pack to open" and the Analysis page.
+page's "next pack to open" and query results.
 
 **Promo packs are always excluded from these calculations.**
 
@@ -440,7 +440,7 @@ Multiple profiles can be active simultaneously on most pages. When multiple prof
 - **Owned count** for a card version = sum of that card version's count across all active profiles
 - A card version is considered **owned** if and only if this sum is > 0
 - This aggregated count is used consistently for: displayed counts, completion percentages,
-  probability calculations, and all analysis queries
+  probability calculations, and all saved queries
 
 This model applies throughout the app. The Trade page follows the same aggregation rule for
 active profiles (the destination), but additionally surfaces inactive profiles as individual
@@ -926,7 +926,7 @@ The layout of these fields is left to implementation judgment.
 
 The Analysis page has been merged into the Summary page. There is no separate Analysis page or
 `/analysis` route. See §Summary Page for the filter toolbar, goal input, any-version toggle,
-saved queries, and completion formula that power analysis queries.
+saved queries, and completion formula that power these queries.
 
 **Do not implement this as separate per-use-case tools.** Hardcoded tools for specific scenarios
 (e.g., a dedicated "Diamond completion" button) will be rejected.
@@ -962,7 +962,7 @@ shown regardless.
 
 ### Collection Goal
 
-The page exposes the same filter toolbar and goal number input (T) as the Analysis page,
+The page exposes the same filter toolbar and goal number input (T) as the Summary page,
 defining which cards the destination "wants." Default: T = 1 (own at least one of each card).
 Adjusting the goal or filters recalculates all recommendations instantly. A card is a candidate
 to receive if the aggregate count across all active profiles is below target.
@@ -1154,18 +1154,17 @@ A settings area (page or panel) for app-wide preferences. At minimum:
 **Ignore unobtainable sets**
 - Toggle: when enabled, sets where `Set::retirement_date()` returns a date in the past are
   excluded from the entire app — hidden from the Card Catalog, excluded from set completion
-  counts, excluded from all probability calculations and analysis results
+  counts, excluded from all probability calculations and query results
 - Default: off (unobtainable sets appear in the catalog and completion, but their packs are
-  excluded from recommendations by default — see Summary and Analysis pages)
-- When this setting is on, the per-page "include unobtainable" toggles on the Summary and
-  Analysis pages are hidden entirely
+  excluded from recommendations by default — see §Summary Page)
+- When this setting is on, the Obtainable filter on the Summary page is hidden entirely
 - Persisted across sessions
 
 **Ignore Premium Mission cards**
 - Toggle: when enabled, cards where `CardVersion::source().name()` is `"Premium Mission"` are
   excluded from the entire app —
   hidden from the Card Catalog, excluded from set completion counts, excluded from probability
-  calculations, and excluded from all analysis results
+  calculations, and excluded from all query results
 - Default: off (premium cards are shown)
 - Persisted across sessions
 
