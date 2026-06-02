@@ -488,7 +488,7 @@ fn CardPanel(cv_id: usize) -> Element {
                 class: "w-14 h-20 object-cover rounded flex-shrink-0",
             }
             div { class: "min-w-0",
-                p { class: "text-sm font-semibold text-gray-900 dark:text-gray-100 truncate",
+                p { class: "text-sm font-semibold text-gray-900 dark:text-gray-100 line-clamp-2",
                     "{card_name}"
                 }
                 p { class: "text-xs text-gray-500 dark:text-gray-400 mt-0.5",
@@ -541,8 +541,9 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
 
     rsx! {
         div {
-            class: "flex gap-3 p-4 border-b border-gray-100 dark:border-gray-700 last:border-0 \
-                    cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50",
+            class: "flex flex-col gap-3 p-4 border-b border-gray-100 dark:border-gray-700 \
+                    last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 \
+                    sm:flex-row sm:items-start",
             onclick: move |_| {
                 back_origin.set(CardDetailOrigin::Trade);
                 drop(
@@ -552,22 +553,22 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
                         }),
                 );
             },
-            // Rank badge
-            span { class: "shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 mt-6",
-                "#{rank}"
-            }
-            // Card panel
-            div { class: "flex-1 min-w-0",
-                CardPanel { cv_id: rec.cv.id() }
-                // Priority badge
-                if rec.is_zero_rate {
-                    span { class: "inline-flex items-center mt-1.5 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200",
-                        "Priority — not obtainable from packs"
+            // Rank + card panel (always horizontal)
+            div { class: "flex gap-3 items-center flex-1 min-w-0",
+                span { class: "shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
+                    "#{rank}"
+                }
+                div { class: "flex-1 min-w-0",
+                    CardPanel { cv_id: rec.cv.id() }
+                    if rec.is_zero_rate {
+                        span { class: "inline-flex items-center mt-1.5 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200",
+                            "Priority — not obtainable from packs"
+                        }
                     }
                 }
             }
-            // Stats + transfer
-            div { class: "shrink-0 flex flex-col items-end gap-1.5 min-w-[11rem]",
+            // Stats + transfer (full-width on mobile, fixed sidebar on sm+)
+            div { class: "flex flex-col items-end gap-1.5 sm:shrink-0 sm:min-w-[11rem]",
                 button {
                     r#type: "button",
                     class: "px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white \
@@ -576,7 +577,6 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
                     onclick: on_transfer,
                     "Transfer"
                 }
-                // Source profile
                 div { class: "text-xs text-right",
                     span { class: "text-gray-500 dark:text-gray-400", "Source: " }
                     span { class: "font-medium text-gray-800 dark:text-gray-200",
@@ -584,19 +584,16 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
                     }
                     span { class: "text-gray-500 dark:text-gray-400", " ({rec.best_source.count} owned)" }
                 }
-                // Dest profile
                 div { class: "text-xs text-right",
                     span { class: "text-gray-500 dark:text-gray-400", "Dest: " }
                     span { class: "font-medium text-gray-800 dark:text-gray-200", "{dest_name}" }
                     span { class: "text-gray-500 dark:text-gray-400", " ({rec.dest_count} owned)" }
                 }
-                // Pull rate
                 div { class: "text-xs text-right text-gray-500 dark:text-gray-400",
                     "Pull rate: {pull_rate_label(rec.max_rate)}"
                 }
-                // Alt sources
                 if !rec.alt_sources.is_empty() {
-                    div { class: "text-xs text-right text-gray-400 dark:text-gray-500",
+                    div { class: "text-xs text-right text-gray-400 dark:text-gray-500 break-words",
                         "Also: "
                         for (i, alt) in rec.alt_sources.iter().enumerate() {
                             if i > 0 {
@@ -642,7 +639,7 @@ fn TradeCardHalf(
                 class: "w-14 h-20 object-cover rounded flex-shrink-0",
             }
             div { class: "min-w-0 flex flex-col gap-0.5",
-                p { class: "text-sm font-semibold text-gray-900 dark:text-gray-100 truncate",
+                p { class: "text-sm font-semibold text-gray-900 dark:text-gray-100 line-clamp-2",
                     "{card_name}"
                 }
                 p { class: "text-xs text-gray-500 dark:text-gray-400", "{set_code} {number:03}" }
@@ -731,8 +728,8 @@ fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> El
                     "Transfer"
                 }
             }
-            // Two-column card layout — each box navigates to that card's detail page
-            div { class: "grid grid-cols-2 gap-3",
+            // Card layout — stacked on mobile, two columns on sm+
+            div { class: "grid grid-cols-1 sm:grid-cols-2 gap-3",
                 div {
                     class: "bg-green-50 dark:bg-green-950/20 rounded-md p-2 cursor-pointer \
                             hover:bg-green-100 dark:hover:bg-green-900/50",
@@ -797,8 +794,9 @@ fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
     let cv_id = rec.cv.id();
     rsx! {
         div {
-            class: "flex gap-3 p-4 border-b border-gray-100 dark:border-gray-700 last:border-0 \
-                    cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50",
+            class: "flex flex-col gap-3 p-4 border-b border-gray-100 dark:border-gray-700 \
+                    last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 \
+                    sm:flex-row sm:items-start",
             onclick: move |_| {
                 back_origin.set(CardDetailOrigin::Trade);
                 drop(
@@ -808,18 +806,20 @@ fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
                         }),
                 );
             },
-            span { class: "shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 mt-6",
-                "#{rank}"
-            }
-            div { class: "flex-1 min-w-0",
-                CardPanel { cv_id: rec.cv.id() }
-                if rec.is_unobtainable {
-                    span { class: "inline-flex items-center mt-1.5 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200",
-                        "Retired set — cannot be re-obtained from packs"
+            div { class: "flex gap-3 items-center flex-1 min-w-0",
+                span { class: "shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
+                    "#{rank}"
+                }
+                div { class: "flex-1 min-w-0",
+                    CardPanel { cv_id: rec.cv.id() }
+                    if rec.is_unobtainable {
+                        span { class: "inline-flex items-center mt-1.5 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200",
+                            "Retired set — cannot be re-obtained from packs"
+                        }
                     }
                 }
             }
-            div { class: "shrink-0 flex flex-col items-end gap-1.5",
+            div { class: "flex flex-col items-end gap-1.5 sm:shrink-0",
                 div { class: "text-xs text-right",
                     span { class: "text-gray-500 dark:text-gray-400", "{dest_name}: " }
                     span { class: "font-medium text-gray-800 dark:text-gray-200",
@@ -959,18 +959,10 @@ pub fn TradePage() -> Element {
             // ── Tab bar ───────────────────────────────────────────────────────
             div { class: "border-b border-gray-200 dark:border-gray-700 overflow-x-auto",
                 div { class: "flex min-w-max",
+                    TabBtn { label: "Shares", tab: Tab::Shares, active_tab }
+                    TabBtn { label: "Trades", tab: Tab::Trades, active_tab }
                     TabBtn {
-                        label: "Recommended Shares",
-                        tab: Tab::Shares,
-                        active_tab,
-                    }
-                    TabBtn {
-                        label: "Recommended Trades",
-                        tab: Tab::Trades,
-                        active_tab,
-                    }
-                    TabBtn {
-                        label: "Trade Candidates",
+                        label: "Candidates",
                         tab: Tab::Candidates,
                         active_tab,
                     }
