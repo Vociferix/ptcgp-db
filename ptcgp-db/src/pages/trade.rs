@@ -525,6 +525,7 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
     let mut back_origin = use_context::<Signal<CardDetailOrigin>>();
     let nav = use_navigator();
     let cv_id = rec.cv.id();
+    let rate_label = pull_rate_label(rec.max_rate);
     let source_name = rec.best_source.name.clone();
     let dest_for_xfer = dest_name.clone();
     let on_transfer = use_callback(move |e: Event<MouseData>| {
@@ -580,10 +581,10 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
                     "#{rank}"
                 }
                 div { class: "flex-1 min-w-0",
-                    CardPanel { cv_id: rec.cv.id() }
+                    CardPanel { cv_id }
                     // Pull rate under card (mobile only)
                     div { class: "sm:hidden mt-1 text-xs text-gray-500 dark:text-gray-400",
-                        "Pull rate: {pull_rate_label(rec.max_rate)}"
+                        "Pull rate: {rate_label}"
                     }
                     // Alt sources under card (mobile only)
                     if !rec.alt_sources.is_empty() {
@@ -629,7 +630,7 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
                         span { class: "text-gray-500 dark:text-gray-400", " ({rec.dest_count} owned)" }
                     }
                     div { class: "text-xs text-right text-gray-500 dark:text-gray-400",
-                        "Pull rate: {pull_rate_label(rec.max_rate)}"
+                        "Pull rate: {rate_label}"
                     }
                     if !rec.alt_sources.is_empty() {
                         div { class: "text-xs text-right text-gray-400 dark:text-gray-500 break-words",
@@ -832,6 +833,7 @@ fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
     let mut back_origin = use_context::<Signal<CardDetailOrigin>>();
     let nav = use_navigator();
     let cv_id = rec.cv.id();
+    let rate_label = pull_rate_label(rec.max_rate);
     rsx! {
         div {
             class: "flex flex-col p-4 border-b border-gray-100 dark:border-gray-700 \
@@ -859,7 +861,7 @@ fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
                         span { class: "text-gray-500 dark:text-gray-400", " ({rec.excess} excess)" }
                     }
                     div { class: "text-xs text-right text-gray-500 dark:text-gray-400",
-                        "Pull rate: {pull_rate_label(rec.max_rate)}"
+                        "Pull rate: {rate_label}"
                     }
                 }
             }
@@ -869,7 +871,7 @@ fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
                     "#{rank}"
                 }
                 div { class: "flex-1 min-w-0",
-                    CardPanel { cv_id: rec.cv.id() }
+                    CardPanel { cv_id }
                     if rec.is_unobtainable {
                         span { class: "inline-flex items-center mt-1.5 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200",
                             "Retired set — cannot be re-obtained from packs"
@@ -886,7 +888,7 @@ fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
                         span { class: "text-gray-500 dark:text-gray-400", " ({rec.excess} excess)" }
                     }
                     div { class: "text-xs text-right text-gray-500 dark:text-gray-400",
-                        "Pull rate: {pull_rate_label(rec.max_rate)}"
+                        "Pull rate: {rate_label}"
                     }
                 }
             }
