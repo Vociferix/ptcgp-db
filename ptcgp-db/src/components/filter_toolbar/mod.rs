@@ -63,15 +63,17 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
             "flex flex-col gap-3 @2xl:hidden",
         )
     };
-    let (sk_row_cls, sk_panel_cls) = if mode == FilterMode::Summary {
-        (
-            "hidden @3xl:flex items-end gap-2",
-            "flex flex-col gap-3 @3xl:hidden",
-        )
-    } else {
+    let (sk_row_cls, sk_panel_cls) = if mode == FilterMode::Catalog {
         (
             "hidden @4xl:flex items-end gap-2",
             "flex flex-col gap-3 @4xl:hidden",
+        )
+    } else {
+        // Summary has no Name field and Trade has max-w-4xl capping the container;
+        // both have enough room at @3xl (768px) for Series + Kind.
+        (
+            "hidden @3xl:flex items-end gap-2",
+            "flex flex-col gap-3 @3xl:hidden",
         )
     };
 
