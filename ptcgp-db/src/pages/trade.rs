@@ -1,11 +1,9 @@
-use std::cmp::Reverse;
 use std::collections::HashSet;
 
-use chrono::NaiveDate;
 use dioxus::prelude::*;
 use ptcgp_db_core::{
-    AppSettings, ProfileStore, max_card_pull_rate,
-    save_data::{CardKindFilter, FilterConfig},
+    AppSettings, CandidateRec, ProfileStore, ShareRec, TradeRec, build_candidates, build_shares,
+    build_trades, save_data::FilterConfig,
 };
 use ptcgp_db_data::{Card, CardVersion, Prob};
 
@@ -13,451 +11,6 @@ use crate::app::{AppStorage, CardDetailOrigin, TradePageState, schedule_save};
 use crate::components::toggle::Toggle;
 use crate::components::{FilterMode, FilterToolbar};
 use crate::routes::Route;
-
-// ---------------------------------------------------------------------------
-// Filter + count helpers
-// ---------------------------------------------------------------------------
-
-fn today_naive() -> NaiveDate {
-    chrono::Utc::now().date_naive()
-}
-
-fn passes_filter(
-    cv: &CardVersion,
-    cfg: &FilterConfig,
-    settings: &AppSettings,
-    today: NaiveDate,
-    matched_name_ids: Option<&[usize]>,
-) -> bool {
-    if settings.ignore_unobtainable_sets() && cv.set().retirement_date().is_some_and(|d| d <= today)
-    {
-        return false;
-    }
-    if settings.ignore_premium_mission() && cv.source().name().as_str() == "Premium Mission" {
-        return false;
-    }
-    if settings.ignore_gold_shop() && cv.source().name().as_str() == "Gold Shop" {
-        return false;
-    }
-    if matched_name_ids.is_some_and(|ids| !ids.contains(&cv.card().name().id())) {
-        return false;
-    }
-    if cfg.series.is_some_and(|sid| cv.series().id() != sid) {
-        return false;
-    }
-    if !cfg.sets.is_empty() && !cfg.sets.contains(&cv.set().id()) {
-        return false;
-    }
-    if !cfg.packs.is_empty() && !cv.packs().iter().any(|p| cfg.packs.contains(&p.id())) {
-        return false;
-    }
-    if !cfg.rarities.is_empty() && !cfg.rarities.contains(&cv.rarity().class().id()) {
-        return false;
-    }
-    match cfg.card_kind {
-        Some(CardKindFilter::Pokemon) if !cv.card().is_pokemon() => return false,
-        Some(CardKindFilter::Trainer) if !cv.card().is_trainer() => return false,
-        _ => {}
-    }
-    let pkmn = cv.card().pokemon();
-    if let Some(ex_only) = cfg.ex
-        && pkmn.is_none_or(|p| p.is_ex() != ex_only)
-    {
-        return false;
-    }
-    if let Some(mega_only) = cfg.mega
-        && pkmn.is_none_or(|p| p.is_mega() != mega_only)
-    {
-        return false;
-    }
-    if let Some(stage_id) = cfg.stage
-        && pkmn.is_none_or(|p| p.stage().id() != stage_id)
-    {
-        return false;
-    }
-    if !cfg.elements.is_empty() && pkmn.is_none_or(|p| !cfg.elements.contains(&p.element().id())) {
-        return false;
-    }
-    if cfg.foil.is_some_and(|f| cv.is_foil() != f) {
-        return false;
-    }
-    if !cfg.sources.is_empty() && !cfg.sources.contains(&cv.source().id()) {
-        return false;
-    }
-    if let Some(obtainable) = cfg.obtainable {
-        let is_obtainable = cv.set().retirement_date().is_none_or(|d| d > today);
-        if is_obtainable != obtainable {
-            return false;
-        }
-    }
-    true
-}
-
-/// Raw aggregate count for destination (active profiles), with optional merge/any-version.
-fn raw_dest_count(
-    cv: &CardVersion,
-    store: &ProfileStore<AppStorage>,
-    merge_dupes: bool,
-    any_version: bool,
-) -> u32 {
-    if any_version {
-        cv.card()
-            .versions()
-            .iter()
-            .map(|v| store.aggregate_count(v.id()))
-            .fold(0u32, u32::saturating_add)
-    } else if merge_dupes {
-        let mut total = store.aggregate_count(cv.id());
-        for dup in cv.duplicates() {
-            total = total.saturating_add(store.aggregate_count(dup.id()));
-        }
-        total
-    } else {
-        store.aggregate_count(cv.id())
-    }
-}
-
-/// Raw count for a specific (source) profile, with optional merge_dupes.
-fn raw_source_count(
-    cv: &CardVersion,
-    store: &ProfileStore<AppStorage>,
-    profile_name: &str,
-    merge_dupes: bool,
-) -> u32 {
-    if merge_dupes {
-        let mut total = store.owned_count(profile_name, cv.id());
-        for dup in cv.duplicates() {
-            total = total.saturating_add(store.owned_count(profile_name, dup.id()));
-        }
-        total
-    } else {
-        store.owned_count(profile_name, cv.id())
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Data structures
-// ---------------------------------------------------------------------------
-
-#[derive(Clone, PartialEq)]
-struct SourceInfo {
-    name: String,
-    count: u32,
-}
-
-/// A recommended share: one card the destination needs, with a source profile.
-#[derive(Clone, PartialEq)]
-struct ShareRec {
-    cv: &'static CardVersion,
-    dest_count: u32,
-    needed: u32,
-    max_rate: Prob,
-    /// True when max_pull_rate == 0 (top-priority tier).
-    is_zero_rate: bool,
-    best_source: SourceInfo,
-    alt_sources: Vec<SourceInfo>,
-}
-
-/// A recommended trade: two-sided exchange between source profile and destination.
-#[derive(Clone, PartialEq)]
-struct TradeRec {
-    source_name: String,
-    /// Card the destination receives from the source.
-    card_b: &'static CardVersion,
-    card_b_dest_count: u32,
-    card_b_source_count: u32,
-    card_b_max_rate: Prob,
-    card_b_receive_value: f64,
-    /// Card the destination gives to the source.
-    card_a: &'static CardVersion,
-    card_a_dest_count: u32,
-    card_a_source_count: u32,
-    card_a_max_rate: Prob,
-}
-
-/// A card from the destination collection that is a good candidate to give in trades.
-#[derive(Clone, PartialEq)]
-struct CandidateRec {
-    cv: &'static CardVersion,
-    dest_count: u32,
-    excess: u32,
-    max_rate: Prob,
-    is_unobtainable: bool,
-}
-
-// ---------------------------------------------------------------------------
-// Computation
-// ---------------------------------------------------------------------------
-
-fn build_shares(
-    store: &ProfileStore<AppStorage>,
-    settings: &AppSettings,
-    cfg: &FilterConfig,
-    today: NaiveDate,
-    inactive_names: &[String],
-    matched_name_ids: Option<&[usize]>,
-) -> Vec<ShareRec> {
-    let goal = cfg.goal.max(1);
-    let merge_dupes = settings.merge_duplicate_printings();
-    let any_version = cfg.any_version_owned;
-    let mut recs: Vec<ShareRec> = Vec::new();
-
-    for cv in CardVersion::ALL {
-        if merge_dupes && !cv.is_original() && !cv.duplicates().is_empty() {
-            continue;
-        }
-        if !cv.is_tradable() {
-            continue;
-        }
-        if cv.rarity().group().name().as_str() != "Diamond" {
-            continue;
-        }
-        if !passes_filter(cv, cfg, settings, today, matched_name_ids) {
-            continue;
-        }
-
-        let raw = raw_dest_count(cv, store, merge_dupes, any_version);
-        if raw >= goal {
-            continue;
-        }
-        let needed = goal - raw;
-
-        let mut sources: Vec<SourceInfo> = inactive_names
-            .iter()
-            .filter_map(|name| {
-                let cnt = raw_source_count(cv, store, name, merge_dupes);
-                if cnt > 0 {
-                    Some(SourceInfo {
-                        name: name.clone(),
-                        count: cnt,
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        if sources.is_empty() {
-            continue;
-        }
-
-        sources.sort_by_key(|s| Reverse(s.count));
-        let best_source = sources.remove(0);
-        let alt_sources = sources;
-
-        let max_rate = max_card_pull_rate(cv.id());
-        let is_zero_rate = max_rate == Prob::ZERO;
-
-        recs.push(ShareRec {
-            cv,
-            dest_count: raw,
-            needed,
-            max_rate,
-            is_zero_rate,
-            best_source,
-            alt_sources,
-        });
-    }
-
-    recs.sort_by(|a, b| match (a.is_zero_rate, b.is_zero_rate) {
-        (true, false) => std::cmp::Ordering::Less,
-        (false, true) => std::cmp::Ordering::Greater,
-        (true, true) => a.needed.cmp(&b.needed),
-        (false, false) => {
-            let va = 1.0 / (a.max_rate.as_f64() * a.needed as f64);
-            let vb = 1.0 / (b.max_rate.as_f64() * b.needed as f64);
-            vb.partial_cmp(&va).unwrap_or(std::cmp::Ordering::Equal)
-        }
-    });
-    recs
-}
-
-fn build_trades(
-    store: &ProfileStore<AppStorage>,
-    settings: &AppSettings,
-    cfg: &FilterConfig,
-    today: NaiveDate,
-    inactive_names: &[String],
-    matched_name_ids: Option<&[usize]>,
-) -> Vec<TradeRec> {
-    let goal = cfg.goal.max(1);
-    let merge_dupes = settings.merge_duplicate_printings();
-    let any_version = cfg.any_version_owned;
-
-    struct CardData {
-        cv: &'static CardVersion,
-        dest_raw: u32,
-        rarity_class_id: usize,
-        max_rate: Prob,
-    }
-
-    let card_data: Vec<CardData> = CardVersion::ALL
-        .iter()
-        .filter(|cv| {
-            if merge_dupes && !cv.is_original() && !cv.duplicates().is_empty() {
-                return false;
-            }
-            cv.is_tradable() && passes_filter(cv, cfg, settings, today, matched_name_ids)
-        })
-        .map(|cv| CardData {
-            cv,
-            dest_raw: raw_dest_count(cv, store, merge_dupes, any_version),
-            rarity_class_id: cv.rarity().class().id(),
-            max_rate: max_card_pull_rate(cv.id()),
-        })
-        .collect();
-
-    let mut recs: Vec<TradeRec> = Vec::new();
-
-    for source_name in inactive_names {
-        let src_counts: Vec<u32> = card_data
-            .iter()
-            .map(|d| raw_source_count(d.cv, store, source_name, merge_dupes))
-            .collect();
-
-        let rarity_class_ids: Vec<usize> = {
-            let mut seen: HashSet<usize> = HashSet::new();
-            card_data
-                .iter()
-                .map(|d| d.rarity_class_id)
-                .filter(|&id| seen.insert(id))
-                .collect()
-        };
-
-        for rarity_class_id in rarity_class_ids {
-            let best_b = card_data
-                .iter()
-                .zip(src_counts.iter())
-                .filter(|(d, src_cnt)| {
-                    d.rarity_class_id == rarity_class_id && d.dest_raw < goal && **src_cnt > 0
-                })
-                .max_by(|(da, _), (db, _)| {
-                    match (da.max_rate == Prob::ZERO, db.max_rate == Prob::ZERO) {
-                        (true, false) => std::cmp::Ordering::Greater,
-                        (false, true) => std::cmp::Ordering::Less,
-                        _ => {
-                            let va = if da.max_rate == Prob::ZERO {
-                                f64::INFINITY
-                            } else {
-                                1.0 / (da.max_rate.as_f64() * (goal - da.dest_raw) as f64)
-                            };
-                            let vb = if db.max_rate == Prob::ZERO {
-                                f64::INFINITY
-                            } else {
-                                1.0 / (db.max_rate.as_f64() * (goal - db.dest_raw) as f64)
-                            };
-                            va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
-                        }
-                    }
-                });
-
-            let Some((b_data, b_src_count_ref)) = best_b else {
-                continue;
-            };
-            let b_src_count = *b_src_count_ref;
-
-            let b_receive_value = if b_data.max_rate == Prob::ZERO {
-                f64::INFINITY
-            } else {
-                1.0 / (b_data.max_rate.as_f64() * (goal - b_data.dest_raw) as f64)
-            };
-
-            let best_a = card_data
-                .iter()
-                .zip(src_counts.iter())
-                .filter(|(d, src_cnt)| {
-                    d.rarity_class_id == rarity_class_id
-                        && d.dest_raw > goal
-                        && **src_cnt < goal
-                        && d.max_rate != Prob::ZERO
-                })
-                .min_by(|(da, _), (db, _)| {
-                    let va = 1.0 / (da.max_rate.as_f64() * (da.dest_raw - goal) as f64);
-                    let vb = 1.0 / (db.max_rate.as_f64() * (db.dest_raw - goal) as f64);
-                    va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
-                });
-
-            let Some((a_data, a_src_count_ref)) = best_a else {
-                continue;
-            };
-            let a_src_count = *a_src_count_ref;
-
-            recs.push(TradeRec {
-                source_name: source_name.clone(),
-                card_b: b_data.cv,
-                card_b_dest_count: b_data.dest_raw,
-                card_b_source_count: b_src_count,
-                card_b_max_rate: b_data.max_rate,
-                card_b_receive_value: b_receive_value,
-                card_a: a_data.cv,
-                card_a_dest_count: a_data.dest_raw,
-                card_a_source_count: a_src_count,
-                card_a_max_rate: a_data.max_rate,
-            });
-        }
-    }
-
-    recs.sort_by(|a, b| {
-        b.card_b_receive_value
-            .partial_cmp(&a.card_b_receive_value)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    recs
-}
-
-fn build_candidates(
-    store: &ProfileStore<AppStorage>,
-    settings: &AppSettings,
-    cfg: &FilterConfig,
-    today: NaiveDate,
-    matched_name_ids: Option<&[usize]>,
-    show_unobtainable: bool,
-) -> Vec<CandidateRec> {
-    let goal = cfg.goal.max(1);
-    let merge_dupes = settings.merge_duplicate_printings();
-    let any_version = cfg.any_version_owned;
-    let mut recs: Vec<CandidateRec> = Vec::new();
-
-    for cv in CardVersion::ALL {
-        if merge_dupes && !cv.is_original() && !cv.duplicates().is_empty() {
-            continue;
-        }
-        if !passes_filter(cv, cfg, settings, today, matched_name_ids) {
-            continue;
-        }
-
-        let raw = raw_dest_count(cv, store, merge_dupes, any_version);
-        if raw <= goal {
-            continue;
-        }
-        let excess = raw - goal;
-
-        let max_rate = max_card_pull_rate(cv.id());
-        if max_rate == Prob::ZERO {
-            continue;
-        }
-
-        let is_unobtainable = cv.set().retirement_date().is_some_and(|d| d <= today);
-        if is_unobtainable && !show_unobtainable {
-            continue;
-        }
-
-        recs.push(CandidateRec {
-            cv,
-            dest_count: raw,
-            excess,
-            max_rate,
-            is_unobtainable,
-        });
-    }
-
-    recs.sort_by(|a, b| {
-        let va = 1.0 / (a.max_rate.as_f64() * a.excess as f64);
-        let vb = 1.0 / (b.max_rate.as_f64() * b.excess as f64);
-        va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
-    });
-    recs
-}
 
 // ---------------------------------------------------------------------------
 // Tab state
@@ -495,7 +48,7 @@ fn TabBtn(label: &'static str, tab: Tab, active_tab: Signal<Tab>) -> Element {
 // Shared card panel
 // ---------------------------------------------------------------------------
 
-/// Card image + name + code + set/rarity icons, sized to match the catalog list.
+/// Card image + name + code + set/rarity icons.
 #[component]
 fn CardPanel(cv_id: usize) -> Element {
     let Some(cv) = CardVersion::from_id(cv_id) else {
@@ -613,11 +166,9 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
                 }
                 div { class: "flex-1 min-w-0",
                     CardPanel { cv_id }
-                    // Pull rate under card (mobile only)
                     div { class: "sm:hidden mt-1 text-xs text-gray-500 dark:text-gray-400",
                         "Pull rate: {rate_label}"
                     }
-                    // Alt sources under card (mobile only)
                     if !rec.alt_sources.is_empty() {
                         div { class: "sm:hidden mt-0.5 text-xs text-gray-400 dark:text-gray-500 break-words",
                             "Also: "
@@ -635,7 +186,6 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
                         }
                     }
                 }
-                // Desktop stats sidebar (hidden on mobile)
                 div { class: "hidden sm:flex flex-col items-end gap-1.5 shrink-0 min-w-[11rem]",
                     button {
                         r#type: "button",
@@ -684,7 +234,7 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
 // Trades tab
 // ---------------------------------------------------------------------------
 
-/// Compact card half-panel for use inside the two-column trade layout.
+/// Compact card half-panel for the two-column trade layout.
 #[component]
 fn TradeCardHalf(
     cv_id: usize,
@@ -771,7 +321,6 @@ fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> El
 
     rsx! {
         div { class: "p-4 border-b border-gray-100 dark:border-gray-700 last:border-0",
-            // Header row: rank + profiles + rarity icon + Transfer button
             div { class: "flex items-center gap-2 mb-3",
                 span { class: "shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
                     "#{rank}"
@@ -800,7 +349,6 @@ fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> El
                     "Transfer"
                 }
             }
-            // Card layout — stacked on mobile, two columns on sm+
             div { class: "grid grid-cols-1 sm:grid-cols-2 gap-3",
                 div {
                     class: "bg-green-50 dark:bg-green-950/20 rounded-md p-2 cursor-pointer \
@@ -878,7 +426,7 @@ fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
                         }),
                 );
             },
-            // Mobile header (hidden sm+): rank left, owned/pull rate right
+            // Mobile header (hidden sm+)
             div { class: "sm:hidden flex items-start justify-between gap-2 mb-3",
                 span { class: "shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
                     "#{rank}"
@@ -896,7 +444,6 @@ fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
                     }
                 }
             }
-            // Body: desktop rank badge + card panel + desktop stats sidebar
             div { class: "flex items-start gap-3",
                 span { class: "hidden sm:flex shrink-0 w-8 h-8 items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
                     "#{rank}"
@@ -909,7 +456,6 @@ fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) -> Element {
                         }
                     }
                 }
-                // Desktop stats sidebar (hidden on mobile)
                 div { class: "hidden sm:flex flex-col items-end gap-1.5 shrink-0",
                     div { class: "text-xs text-right",
                         span { class: "text-gray-500 dark:text-gray-400", "{dest_name}: " }
@@ -988,7 +534,7 @@ pub fn TradePage() -> Element {
         };
     };
 
-    let today = today_naive();
+    let today = chrono::Utc::now().date_naive();
 
     let active_set: HashSet<&str> = store_ref
         .active_profile_names()
@@ -1006,7 +552,6 @@ pub fn TradePage() -> Element {
     let single_profile = store_ref.profiles().len() == 1;
     let multi_active = store_ref.active_profile_names().len() > 1;
 
-    // Destination display + transfer target: single active profile name, or "Active profiles".
     let dest_name = match store_ref.active_profile_names() {
         [name] => name.clone(),
         _ => "Active profiles".to_string(),
@@ -1079,7 +624,6 @@ pub fn TradePage() -> Element {
 
             FilterToolbar { config, mode: FilterMode::Trade }
 
-            // ── Tab bar ───────────────────────────────────────────────────────
             div { class: "border-b border-gray-200 dark:border-gray-700 overflow-x-auto",
                 div { class: "flex min-w-max",
                     TabBtn { label: "Shares", tab: Tab::Shares, active_tab }
@@ -1092,7 +636,6 @@ pub fn TradePage() -> Element {
                 }
             }
 
-            // ── Tab content ───────────────────────────────────────────────────
             match *active_tab.read() {
                 Tab::Shares => rsx! {
                     div { class: "{card_cls}",
@@ -1154,7 +697,6 @@ pub fn TradePage() -> Element {
                 },
                 Tab::Candidates => rsx! {
                     div {
-                        // Unobtainable toggle
                         div { class: "flex items-center gap-2 mb-3",
                             Toggle {
                                 checked: *show_unobtainable.read(),

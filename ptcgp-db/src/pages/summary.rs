@@ -1,12 +1,9 @@
-use std::collections::{HashMap, HashSet};
-
-use chrono::NaiveDate;
 use dioxus::prelude::*;
-use ptcgp_db_core::save_data::{CardKindFilter, CardVersionId, FilterConfig, SavedQueriesSaveData};
+use ptcgp_db_core::save_data::{FilterConfig, SavedQueriesSaveData};
 use ptcgp_db_core::{
-    AppSettings, ProfileStore, SavedQueries, completion, completion_merged, desired_pull_rate,
+    AppSettings, PackRowData, ProfileStore, SavedQueries, SummaryData, compute_summary,
 };
-use ptcgp_db_data::{CardVersion, Pack, Prob, Set};
+use ptcgp_db_data::{Pack, Set};
 
 #[cfg(target_arch = "wasm32")]
 use ptcgp_db_core::storage::Storage as _;
@@ -28,39 +25,27 @@ const TRIGGER_CLS: &str = "flex items-center gap-1 px-2 h-8 rounded-md text-sm f
 // Navigation helpers
 // ---------------------------------------------------------------------------
 
-/// Navigate to the catalog with the given pack selected, preserving the
-/// summary's active filters (series, rarities, elements, etc.) but dropping
-/// goal, any-version, owned-count, and name-query (which are summary-only).
-/// The clicked pack overrides any pack filter; sets are cleared (pack implies set).
-fn apply_pack_filter(
-    pack_id: usize,
-    summary_config: Signal<FilterConfig>,
-    mut catalog_filter: Signal<FilterConfig>,
-) {
-    let summary = summary_config.read();
-    *catalog_filter.write() = FilterConfig {
-        packs: vec![pack_id],
-        sets: vec![],
-        goal: 1,
-        any_version_owned: false,
-        owned_count: None,
-        name_query: None,
-        ..summary.clone()
-    };
+enum CatalogNav {
+    Pack(usize),
+    Set(usize),
 }
 
-/// Navigate to the catalog with the given set selected, preserving the
-/// summary's active filters. The clicked set overrides any set filter;
-/// packs are cleared (set is the broader scope).
-fn apply_set_filter(
-    set_id: usize,
+/// Navigate to the catalog with a pack or set pre-selected, preserving the summary's active
+/// filters (series, rarities, elements, etc.) but dropping goal, any-version, owned-count,
+/// and name-query (which are summary-only).
+fn apply_catalog_filter(
+    nav: CatalogNav,
     summary_config: Signal<FilterConfig>,
     mut catalog_filter: Signal<FilterConfig>,
 ) {
     let summary = summary_config.read();
+    let (packs, sets) = match nav {
+        CatalogNav::Pack(id) => (vec![id], vec![]),
+        CatalogNav::Set(id) => (vec![], vec![id]),
+    };
     *catalog_filter.write() = FilterConfig {
-        sets: vec![set_id],
-        packs: vec![],
+        packs,
+        sets,
         goal: 1,
         any_version_owned: false,
         owned_count: None,
@@ -70,137 +55,7 @@ fn apply_set_filter(
 }
 
 // ---------------------------------------------------------------------------
-// Filter helpers
-// ---------------------------------------------------------------------------
-
-fn today_naive() -> NaiveDate {
-    chrono::Utc::now().date_naive()
-}
-
-fn set_is_obtainable(set: &Set, today: NaiveDate) -> bool {
-    set.retirement_date().is_none_or(|r| r > today)
-}
-
-/// Returns true when a card version passes the current filter config.
-/// Does not check goal — that is handled separately.
-fn passes_filter(
-    cv: &CardVersion,
-    cfg: &FilterConfig,
-    settings: &AppSettings,
-    today: NaiveDate,
-) -> bool {
-    if settings.ignore_unobtainable_sets() && cv.set().retirement_date().is_some_and(|d| d <= today)
-    {
-        return false;
-    }
-    if settings.ignore_premium_mission() && cv.source().name().as_str() == "Premium Mission" {
-        return false;
-    }
-    if settings.ignore_gold_shop() && cv.source().name().as_str() == "Gold Shop" {
-        return false;
-    }
-    if cfg.series.is_some_and(|sid| cv.series().id() != sid) {
-        return false;
-    }
-    if !cfg.sets.is_empty() && !cfg.sets.contains(&cv.set().id()) {
-        return false;
-    }
-    if !cfg.packs.is_empty() && !cv.packs().iter().any(|p| cfg.packs.contains(&p.id())) {
-        return false;
-    }
-    if !cfg.rarities.is_empty() && !cfg.rarities.contains(&cv.rarity().class().id()) {
-        return false;
-    }
-    match cfg.card_kind {
-        Some(CardKindFilter::Pokemon) if !cv.card().is_pokemon() => return false,
-        Some(CardKindFilter::Trainer) if !cv.card().is_trainer() => return false,
-        _ => {}
-    }
-    let pkmn = cv.card().pokemon();
-    if let Some(ex_only) = cfg.ex
-        && pkmn.is_none_or(|p| p.is_ex() != ex_only)
-    {
-        return false;
-    }
-    if let Some(mega_only) = cfg.mega
-        && pkmn.is_none_or(|p| p.is_mega() != mega_only)
-    {
-        return false;
-    }
-    if let Some(stage_id) = cfg.stage
-        && pkmn.is_none_or(|p| p.stage().id() != stage_id)
-    {
-        return false;
-    }
-    if !cfg.elements.is_empty() && pkmn.is_none_or(|p| !cfg.elements.contains(&p.element().id())) {
-        return false;
-    }
-    if cfg.foil.is_some_and(|f| cv.is_foil() != f) {
-        return false;
-    }
-    if !cfg.sources.is_empty() && !cfg.sources.contains(&cv.source().id()) {
-        return false;
-    }
-    if let Some(obtainable) = cfg.obtainable {
-        let is_obtainable = cv.set().retirement_date().is_none_or(|d| d > today);
-        if is_obtainable != obtainable {
-            return false;
-        }
-    }
-    true
-}
-
-/// Effective owned count for a card version: handles `any_version_owned`, clamped to goal.
-fn effective_count(
-    cv_id: CardVersionId,
-    cfg: &FilterConfig,
-    store: &ProfileStore<AppStorage>,
-) -> u32 {
-    let goal = cfg.goal.max(1);
-    if cfg.any_version_owned {
-        let Some(cv) = CardVersion::from_id(cv_id) else {
-            return 0;
-        };
-        cv.card()
-            .versions()
-            .iter()
-            .map(|v| store.aggregate_count(v.id()))
-            .fold(0u32, u32::saturating_add)
-            .min(goal)
-    } else {
-        store.aggregate_count(cv_id).min(goal)
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Data structures
-// ---------------------------------------------------------------------------
-
-#[derive(Clone, PartialEq)]
-struct PackRowData {
-    pack: &'static Pack,
-    /// Completion % from the formula: Σ min(count, goal) / (n × goal).
-    completion_pct: f64,
-    /// Completion formula numerator: Σ min(effective_count, goal) for matching cards in pack.
-    owned: usize,
-    /// Completion formula denominator: matching_cards_in_pack × goal.
-    total: usize,
-    rate_pct: f64,
-}
-
-struct SetRowData {
-    set: &'static Set,
-    completion_pct: f64,
-    owned: usize,
-    total: usize,
-    obtainable: bool,
-    best_pack: Option<&'static Pack>,
-    best_rate_pct: f64,
-    pack_rows: Vec<PackRowData>,
-}
-
-// ---------------------------------------------------------------------------
-// Saved queries — custom dropdown matching the toolbar Set/Pack style
+// Saved-query persistence
 // ---------------------------------------------------------------------------
 
 fn default_filter_config() -> FilterConfig {
@@ -211,8 +66,7 @@ fn default_filter_config() -> FilterConfig {
     }
 }
 
-/// Persist saved queries after any mutation. Uses a synchronous write on desktop
-/// (FileStorage is sync under the hood) and spawn_local on WASM (IndexedDB is async).
+/// Persist saved queries after any mutation.
 #[cfg(not(target_arch = "wasm32"))]
 fn save_queries_data(data: SavedQueriesSaveData, store: Signal<Option<ProfileStore<AppStorage>>>) {
     let storage = store.read().as_ref().map(|s| s.storage().clone());
@@ -233,6 +87,10 @@ fn save_queries_data(data: SavedQueriesSaveData, store: Signal<Option<ProfileSto
     });
 }
 
+// ---------------------------------------------------------------------------
+// Saved-queries dropdown
+// ---------------------------------------------------------------------------
+
 #[component]
 fn SavedQueryItem(
     name: String,
@@ -243,11 +101,9 @@ fn SavedQueryItem(
     mut open: Signal<bool>,
     mut active_query: Signal<Option<String>>,
 ) -> Element {
-    // Clone for the load closure; `name` itself is moved into the delete closure below.
     let name_for_load = name.clone();
     rsx! {
         div { class: "flex items-center gap-1 px-3 py-2 select-none hover:bg-gray-50 dark:hover:bg-gray-700",
-            // Name area — clicking loads the query
             div {
                 class: "flex-1 min-w-0 cursor-pointer",
                 onclick: move |_| {
@@ -259,7 +115,6 @@ fn SavedQueryItem(
                     "{name}"
                 }
             }
-            // Delete button
             button {
                 r#type: "button",
                 class: "shrink-0 w-5 h-5 flex items-center justify-center rounded \
@@ -303,7 +158,6 @@ fn SavedQueriesDropdown(
         .collect();
     let count = query_list.len();
 
-    // Determine the trigger label and whether the loaded query has been modified.
     let active_name = active_query.read().clone();
     let (label, is_modified) = match &active_name {
         None => ("Queries".to_string(), false),
@@ -344,17 +198,14 @@ fn SavedQueriesDropdown(
             }
 
             if *open.read() {
-                // Dismiss backdrop
                 div {
                     class: "fixed inset-0 z-10",
                     onclick: move |_| open.set(false),
                 }
-                // Panel
                 div { class: "absolute left-0 top-full mt-1 z-20 max-h-80 overflow-y-auto \
                               overflow-x-hidden rounded-md border border-gray-200 \
                               dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg py-1 \
                               min-w-48",
-                    // Default — always first; resets config and active query
                     div {
                         class: "flex items-center px-3 py-2 cursor-pointer select-none \
                                 hover:bg-gray-50 dark:hover:bg-gray-700",
@@ -368,7 +219,6 @@ fn SavedQueriesDropdown(
                         }
                     }
 
-                    // Saved queries
                     if !query_list.is_empty() {
                         div { class: "border-t border-gray-100 dark:border-gray-700 mt-1 pt-1",
                             for (name, cfg_snapshot) in query_list {
@@ -508,7 +358,7 @@ fn PackSubRow(
     let catalog_filter = use_context::<Signal<FilterConfig>>();
     let pack_id = pack.id();
     let on_click = move |_| {
-        apply_pack_filter(pack_id, summary_config, catalog_filter);
+        apply_catalog_filter(CatalogNav::Pack(pack_id), summary_config, catalog_filter);
         drop(nav.push(Route::CatalogPage {}));
     };
     rsx! {
@@ -572,7 +422,7 @@ fn SetCompletionRow(
     let is_expandable = !pack_rows.is_empty();
     let set_id = set.id();
     let on_click = move |_| {
-        apply_set_filter(set_id, summary_config, catalog_filter);
+        apply_catalog_filter(CatalogNav::Set(set_id), summary_config, catalog_filter);
         drop(nav.push(Route::CatalogPage {}));
     };
 
@@ -675,9 +525,7 @@ pub fn SummaryPage() -> Element {
     let settings_guard = settings.read();
     let cfg = config.read();
 
-    let merge_dupes = settings_guard.merge_duplicate_printings();
-    let goal = cfg.goal.max(1);
-    let today = today_naive();
+    let today = chrono::Utc::now().date_naive();
 
     let Some(store_ref) = store_guard.as_ref() else {
         return rsx! {
@@ -685,168 +533,18 @@ pub fn SummaryPage() -> Element {
         };
     };
 
-    let counts = |id: CardVersionId| store_ref.aggregate_count(id);
+    let SummaryData {
+        set_rows,
+        best_packs,
+        total_owned,
+        total_denom,
+    } = compute_summary(store_ref, &cfg, &settings_guard, today);
 
-    // ── Per-set rows ────────────────────────────────────────────────────────
-    // Desired IDs are accumulated here so the best-pack section below avoids a
-    // separate third pass over all card data.
-    let mut all_desired_ids: HashSet<CardVersionId> = HashSet::new();
-
-    let set_rows: Vec<SetRowData> = Set::ALL
-        .iter()
-        .filter_map(|set| {
-            let matching_cvs: Vec<&CardVersion> = set
-                .card_versions()
-                .iter()
-                .filter(|cv| passes_filter(cv, &cfg, &settings_guard, today))
-                .collect();
-
-            if matching_cvs.is_empty() {
-                return None;
-            }
-
-            // Build a per-card effective-count cache in one pass. The map also
-            // serves as an O(1) membership check for pack-card filtering, replacing
-            // repeated passes_filter calls inside pack_rows below.
-            let eff_counts: HashMap<CardVersionId, u32> = matching_cvs
-                .iter()
-                .map(|cv| (cv.id(), effective_count(cv.id(), &cfg, store_ref)))
-                .collect();
-
-            // Completion formula: numerator = Σ min(effective_count, goal),
-            // denominator = n × goal. This correctly weights partial progress
-            // (e.g. owning 1 copy with goal=2 contributes 0.5 completion).
-            let owned: usize = eff_counts.values().map(|&c| c as usize).sum();
-            let total = matching_cvs.len() * goal as usize;
-
-            let comp = if merge_dupes {
-                completion_merged(counts, goal, matching_cvs.iter().map(|cv| cv.id()))
-            } else {
-                completion(counts, goal, matching_cvs.iter().map(|cv| cv.id()))
-            };
-
-            let obtainable = set_is_obtainable(set, today);
-
-            // Accumulate desired IDs for the global best-pack pass.
-            all_desired_ids.extend(
-                eff_counts
-                    .iter()
-                    .filter(|&(_, &c)| c < goal)
-                    .map(|(&id, _)| id),
-            );
-            let has_desired = eff_counts.values().any(|&c| c < goal);
-
-            let (best_pack, best_rate_pct) = if set.is_promo() || !has_desired {
-                (None, 0.0)
-            } else {
-                let result = set
-                    .packs()
-                    .iter()
-                    .filter_map(|p| {
-                        let rate = desired_pull_rate(p, |id| {
-                            eff_counts.get(&id).is_some_and(|&c| c < goal)
-                        });
-                        if rate == Prob::ZERO {
-                            None
-                        } else {
-                            Some((p, rate))
-                        }
-                    })
-                    .max_by(|(_, a), (_, b)| a.cmp(b));
-                match result {
-                    Some((pack, rate)) => (Some(pack), rate.as_f64() * 100.0),
-                    None => (None, 0.0),
-                }
-            };
-
-            let pack_rows: Vec<PackRowData> = set
-                .packs()
-                .iter()
-                .map(|p| {
-                    // Filter pack cards via eff_counts membership (O(1) HashMap lookup)
-                    // instead of re-running passes_filter on each card.
-                    let p_matching_ids: Vec<CardVersionId> = p
-                        .card_versions()
-                        .iter()
-                        .filter(|cv| eff_counts.contains_key(&cv.id()))
-                        .map(|cv| cv.id())
-                        .collect();
-
-                    let p_owned: usize = p_matching_ids
-                        .iter()
-                        .map(|id| eff_counts.get(id).copied().unwrap_or(0) as usize)
-                        .sum();
-                    let p_total = p_matching_ids.len() * goal as usize;
-
-                    let p_comp = if merge_dupes {
-                        completion_merged(counts, goal, p_matching_ids.iter().copied())
-                    } else {
-                        completion(counts, goal, p_matching_ids.iter().copied())
-                    };
-
-                    let p_rate =
-                        desired_pull_rate(p, |id| eff_counts.get(&id).is_some_and(|&c| c < goal));
-
-                    PackRowData {
-                        pack: p,
-                        completion_pct: p_comp.as_f64() * 100.0,
-                        owned: p_owned,
-                        total: p_total,
-                        rate_pct: p_rate.as_f64() * 100.0,
-                    }
-                })
-                .collect();
-
-            Some(SetRowData {
-                set,
-                completion_pct: comp.as_f64() * 100.0,
-                owned,
-                total,
-                obtainable,
-                best_pack,
-                best_rate_pct,
-                pack_rows,
-            })
-        })
-        .collect();
-
-    // ── Overall totals ───────────────────────────────────────────────────────
-    // Sum the per-set numerators/denominators for a globally consistent completion %.
-
-    let total_owned: usize = set_rows.iter().map(|r| r.owned).sum();
-    let total_denom: usize = set_rows.iter().map(|r| r.total).sum();
     let overall_pct = if total_denom > 0 {
         total_owned as f64 / total_denom as f64 * 100.0
     } else {
         0.0
     };
-
-    // ── Best pack overall ────────────────────────────────────────────────────
-    // all_desired_ids was accumulated during the set_rows pass above. Compute all
-    // non-promo pack rates in a single pass, then find ties at the maximum.
-    let all_pack_rates: Vec<(&'static Pack, Prob)> = Pack::ALL
-        .iter()
-        .filter(|p| !p.set().is_promo())
-        .filter_map(|p| {
-            let rate = desired_pull_rate(p, |id| all_desired_ids.contains(&id));
-            if rate == Prob::ZERO {
-                None
-            } else {
-                Some((p, rate))
-            }
-        })
-        .collect();
-
-    let best_packs: Vec<(&'static Pack, Prob)> =
-        if let Some(&(_, best)) = all_pack_rates.iter().max_by(|(_, a), (_, b)| a.cmp(b)) {
-            all_pack_rates
-                .into_iter()
-                .filter(|(_, r)| *r == best)
-                .collect()
-        } else {
-            vec![]
-        };
-
     let collection_complete =
         best_packs.is_empty() && total_denom > 0 && total_owned == total_denom;
 
@@ -864,7 +562,6 @@ pub fn SummaryPage() -> Element {
         div { class: "max-w-4xl mx-auto p-4 sm:p-6 space-y-6",
             h1 { class: "text-2xl font-bold text-gray-900 dark:text-gray-100", "Summary" }
 
-            // ── Filter toolbar + saved queries controls ───────────────────────
             div { class: "flex flex-col gap-1.5",
                 FilterToolbar { config, mode: FilterMode::Summary }
                 div { class: "flex items-center gap-1.5",
@@ -885,7 +582,6 @@ pub fn SummaryPage() -> Element {
                 }
             }
 
-            // ── Overall totals ────────────────────────────────────────────────
             section {
                 h2 { class: "text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3",
                     "Overall"
@@ -914,7 +610,6 @@ pub fn SummaryPage() -> Element {
                 }
             }
 
-            // ── Next pack ─────────────────────────────────────────────────────
             section {
                 h2 { class: "text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3",
                     "Next pack to open"
@@ -939,7 +634,7 @@ pub fn SummaryPage() -> Element {
                                     key: "{pack.id()}",
                                     class: "flex items-start gap-4 py-4 cursor-pointer rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/60",
                                     onclick: move |_| {
-                                        apply_pack_filter(pack.id(), config, catalog_filter);
+                                        apply_catalog_filter(CatalogNav::Pack(pack.id()), config, catalog_filter);
                                         drop(nav.push(Route::CatalogPage {}));
                                     },
                                     img {
@@ -969,7 +664,6 @@ pub fn SummaryPage() -> Element {
                 }
             }
 
-            // ── Set completion table ──────────────────────────────────────────
             section {
                 h2 { class: "text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3",
                     "Set completion"
