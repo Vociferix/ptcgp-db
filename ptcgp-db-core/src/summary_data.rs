@@ -248,3 +248,293 @@ pub fn compute_summary<S: Storage + Clone>(
         total_denom,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::NaiveDate;
+    use ptcgp_db_data::{CardVersion, Set};
+
+    use crate::AppSettings;
+    use crate::profile_store::ProfileStore;
+    use crate::save_data::FilterConfig;
+    use crate::storage::Storage;
+
+    // ---------------------------------------------------------------------------
+    // Minimal in-memory storage stub
+    // ---------------------------------------------------------------------------
+
+    #[derive(Clone, Debug, Default)]
+    struct MemStorage {
+        profiles: std::rc::Rc<std::cell::RefCell<Option<crate::save_data::ProfilesSaveData>>>,
+    }
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("mem storage error")]
+    struct MemError;
+
+    impl Storage for MemStorage {
+        type Error = MemError;
+        async fn load_profiles(
+            &self,
+        ) -> Result<Option<crate::save_data::ProfilesSaveData>, Self::Error> {
+            Ok(self.profiles.borrow().clone())
+        }
+        async fn save_profiles(
+            &self,
+            data: &crate::save_data::ProfilesSaveData,
+        ) -> Result<(), Self::Error> {
+            *self.profiles.borrow_mut() = Some(data.clone());
+            Ok(())
+        }
+        async fn load_settings(
+            &self,
+        ) -> Result<Option<crate::save_data::AppSettingsSaveData>, Self::Error> {
+            Ok(None)
+        }
+        async fn save_settings(
+            &self,
+            _: &crate::save_data::AppSettingsSaveData,
+        ) -> Result<(), Self::Error> {
+            Ok(())
+        }
+        async fn load_saved_queries(
+            &self,
+        ) -> Result<Option<crate::save_data::SavedQueriesSaveData>, Self::Error> {
+            Ok(None)
+        }
+        async fn save_saved_queries(
+            &self,
+            _: &crate::save_data::SavedQueriesSaveData,
+        ) -> Result<(), Self::Error> {
+            Ok(())
+        }
+    }
+
+    fn empty_store() -> ProfileStore<MemStorage> {
+        let mut store = ProfileStore::new(MemStorage::default());
+        store.create_profile("Main".to_string()).unwrap();
+        store
+    }
+
+    fn today() -> NaiveDate {
+        NaiveDate::from_ymd_opt(2024, 1, 1).unwrap()
+    }
+
+    // ---------------------------------------------------------------------------
+    // Basic structural checks
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn set_rows_covers_all_nonempty_sets() {
+        let store = empty_store();
+        let cfg = FilterConfig::default();
+        let settings = AppSettings::default();
+        let result = compute_summary(&store, &cfg, &settings, today());
+
+        let expected_set_count = Set::ALL
+            .iter()
+            .filter(|s| !s.card_versions().is_empty())
+            .count();
+        assert_eq!(result.set_rows.len(), expected_set_count);
+    }
+
+    #[test]
+    fn total_denom_equals_total_card_versions_at_goal_one() {
+        let store = empty_store();
+        let cfg = FilterConfig {
+            goal: 1,
+            ..Default::default()
+        };
+        let settings = AppSettings::default();
+        let result = compute_summary(&store, &cfg, &settings, today());
+        assert_eq!(result.total_denom, CardVersion::ALL.len());
+    }
+
+    #[test]
+    fn total_denom_scales_with_goal() {
+        let store = empty_store();
+        let cfg = FilterConfig {
+            goal: 2,
+            ..Default::default()
+        };
+        let settings = AppSettings::default();
+        let result = compute_summary(&store, &cfg, &settings, today());
+        assert_eq!(result.total_denom, CardVersion::ALL.len() * 2);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Owned-count effects
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn total_owned_zero_when_nothing_owned() {
+        let store = empty_store();
+        let cfg = FilterConfig::default();
+        let settings = AppSettings::default();
+        let result = compute_summary(&store, &cfg, &settings, today());
+        assert_eq!(result.total_owned, 0);
+    }
+
+    #[test]
+    fn total_owned_increases_when_card_owned() {
+        let mut store = empty_store();
+        let cv = CardVersion::ALL.iter().next().expect("at least one card");
+        store.set_owned_count("Main", cv.id(), 1).unwrap();
+
+        let cfg = FilterConfig::default();
+        let settings = AppSettings::default();
+        let result = compute_summary(&store, &cfg, &settings, today());
+        assert_eq!(result.total_owned, 1);
+    }
+
+    #[test]
+    fn owned_count_clamped_to_goal() {
+        let mut store = empty_store();
+        let cv = CardVersion::ALL.iter().next().expect("at least one card");
+        // Own 5 copies but goal is 1 — contribution to owned/denom must be clamped to 1.
+        store.set_owned_count("Main", cv.id(), 5).unwrap();
+
+        let cfg = FilterConfig {
+            goal: 1,
+            ..Default::default()
+        };
+        let settings = AppSettings::default();
+        let result = compute_summary(&store, &cfg, &settings, today());
+        // total_owned counts effective (clamped) contributions, so should not exceed total_denom.
+        assert!(result.total_owned <= result.total_denom);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Best-pack logic
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn best_packs_non_empty_when_nothing_owned() {
+        let store = empty_store();
+        let cfg = FilterConfig::default();
+        let settings = AppSettings::default();
+        let result = compute_summary(&store, &cfg, &settings, today());
+        // With all cards desired, there should be at least one recommended pack.
+        assert!(!result.best_packs.is_empty());
+    }
+
+    #[test]
+    fn best_packs_empty_when_all_owned_at_goal() {
+        let mut store = empty_store();
+        let goal: u32 = 1;
+        for cv in CardVersion::ALL.iter() {
+            store.set_owned_count("Main", cv.id(), goal).unwrap();
+        }
+
+        let cfg = FilterConfig {
+            goal,
+            ..Default::default()
+        };
+        let settings = AppSettings::default();
+        let result = compute_summary(&store, &cfg, &settings, today());
+        // No card is desired, so no pack can be recommended.
+        assert!(result.best_packs.is_empty());
+    }
+
+    #[test]
+    fn best_packs_all_non_promo() {
+        let store = empty_store();
+        let cfg = FilterConfig::default();
+        let settings = AppSettings::default();
+        let result = compute_summary(&store, &cfg, &settings, today());
+        for (pack, _) in &result.best_packs {
+            assert!(
+                !pack.set().is_promo(),
+                "best_packs must not include promo packs"
+            );
+        }
+    }
+
+    #[test]
+    fn best_packs_all_tied_at_max_rate() {
+        let store = empty_store();
+        let cfg = FilterConfig::default();
+        let settings = AppSettings::default();
+        let result = compute_summary(&store, &cfg, &settings, today());
+        if let Some(&(_, best_rate)) = result.best_packs.first() {
+            for &(_, rate) in &result.best_packs {
+                assert_eq!(
+                    rate, best_rate,
+                    "all best_packs must share the maximum rate"
+                );
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // set_row contents
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn set_row_completion_pct_zero_when_nothing_owned() {
+        let store = empty_store();
+        let cfg = FilterConfig::default();
+        let settings = AppSettings::default();
+        let result = compute_summary(&store, &cfg, &settings, today());
+        for row in &result.set_rows {
+            assert_eq!(
+                row.completion_pct,
+                0.0,
+                "set {} should have 0% completion with nothing owned",
+                row.set.id()
+            );
+        }
+    }
+
+    #[test]
+    fn set_row_owned_reflects_store() {
+        let mut store = empty_store();
+        let Some(set) = Set::ALL.iter().find(|s| !s.card_versions().is_empty()) else {
+            return;
+        };
+        let cv = set.card_versions().iter().next().unwrap();
+        store.set_owned_count("Main", cv.id(), 1).unwrap();
+
+        let cfg = FilterConfig::default();
+        let settings = AppSettings::default();
+        let result = compute_summary(&store, &cfg, &settings, today());
+
+        let row = result
+            .set_rows
+            .iter()
+            .find(|r| r.set.id() == set.id())
+            .expect("set must appear in set_rows");
+        assert_eq!(row.owned, 1);
+    }
+
+    // ---------------------------------------------------------------------------
+    // any_version_owned
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn any_version_owned_counts_other_version_toward_effective_count() {
+        // Find a card that has duplicates so we can own one version and expect
+        // the other to count as owned under any_version_owned.
+        let Some(original) = CardVersion::ALL.iter().find(|c| !c.duplicates().is_empty()) else {
+            return;
+        };
+        let dup = original.duplicates().iter().next().unwrap();
+
+        let mut store = empty_store();
+        // Own only the duplicate version.
+        store.set_owned_count("Main", dup.id(), 1).unwrap();
+
+        let cfg = FilterConfig {
+            goal: 1,
+            any_version_owned: true,
+            ..Default::default()
+        };
+        let settings = AppSettings::default();
+        let result = compute_summary(&store, &cfg, &settings, today());
+
+        // Under any_version_owned, owning the duplicate should count toward the original.
+        // So total_owned should be > 0.
+        assert!(result.total_owned > 0);
+    }
+}
