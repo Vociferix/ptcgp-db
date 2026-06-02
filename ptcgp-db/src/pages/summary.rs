@@ -529,7 +529,7 @@ fn PackSubRow(
             }
             div { class: "text-right whitespace-nowrap shrink-0",
                 span { class: "text-sm font-medium text-gray-900 dark:text-gray-100",
-                    "{completion_pct:.1}%"
+                    "{completion_pct:.3}%"
                 }
                 span { class: "text-xs text-gray-400 dark:text-gray-500 ml-1.5", "{owned}/{total}" }
             }
@@ -541,7 +541,7 @@ fn PackSubRow(
                 } else if rate_pct <= 0.0 {
                     span { class: "text-sm text-gray-400 dark:text-gray-500", "—" }
                 } else {
-                    span { class: "text-sm text-gray-900 dark:text-gray-100", "{rate_pct:.2}%" }
+                    span { class: "text-sm text-gray-900 dark:text-gray-100", "{rate_pct:.3}%" }
                 }
             }
         }
@@ -614,7 +614,7 @@ fn SetCompletionRow(
                 }
                 div { class: "text-right whitespace-nowrap",
                     span { class: "text-sm font-medium text-gray-900 dark:text-gray-100",
-                        "{completion_pct:.1}%"
+                        "{completion_pct:.3}%"
                     }
                     span { class: "text-xs text-gray-400 dark:text-gray-500 ml-1.5",
                         "{owned}/{total}"
@@ -628,7 +628,7 @@ fn SetCompletionRow(
                             "Complete"
                         }
                     } else {
-                        span { class: "text-sm text-gray-900 dark:text-gray-100", "{best_rate_pct:.2}%" }
+                        span { class: "text-sm text-gray-900 dark:text-gray-100", "{best_rate_pct:.3}%" }
                     }
                 }
             }
@@ -893,7 +893,7 @@ pub fn SummaryPage() -> Element {
                     } else {
                         div { class: "flex items-baseline gap-4",
                             span { class: "text-3xl font-bold text-gray-900 dark:text-gray-100",
-                                "{overall_pct:.1}%"
+                                "{overall_pct:.3}%"
                             }
                             span { class: "text-sm text-gray-500 dark:text-gray-400",
                                 "{total_owned} / {total_denom}"
@@ -954,7 +954,7 @@ pub fn SummaryPage() -> Element {
                                             }
                                         }
                                         span { class: "text-sm text-gray-500 dark:text-gray-400",
-                                            "{rate.as_f64() * 100.0:.2}% chance of a desired card"
+                                            "{rate.as_f64() * 100.0:.3}% chance of a desired card"
                                         }
                                     }
                                 }

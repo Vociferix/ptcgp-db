@@ -20,19 +20,19 @@ use ptcgp_db_data::{Series, Stage};
 pub enum FilterMode {
     /// Card Catalog mode: name search + owned-count threshold.
     Catalog,
-    /// Analysis / Trade mode: name search + goal input; no owned-count.
-    Analysis,
+    /// Trade mode: name search + goal input; no owned-count.
+    Trade,
     /// Summary mode: goal input, no name search (saves primary-row space).
     Summary,
 }
 
 /// Single-row filter toolbar with a floating advanced panel.
 ///
-/// Primary row (sm+): Name, [Goal if Analysis], Set, Pack, Source, Series, Kind.
-/// Narrow (< sm): Name, [Goal if Analysis] + "Filters" button that opens the panel
+/// Primary row (sm+): Name, [Goal if Trade/Summary], Set, Pack, Source, Series, Kind.
+/// Narrow (< sm): Name, [Goal if Trade/Summary] + "Filters" button that opens the panel
 /// with all filters including the primary ones.
 /// Advanced floating panel: Rarity, Element, Stage, Ex, Mega, Foil, Obtainable,
-/// Count (Catalog) / Any-version (Analysis) — plus primary filters on narrow.
+/// Count (Catalog) / Any-version (Trade/Summary) — plus primary filters on narrow.
 #[component]
 pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element {
     let settings = use_context::<Signal<AppSettings>>();
@@ -84,15 +84,15 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
             // flex-nowrap prevents wrapping; filters that don't fit at a given
             // breakpoint are hidden here and surfaced in the floating panel.
             div { class: "flex flex-nowrap items-end gap-2",
-                // Name — Catalog and Analysis only; Summary omits it to save space
+                // Name — Catalog and Trade only; Summary omits it to save space
                 if mode != FilterMode::Summary {
                     div { class: "flex-shrink-0",
                         NameFilter { config }
                     }
                 }
 
-                // Goal — Analysis and Summary modes
-                if mode == FilterMode::Analysis || mode == FilterMode::Summary {
+                // Goal — Trade and Summary modes
+                if mode == FilterMode::Trade || mode == FilterMode::Summary {
                     div { class: "flex-shrink-0",
                         GoalFilter { config }
                     }
@@ -192,7 +192,7 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                         FilterMode::Catalog => rsx! {
                             CountFilter { config }
                         },
-                        FilterMode::Analysis | FilterMode::Summary => rsx! {
+                        FilterMode::Trade | FilterMode::Summary => rsx! {
                             AnyVersionFilter { config }
                         },
                     }

@@ -231,7 +231,7 @@ fn CountOpBtn(
 }
 
 // ---------------------------------------------------------------------------
-// Goal input and any-version toggle (Analysis mode)
+// Goal input and any-version toggle (Trade / Summary modes)
 // ---------------------------------------------------------------------------
 
 #[component]
