@@ -7,7 +7,7 @@ use dioxus::prelude::*;
 use ptcgp_db_core::{AppSettings, CARD_PULL_RATES, ProfileStore};
 use ptcgp_db_data::CardVersion;
 
-use crate::app::{AppStorage, CardDetailOrigin, schedule_save};
+use crate::app::{AppStorage, CardDetailOrigin, set_card_count};
 use crate::components::count_spinner::CountSpinner;
 use crate::components::effect_text::EffectText;
 use crate::components::icons::ArrowLeft;
@@ -30,21 +30,6 @@ fn ordinal_suffix(n: usize) -> &'static str {
         3 => "rd",
         _ => "th",
     }
-}
-
-fn do_set_count(cv_id: usize, new_count: u32, mut store: Signal<Option<ProfileStore<AppStorage>>>) {
-    let name = {
-        let s = store.read();
-        let Some(s) = s.as_ref() else { return };
-        s.active_profile_names().first().cloned()
-    };
-    let Some(name) = name else { return };
-    {
-        let mut s = store.write();
-        let Some(s) = s.as_mut() else { return };
-        let _ = s.set_owned_count(&name, cv_id, new_count);
-    }
-    schedule_save();
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +55,13 @@ fn PullRateSection(cv_id: usize) -> Element {
     }
 }
 
-#[allow(clippy::type_complexity)]
+struct VariantPullRow {
+    name: ptcgp_db_data::str_table::StrEntry,
+    variant_pct: f64,
+    card_pct: f64,
+    slots: Vec<(usize, f64)>,
+}
+
 #[component]
 fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
     let Some(pack) = ptcgp_db_data::Pack::from_id(pack_id) else {
@@ -79,12 +70,7 @@ fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
     let logo = pack.logo();
     let title = pack.title();
 
-    let variant_rows: Vec<(
-        ptcgp_db_data::str_table::StrEntry,
-        f64,
-        f64,
-        Vec<(usize, f64)>,
-    )> = pack
+    let variant_rows: Vec<VariantPullRow> = pack
         .variants()
         .iter()
         .filter_map(|variant| {
@@ -105,9 +91,12 @@ fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
             let not_prob = slots
                 .iter()
                 .fold(1.0f64, |acc, (_, r)| acc * (1.0 - r / 100.0));
-            let card_pct = (1.0 - not_prob) * 100.0;
-            let variant_pct = variant.pull_rate().as_f64() * 100.0;
-            Some((variant.name(), variant_pct, card_pct, slots))
+            Some(VariantPullRow {
+                name: variant.name(),
+                variant_pct: variant.pull_rate().as_f64() * 100.0,
+                card_pct: (1.0 - not_prob) * 100.0,
+                slots,
+            })
         })
         .collect();
 
@@ -124,17 +113,17 @@ fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
                     "{overall_pct:.3}%"
                 }
             }
-            for (vname, vpct, cpct, slots) in variant_rows {
+            for row in variant_rows {
                 div { class: "ml-6 flex flex-col gap-0.5",
                     div { class: "flex items-center gap-2 rounded px-1 hover:bg-gray-100 dark:hover:bg-gray-700/50",
                         span { class: "flex-1 text-xs text-gray-600 dark:text-gray-400",
-                            "{vname} · {vpct:.3}% of packs"
+                            "{row.name} · {row.variant_pct:.3}% of packs"
                         }
                         span { class: "text-xs tabular-nums text-gray-700 dark:text-gray-300",
-                            "{cpct:.3}%"
+                            "{row.card_pct:.3}%"
                         }
                     }
-                    for (pull_num, slot_pct) in slots {
+                    for (pull_num, slot_pct) in row.slots {
                         div { class: "ml-4 flex items-center gap-2 rounded px-1 hover:bg-gray-100 dark:hover:bg-gray-700/50",
                             span { class: "flex-1 text-xs text-gray-400 dark:text-gray-500",
                                 "{pull_num + 1}{ordinal_suffix(pull_num + 1)} Card"
@@ -355,7 +344,7 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
                         value,
                         stored_count,
                         disabled: multi_active,
-                        on_change: move |n| do_set_count(cv_id, n, store),
+                        on_change: move |n| set_card_count(cv_id, n, store),
                     }
                     div { class: "flex items-center gap-2 ml-auto",
                         img {
@@ -434,11 +423,11 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
                                 }
                             } else {
                                 div { class: "flex items-center gap-1",
-                                    for _ in 0..p.retreat_cost() {
-                                        if let Some(colorless) = ptcgp_db_data::Element::ALL
-                                            .iter()
-                                            .find(|e| e.code() == Some('C'))
-                                        {
+                                    if let Some(colorless) = ptcgp_db_data::Element::ALL
+                                        .iter()
+                                        .find(|e| e.code() == Some('C'))
+                                    {
+                                        for _ in 0..p.retreat_cost() {
                                             img {
                                                 src: "{colorless.icon()}",
                                                 alt: "",

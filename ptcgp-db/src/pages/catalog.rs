@@ -4,7 +4,7 @@ use ptcgp_db_core::save_data::FilterConfig;
 use ptcgp_db_core::{AppSettings, CARD_PULL_RATES, ProfileStore, filter_card};
 use ptcgp_db_data::{Card, CardVersion};
 
-use crate::app::{AppStorage, CardDetailOrigin, schedule_save};
+use crate::app::{AppStorage, CardDetailOrigin, set_card_count};
 use crate::components::count_spinner::CountSpinner;
 use crate::components::icons::{ChevronDown, ChevronUp};
 use crate::components::{FilterMode, FilterToolbar};
@@ -123,22 +123,26 @@ fn premium_tint_class(cv: &CardVersion) -> &'static str {
 }
 
 // ---------------------------------------------------------------------------
-// Count mutation helper
+// Sort helpers
 // ---------------------------------------------------------------------------
 
-fn do_set_count(cv_id: usize, new_count: u32, mut store: Signal<Option<ProfileStore<AppStorage>>>) {
-    let name = {
-        let s = store.read();
-        let Some(s) = s.as_ref() else { return };
-        s.active_profile_names().first().cloned()
-    };
-    let Some(name) = name else { return };
-    {
-        let mut s = store.write();
-        let Some(s) = s.as_mut() else { return };
-        let _ = s.set_owned_count(&name, cv_id, new_count);
-    }
-    schedule_save();
+/// Sorts `ids` using a comparison function, applying direction and a stable tiebreak on index.
+///
+/// `cmp(a, b)` should return the natural `Ordering` for the sort key (i.e. as if ascending).
+/// `dir` flips the primary ordering; ties always break ascending by index for determinism.
+fn sort_with_dir(
+    ids: &mut [usize],
+    dir: SortDir,
+    cmp: impl Fn(usize, usize) -> std::cmp::Ordering,
+) {
+    ids.sort_by(|&a, &b| {
+        let n = cmp(a, b);
+        if dir == SortDir::Asc {
+            n.then(a.cmp(&b))
+        } else {
+            n.reverse().then(a.cmp(&b))
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -243,56 +247,44 @@ pub fn CatalogPage() -> Element {
                     ids.reverse();
                 }
             }
-            SortColumn::Name => ids.sort_by(|&a, &b| {
-                let n = CardVersion::ALL[a]
-                    .card()
-                    .name()
-                    .as_str()
-                    .cmp(CardVersion::ALL[b].card().name().as_str());
-                if sc.dir == SortDir::Asc {
-                    n.then(a.cmp(&b))
-                } else {
-                    n.reverse().then(a.cmp(&b))
-                }
-            }),
-            SortColumn::OwnedCount => ids.sort_by(|&a, &b| {
-                let n = s.aggregate_count(a).cmp(&s.aggregate_count(b));
-                if sc.dir == SortDir::Asc {
-                    n.then(a.cmp(&b))
-                } else {
-                    n.reverse().then(a.cmp(&b))
-                }
-            }),
-            SortColumn::Rarity => ids.sort_by(|&a, &b| {
-                let n = CardVersion::ALL[a]
-                    .rarity()
-                    .class()
-                    .id()
-                    .cmp(&CardVersion::ALL[b].rarity().class().id());
-                if sc.dir == SortDir::Asc {
-                    n.then(a.cmp(&b))
-                } else {
-                    n.reverse().then(a.cmp(&b))
-                }
-            }),
-            SortColumn::Element => ids.sort_by(|&a, &b| {
-                let ea = CardVersion::ALL[a]
-                    .card()
-                    .pokemon()
-                    .map(|p| p.element().id())
-                    .unwrap_or(usize::MAX);
-                let eb = CardVersion::ALL[b]
-                    .card()
-                    .pokemon()
-                    .map(|p| p.element().id())
-                    .unwrap_or(usize::MAX);
-                let n = ea.cmp(&eb);
-                if sc.dir == SortDir::Asc {
-                    n.then(a.cmp(&b))
-                } else {
-                    n.reverse().then(a.cmp(&b))
-                }
-            }),
+            SortColumn::Name => {
+                sort_with_dir(&mut ids, sc.dir, |a, b| {
+                    CardVersion::ALL[a]
+                        .card()
+                        .name()
+                        .as_str()
+                        .cmp(CardVersion::ALL[b].card().name().as_str())
+                });
+            }
+            SortColumn::OwnedCount => {
+                sort_with_dir(&mut ids, sc.dir, |a, b| {
+                    s.aggregate_count(a).cmp(&s.aggregate_count(b))
+                });
+            }
+            SortColumn::Rarity => {
+                sort_with_dir(&mut ids, sc.dir, |a, b| {
+                    CardVersion::ALL[a]
+                        .rarity()
+                        .class()
+                        .id()
+                        .cmp(&CardVersion::ALL[b].rarity().class().id())
+                });
+            }
+            SortColumn::Element => {
+                sort_with_dir(&mut ids, sc.dir, |a, b| {
+                    let ea = CardVersion::ALL[a]
+                        .card()
+                        .pokemon()
+                        .map(|p| p.element().id())
+                        .unwrap_or(usize::MAX);
+                    let eb = CardVersion::ALL[b]
+                        .card()
+                        .pokemon()
+                        .map(|p| p.element().id())
+                        .unwrap_or(usize::MAX);
+                    ea.cmp(&eb)
+                });
+            }
             SortColumn::PullRate => {
                 ids.sort_by(|&a, &b| {
                     let ra = CARD_PULL_RATES[a].max_pull_rate_pct;
@@ -632,7 +624,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                     value,
                     stored_count,
                     disabled: multi_active,
-                    on_change: move |n| do_set_count(cv_id, n, store),
+                    on_change: move |n| set_card_count(cv_id, n, store),
                 }
             }
         }

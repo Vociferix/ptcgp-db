@@ -130,6 +130,29 @@ pub(crate) fn schedule_save() {
     use_coroutine_handle::<ScheduleSave>().send(ScheduleSave);
 }
 
+/// Sets the owned count for a card version in the first active profile, then schedules a save.
+///
+/// Used by catalog and card detail components to commit `CountSpinner` changes. No-ops when
+/// no profile is loaded or the active-profile list is empty.
+pub(crate) fn set_card_count(
+    cv_id: usize,
+    new_count: u32,
+    mut store: Signal<Option<ProfileStore<AppStorage>>>,
+) {
+    let name = {
+        let s = store.read();
+        let Some(s) = s.as_ref() else { return };
+        s.active_profile_names().first().cloned()
+    };
+    let Some(name) = name else { return };
+    {
+        let mut s = store.write();
+        let Some(s) = s.as_mut() else { return };
+        let _ = s.set_owned_count(&name, cv_id, new_count);
+    }
+    schedule_save();
+}
+
 // ---------------------------------------------------------------------------
 // App root
 // ---------------------------------------------------------------------------
