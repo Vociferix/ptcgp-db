@@ -34,22 +34,22 @@ impl<'de> Deserialize<'de> for CardVersionId {
         let s: Cow<'de, str> = Cow::deserialize(d)?;
         // Set codes may contain `-` (e.g. "P-A"), so split at the last hyphen only.
         let (set_code, num_str) = s.rsplit_once('-').ok_or_else(|| {
-            de::Error::custom(&format_args!("expected SET-NUMBER format, got {s:?}"))
+            de::Error::custom(format_args!("expected SET-NUMBER format, got {s:?}"))
         })?;
         let number: usize = num_str
             .parse()
-            .map_err(|_| de::Error::custom(&format_args!("invalid card number in {s:?}")))?;
+            .map_err(|_| de::Error::custom(format_args!("invalid card number in {s:?}")))?;
         // Find the set by code, then index into its card_versions by number (1-indexed).
         let set_code_id = Set::CODES
             .iter()
             .position(|code| code == set_code)
-            .ok_or_else(|| de::Error::custom(&format_args!("unknown set code {set_code:?}")))?;
+            .ok_or_else(|| de::Error::custom(format_args!("unknown set code {set_code:?}")))?;
         let set = Set::ALL
             .iter()
             .find(|set| set.code().id() == set_code_id)
-            .ok_or_else(|| de::Error::custom(&format_args!("unknown set code {set_code:?}")))?;
+            .ok_or_else(|| de::Error::custom(format_args!("unknown set code {set_code:?}")))?;
         if number == 0 || number > set.card_versions().len() {
-            return Err(de::Error::custom(&format_args!(
+            return Err(de::Error::custom(format_args!(
                 "invalid card number {number} for set {set_code}"
             )));
         }
