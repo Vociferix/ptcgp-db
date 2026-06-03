@@ -51,12 +51,11 @@ These override any general defaults:
 
 ## Running the app
 
-Run from the crate directory that contains `Dioxus.toml`:
+Run from the workspace root using `-p ptcgp-db`:
 
 ```
-cd ptcgp-db/ptcgp-db
-dx serve --platform web
-dx serve --platform desktop
+dx serve -p ptcgp-db --platform web
+dx serve -p ptcgp-db --platform desktop
 ```
 
 The `--platform` flag is required; `dx serve` without it cannot detect the target and will exit with
