@@ -6,6 +6,7 @@ use futures_util::StreamExt as _;
 use ptcgp_db_core::save_data::{CardVersionId, FilterConfig, Theme};
 use ptcgp_db_core::storage::Storage as _;
 use ptcgp_db_core::{AppSettings, ProfileStore, SavedQueries};
+use ptcgp_db_data::CardSource;
 
 use crate::pages::OnboardingPage;
 use crate::routes::Route;
@@ -155,6 +156,21 @@ pub(crate) fn set_card_count(
     }
     schedule_save();
 }
+
+const fn favicon() -> Asset {
+    let mut srcs = CardSource::ALL;
+
+    while let Some((src, tail)) = srcs.split_first() {
+        srcs = tail;
+        if src.name().as_str().eq_ignore_ascii_case("Pack") {
+            return src.icon();
+        }
+    }
+
+    panic!("Card source 'Pack' not found")
+}
+
+const FAVICON: Asset = favicon();
 
 // ---------------------------------------------------------------------------
 // Drive startup sync (web only)
@@ -418,6 +434,7 @@ pub fn App() -> Element {
 
     rsx! {
         document::Stylesheet { href: asset!("/public/tailwind.css") }
+        document::Link { rel: "icon", r#type: "image/png", href: FAVICON }
         {body}
     }
 }

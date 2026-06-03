@@ -1,4 +1,21 @@
+use crate::components::icons::Check;
 use dioxus::prelude::*;
+
+/// Visual checkbox for the multi-select toggle zone in dropdown rows.
+///
+/// Renders a filled blue box with a checkmark when `checked`, or an outlined square when not.
+#[component]
+pub fn ToggleCheckbox(checked: bool) -> Element {
+    rsx! {
+        if checked {
+            span { class: "flex items-center justify-center w-5 h-5 rounded bg-blue-500 dark:bg-blue-600",
+                Check { class: "w-3.5 h-3.5 text-white" }
+            }
+        } else {
+            span { class: "block w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-500" }
+        }
+    }
+}
 
 /// A styled toggle switch (on/off).
 ///

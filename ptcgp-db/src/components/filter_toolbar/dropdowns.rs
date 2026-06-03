@@ -1,4 +1,5 @@
-use crate::components::icons::{Check, ChevronDown, ChevronUp};
+use crate::components::icons::{ChevronDown, ChevronUp};
+use crate::components::toggle::ToggleCheckbox;
 use dioxus::prelude::*;
 use ptcgp_db_data::{CardSource, Pack, Set};
 
@@ -29,18 +30,6 @@ fn DropdownPanel(open: Signal<bool>, extra_cls: &'static str, children: Element)
                         py-1 {extra_cls}",
                 {children}
             }
-        }
-    }
-}
-
-/// Header hint shown at the top of every multi-select dropdown.
-/// The `border-b` provides a visual separator from the item list below.
-#[component]
-fn DropdownHint() -> Element {
-    rsx! {
-        div { class: "px-3 pt-0.5 pb-1 border-b border-gray-100 dark:border-gray-600 \
-                      text-xs text-gray-400 dark:text-gray-400",
-            "Ctrl+Click to select multiple"
         }
     }
 }
@@ -98,16 +87,6 @@ pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
             }
 
             DropdownPanel { open, extra_cls: "w-72",
-                DropdownHint {}
-                for set in &visible_sets {
-                    SetItem {
-                        key: "{set.id()}",
-                        set,
-                        checked: sets.contains(&set.id()),
-                        config,
-                        open,
-                    }
-                }
                 if !sets.is_empty() {
                     DropdownClearBtn {
                         on_clear: move |_| {
@@ -117,6 +96,15 @@ pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
                         },
                     }
                 }
+                for set in &visible_sets {
+                    SetItem {
+                        key: "{set.id()}",
+                        set,
+                        checked: sets.contains(&set.id()),
+                        config,
+                        open,
+                    }
+                }
             }
         }
     }
@@ -124,7 +112,8 @@ pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
 
 /// One set row: compact icon on the left, full logo on the right.
 ///
-/// Regular click selects only this set; Ctrl+Click toggles it in/out.
+/// Tapping the row body selects only this set and closes the dropdown.
+/// Tapping the checkbox on the right toggles this set in/out without closing.
 #[component]
 fn SetItem(
     set: &'static Set,
@@ -134,18 +123,17 @@ fn SetItem(
 ) -> Element {
     let id = set.id();
     let row_cls = dropdown_row_cls(checked);
-
-    let on_click = move |e: MouseEvent| {
-        if e.modifiers().ctrl() {
-            toggle_set(&mut config.write(), id, checked);
-        } else {
-            select_only_set(&mut config.write(), id);
-            open.set(false);
-        }
+    let on_select = move |_| {
+        select_only_set(&mut config.write(), id);
+        open.set(false);
+    };
+    let on_toggle = move |e: MouseEvent| {
+        e.stop_propagation();
+        toggle_set(&mut config.write(), id, checked);
     };
 
     rsx! {
-        div { class: "{row_cls}", onclick: on_click,
+        div { class: "{row_cls}", onclick: on_select,
             img {
                 src: "{set.icon()}",
                 alt: "{set.code()}",
@@ -156,10 +144,12 @@ fn SetItem(
                 alt: "{set.name()}",
                 class: "h-10 w-auto max-w-32 object-contain",
             }
-            if checked {
-                span { class: "ml-auto pl-2 shrink-0",
-                    Check { class: "w-4 h-4 text-blue-500 dark:text-blue-400" }
-                }
+            button {
+                r#type: "button",
+                class: "ml-auto shrink-0 p-2 -mr-1 rounded \
+                        hover:bg-gray-200/60 dark:hover:bg-gray-500/40",
+                onclick: on_toggle,
+                ToggleCheckbox { checked }
             }
         }
     }
@@ -215,7 +205,9 @@ pub fn PackDropdown(config: Signal<FilterConfig>) -> Element {
             }
 
             DropdownPanel { open, extra_cls: "w-60",
-                DropdownHint {}
+                if !packs.is_empty() {
+                    DropdownClearBtn { on_clear: move |_| config.write().packs.clear() }
+                }
                 for (set_id, pack_ids) in groups {
                     PackGroup {
                         key: "{set_id}",
@@ -224,9 +216,6 @@ pub fn PackDropdown(config: Signal<FilterConfig>) -> Element {
                         config,
                         open,
                     }
-                }
-                if !packs.is_empty() {
-                    DropdownClearBtn { on_clear: move |_| config.write().packs.clear() }
                 }
             }
         }
@@ -270,7 +259,8 @@ fn PackGroup(
 
 /// One pack row.
 ///
-/// Regular click selects only this pack; Ctrl+Click toggles it in/out.
+/// Tapping the row body selects only this pack and closes the dropdown.
+/// Tapping the checkbox on the right toggles this pack in/out without closing.
 #[component]
 fn PackItem(
     pack: &'static Pack,
@@ -280,28 +270,29 @@ fn PackItem(
 ) -> Element {
     let id = pack.id();
     let row_cls = dropdown_row_cls(checked);
-
-    let on_click = move |e: MouseEvent| {
-        if e.modifiers().ctrl() {
-            toggle_pack(&mut config.write(), id, checked);
-        } else {
-            select_only_pack(&mut config.write(), id);
-            open.set(false);
-        }
+    let on_select = move |_| {
+        select_only_pack(&mut config.write(), id);
+        open.set(false);
+    };
+    let on_toggle = move |e: MouseEvent| {
+        e.stop_propagation();
+        toggle_pack(&mut config.write(), id, checked);
     };
 
     rsx! {
-        div { class: "{row_cls}", onclick: on_click,
+        div { class: "{row_cls}", onclick: on_select,
             img {
                 src: "{pack.logo()}",
                 alt: "{pack.title()}",
                 // Generous height — pack logos need more room than set logos.
                 class: "h-14 w-auto max-w-40 object-contain",
             }
-            if checked {
-                span { class: "ml-auto pl-2 shrink-0",
-                    Check { class: "w-4 h-4 text-blue-500 dark:text-blue-400" }
-                }
+            button {
+                r#type: "button",
+                class: "ml-auto shrink-0 p-2 -mr-1 rounded \
+                        hover:bg-gray-200/60 dark:hover:bg-gray-500/40",
+                onclick: on_toggle,
+                ToggleCheckbox { checked }
             }
         }
     }
@@ -338,7 +329,9 @@ pub fn SourceDropdown(config: Signal<FilterConfig>) -> Element {
             }
 
             DropdownPanel { open, extra_cls: "min-w-48",
-                DropdownHint {}
+                if !sources.is_empty() {
+                    DropdownClearBtn { on_clear: move |_| config.write().sources.clear() }
+                }
                 for source in CardSource::ALL {
                     SourceItem {
                         key: "{source.id()}",
@@ -348,9 +341,6 @@ pub fn SourceDropdown(config: Signal<FilterConfig>) -> Element {
                         open,
                     }
                 }
-                if !sources.is_empty() {
-                    DropdownClearBtn { on_clear: move |_| config.write().sources.clear() }
-                }
             }
         }
     }
@@ -358,7 +348,8 @@ pub fn SourceDropdown(config: Signal<FilterConfig>) -> Element {
 
 /// One source row.
 ///
-/// Regular click selects only this source; Ctrl+Click toggles it in/out.
+/// Tapping the row body selects only this source and closes the dropdown.
+/// Tapping the checkbox on the right toggles this source in/out without closing.
 #[component]
 fn SourceItem(
     source: &'static CardSource,
@@ -368,28 +359,29 @@ fn SourceItem(
 ) -> Element {
     let id = source.id();
     let row_cls = dropdown_row_cls(checked);
-
-    let on_click = move |e: MouseEvent| {
-        if e.modifiers().ctrl() {
-            toggle_source(&mut config.write(), id, checked);
-        } else {
-            select_only_source(&mut config.write(), id);
-            open.set(false);
-        }
+    let on_select = move |_| {
+        select_only_source(&mut config.write(), id);
+        open.set(false);
+    };
+    let on_toggle = move |e: MouseEvent| {
+        e.stop_propagation();
+        toggle_source(&mut config.write(), id, checked);
     };
 
     rsx! {
-        div { class: "{row_cls}", onclick: on_click,
+        div { class: "{row_cls}", onclick: on_select,
             img {
                 src: "{source.icon()}",
                 alt: "{source.name()}",
                 class: "h-7 w-7 object-contain shrink-0",
             }
             span { class: "text-sm text-gray-700 dark:text-gray-300", "{source.name()}" }
-            if checked {
-                span { class: "ml-auto pl-2 shrink-0",
-                    Check { class: "w-4 h-4 text-blue-500 dark:text-blue-400" }
-                }
+            button {
+                r#type: "button",
+                class: "ml-auto shrink-0 p-2 -mr-1 rounded \
+                        hover:bg-gray-200/60 dark:hover:bg-gray-500/40",
+                onclick: on_toggle,
+                ToggleCheckbox { checked }
             }
         }
     }
