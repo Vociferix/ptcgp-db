@@ -1,4 +1,5 @@
-use crate::components::icons::{Check, ChevronDown, ChevronUp};
+use crate::components::icons::{ChevronDown, ChevronUp};
+use crate::components::toggle::ToggleCheckbox;
 use dioxus::prelude::*;
 use ptcgp_db_data::{CardSource, Pack, Set};
 
@@ -29,20 +30,6 @@ fn DropdownPanel(open: Signal<bool>, extra_cls: &'static str, children: Element)
                         py-1 {extra_cls}",
                 {children}
             }
-        }
-    }
-}
-
-/// Visual checkbox rendered in the multi-select toggle zone of every dropdown row.
-#[component]
-fn ToggleCheckbox(checked: bool) -> Element {
-    rsx! {
-        if checked {
-            span { class: "flex items-center justify-center w-5 h-5 rounded bg-blue-500 dark:bg-blue-600",
-                Check { class: "w-3.5 h-3.5 text-white" }
-            }
-        } else {
-            span { class: "w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-500" }
         }
     }
 }
@@ -100,15 +87,6 @@ pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
             }
 
             DropdownPanel { open, extra_cls: "w-72",
-                for set in &visible_sets {
-                    SetItem {
-                        key: "{set.id()}",
-                        set,
-                        checked: sets.contains(&set.id()),
-                        config,
-                        open,
-                    }
-                }
                 if !sets.is_empty() {
                     DropdownClearBtn {
                         on_clear: move |_| {
@@ -116,6 +94,15 @@ pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
                             cfg.sets.clear();
                             cfg.packs.clear();
                         },
+                    }
+                }
+                for set in &visible_sets {
+                    SetItem {
+                        key: "{set.id()}",
+                        set,
+                        checked: sets.contains(&set.id()),
+                        config,
+                        open,
                     }
                 }
             }
@@ -218,6 +205,9 @@ pub fn PackDropdown(config: Signal<FilterConfig>) -> Element {
             }
 
             DropdownPanel { open, extra_cls: "w-60",
+                if !packs.is_empty() {
+                    DropdownClearBtn { on_clear: move |_| config.write().packs.clear() }
+                }
                 for (set_id, pack_ids) in groups {
                     PackGroup {
                         key: "{set_id}",
@@ -226,9 +216,6 @@ pub fn PackDropdown(config: Signal<FilterConfig>) -> Element {
                         config,
                         open,
                     }
-                }
-                if !packs.is_empty() {
-                    DropdownClearBtn { on_clear: move |_| config.write().packs.clear() }
                 }
             }
         }
@@ -342,6 +329,9 @@ pub fn SourceDropdown(config: Signal<FilterConfig>) -> Element {
             }
 
             DropdownPanel { open, extra_cls: "min-w-48",
+                if !sources.is_empty() {
+                    DropdownClearBtn { on_clear: move |_| config.write().sources.clear() }
+                }
                 for source in CardSource::ALL {
                     SourceItem {
                         key: "{source.id()}",
@@ -350,9 +340,6 @@ pub fn SourceDropdown(config: Signal<FilterConfig>) -> Element {
                         config,
                         open,
                     }
-                }
-                if !sources.is_empty() {
-                    DropdownClearBtn { on_clear: move |_| config.write().sources.clear() }
                 }
             }
         }

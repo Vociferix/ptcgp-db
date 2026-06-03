@@ -1,12 +1,13 @@
 use crate::app::{AppStorage, schedule_save};
-use crate::components::icons::{Check, ChevronDown, ChevronUp};
+use crate::components::icons::{ChevronDown, ChevronUp};
+use crate::components::toggle::ToggleCheckbox;
 use dioxus::prelude::*;
 
 /// Profile selector embedded in the navigation bar.
 ///
-/// Regular click on a profile switches to only that profile and closes the menu.
-/// Ctrl+Click toggles a profile in or out of the active set for multi-profile
-/// aggregation.
+/// Tapping a profile row switches to only that profile and closes the menu.
+/// Tapping the checkbox on the right of a row toggles it in or out of the
+/// active set for multi-profile aggregation.
 ///
 /// Set `open_upward` when the selector sits near the bottom of the viewport so
 /// the dropdown expands above the trigger instead of below it.
@@ -76,16 +77,18 @@ pub fn ProfileSelector(#[props(default = false)] open_upward: bool) -> Element {
                             store,
                         }
                     }
-                    div { class: "px-3 pt-1 pb-0.5 border-t border-gray-100 dark:border-gray-600 \
-                                  text-xs text-gray-400 dark:text-gray-400",
-                        "Ctrl+Click to select multiple"
-                    }
                 }
             }
         }
     }
 }
 
+/// One profile row.
+///
+/// Tapping the row body activates only this profile and closes the dropdown.
+/// Tapping the checkbox on the right toggles this profile in/out without closing.
+/// `deactivate_profile` is a no-op when it would leave the active set empty, so
+/// the last remaining active profile cannot be deselected via the checkbox.
 #[component]
 fn ProfileRow(
     name: String,
@@ -93,53 +96,66 @@ fn ProfileRow(
     mut open: Signal<bool>,
     mut store: Signal<Option<ptcgp_db_core::ProfileStore<AppStorage>>>,
 ) -> Element {
-    rsx! {
-        div {
-            class: "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer \
-                    hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100",
-            onclick: {
-                let name = name.clone();
-                move |e: MouseEvent| {
-                    let mut guard = store.write();
-                    let Some(ref mut s) = *guard else { return };
-                    if e.modifiers().ctrl() {
-                        // Ctrl+Click: toggle this profile in the multi-select set.
-                        // deactivate_profile is a no-op when it would leave the set empty.
-                        if is_active {
-                            let _ = s.deactivate_profile(&name);
-                        } else {
-                            let _ = s.activate_profile(&name);
-                        }
-                        drop(guard);
-                        schedule_save();
-                    } else {
-                        // Regular click: switch to only this profile.
-                        // Activate first so there is always ≥1 active profile
-                        // when deactivating the others (deactivate_profile rejects
-                        // attempts to leave the active set empty).
-                        let _ = s.activate_profile(&name);
-                        let others: Vec<String> = s
-                            .active_profile_names()
-                            .iter()
-                            .filter(|n| n.as_str() != name)
-                            .cloned()
-                            .collect();
-                        for other in &others {
-                            let _ = s.deactivate_profile(other);
-                        }
-                        drop(guard);
-                        schedule_save();
-                        open.set(false);
-                    }
-                }
-            },
-            // Active indicator — checkmark for active profiles, blank space otherwise
-            span { class: "shrink-0 w-4 h-4",
-                if is_active {
-                    Check { class: "w-4 h-4 text-blue-500 dark:text-blue-400" }
-                }
+    let row_cls = if is_active {
+        "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer select-none \
+         bg-blue-50 dark:bg-blue-950/80 hover:bg-blue-100 dark:hover:bg-blue-900/60 \
+         text-gray-800 dark:text-gray-100"
+    } else {
+        "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer select-none \
+         hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100"
+    };
+
+    // Activate only this profile and close the dropdown.
+    // Activate first so there is always ≥1 active profile when deactivating
+    // the others (deactivate_profile rejects an attempt to leave the set empty).
+    let on_select = {
+        let name = name.clone();
+        move |_| {
+            let mut guard = store.write();
+            let Some(ref mut s) = *guard else { return };
+            let _ = s.activate_profile(&name);
+            let others: Vec<String> = s
+                .active_profile_names()
+                .iter()
+                .filter(|n| n.as_str() != name)
+                .cloned()
+                .collect();
+            for other in &others {
+                let _ = s.deactivate_profile(other);
             }
-            span { class: "flex-1 truncate select-none", "{name}" }
+            drop(guard);
+            schedule_save();
+            open.set(false);
+        }
+    };
+
+    // Toggle this profile in/out of the active set without closing the dropdown.
+    let on_toggle = {
+        let name = name.clone();
+        move |e: MouseEvent| {
+            e.stop_propagation();
+            let mut guard = store.write();
+            let Some(ref mut s) = *guard else { return };
+            if is_active {
+                let _ = s.deactivate_profile(&name);
+            } else {
+                let _ = s.activate_profile(&name);
+            }
+            drop(guard);
+            schedule_save();
+        }
+    };
+
+    rsx! {
+        div { class: "{row_cls}", onclick: on_select,
+            span { class: "flex-1 truncate", "{name}" }
+            button {
+                r#type: "button",
+                class: "shrink-0 p-2 -mr-1 rounded \
+                        hover:bg-gray-200/60 dark:hover:bg-gray-500/40",
+                onclick: on_toggle,
+                ToggleCheckbox { checked: is_active }
+            }
         }
     }
 }
