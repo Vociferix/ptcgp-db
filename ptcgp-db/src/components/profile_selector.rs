@@ -41,7 +41,8 @@ pub fn ProfileSelector(#[props(default = false)] open_upward: bool) -> Element {
                 r#type: "button",
                 class: "flex items-center gap-1 px-2 py-1 rounded text-sm font-medium \
                         bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 \
-                        text-gray-800 dark:text-gray-100 w-full",
+                        text-gray-800 dark:text-gray-100 w-full \
+                        shadow-sm active:shadow-none active:translate-y-px",
                 onclick: move |_| open.toggle(),
                 span { class: "truncate flex-1 text-left", "{label}" }
                 if *open.read() {

@@ -148,7 +148,8 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                     title: "Advanced Filters",
                     class: "shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md \
                             text-xs font-medium text-gray-600 dark:text-gray-300 \
-                            bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600",
+                            bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 \
+                            shadow-sm active:shadow-none active:translate-y-px",
                     onclick: move |_| panel_open.toggle(),
                     Bars3 { class: "w-5 h-5" }
                     if total_active > 0 {

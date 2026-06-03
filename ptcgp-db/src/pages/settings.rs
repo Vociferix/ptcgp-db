@@ -111,9 +111,10 @@ pub fn SettingsPage() -> Element {
                                         settings.write().set_theme(value);
                                         persist_settings(settings, store);
                                     },
-                                    class: if theme == value { "px-3 py-1.5 text-sm font-medium bg-blue-600 text-white" } else { "px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 \
+                                    class: if theme == value { "px-3 py-1.5 text-sm font-medium bg-blue-600 text-white shadow-inner" } else { "px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 \
                                          bg-white dark:bg-gray-800 \
-                                         hover:bg-gray-100 dark:hover:bg-gray-700" },
+                                         hover:bg-gray-100 dark:hover:bg-gray-700 \
+                                         shadow-sm active:shadow-none active:translate-y-px" },
                                     "{label}"
                                 }
                             }

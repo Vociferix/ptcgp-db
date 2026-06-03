@@ -19,7 +19,7 @@ use crate::routes::Route;
 
 const TRIGGER_CLS: &str = "flex items-center gap-1 px-2 h-8 rounded-md text-sm font-medium \
     bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 \
-    text-gray-800 dark:text-gray-100";
+    text-gray-800 dark:text-gray-100 shadow-sm active:shadow-none active:translate-y-px";
 
 // ---------------------------------------------------------------------------
 // Navigation helpers
@@ -324,7 +324,8 @@ fn SaveQueryDialog(
                         class: "px-3 py-1.5 rounded-md text-sm font-medium \
                                 text-gray-700 dark:text-gray-200 \
                                 bg-gray-100 dark:bg-gray-700 \
-                                hover:bg-gray-200 dark:hover:bg-gray-600",
+                                hover:bg-gray-200 dark:hover:bg-gray-600 \
+                                shadow-sm active:shadow-none active:translate-y-px",
                         onclick: move |_| on_close.call(()),
                         "Cancel"
                     }
@@ -332,7 +333,9 @@ fn SaveQueryDialog(
                         r#type: "button",
                         class: "px-3 py-1.5 rounded-md text-sm font-medium \
                                 bg-blue-600 text-white hover:bg-blue-700 \
-                                disabled:opacity-50 disabled:cursor-not-allowed",
+                                disabled:opacity-50 disabled:cursor-not-allowed \
+                                shadow-md shadow-blue-500/30 dark:shadow-blue-900/70 \
+                                active:shadow-sm active:translate-y-px",
                         disabled: name.read().trim().is_empty(),
                         onclick: move |_| try_save(),
                         "Save"

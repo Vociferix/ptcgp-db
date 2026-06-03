@@ -126,7 +126,8 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
         schedule_save();
     });
     let btn_cls = "px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white \
-                   hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed";
+                   hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed \
+                   shadow-md shadow-blue-500/30 dark:shadow-blue-900/70 active:shadow-sm active:translate-y-px";
 
     rsx! {
         div {
@@ -347,7 +348,8 @@ fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> El
                     r#type: "button",
                     class: "shrink-0 px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 \
                             text-white hover:bg-blue-700 disabled:opacity-40 \
-                            disabled:cursor-not-allowed",
+                            disabled:cursor-not-allowed \
+                            shadow-md shadow-blue-500/30 dark:shadow-blue-900/70 active:shadow-sm active:translate-y-px",
                     disabled,
                     onclick: on_transfer,
                     "Transfer"

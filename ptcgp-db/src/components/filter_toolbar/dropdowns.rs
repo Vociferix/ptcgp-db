@@ -11,7 +11,7 @@ use ptcgp_db_core::save_data::FilterConfig;
 
 const TRIGGER_CLS: &str = "flex items-center gap-1 px-2 h-8 rounded-md text-sm font-medium \
     bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 \
-    text-gray-800 dark:text-gray-100";
+    text-gray-800 dark:text-gray-100 shadow-sm active:shadow-none active:translate-y-px";
 
 #[component]
 fn DropdownPanel(open: Signal<bool>, extra_cls: &'static str, children: Element) -> Element {
