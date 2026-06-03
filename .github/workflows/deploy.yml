@@ -58,13 +58,12 @@ jobs:
         run: sed -i '/^\[web\.app\]/a base_path = "ptcgp-db"' ptcgp-db/Dioxus.toml
 
       - name: Build web
-        working-directory: ptcgp-db
-        run: dx build --platform web --release
+        run: dx build -p ptcgp-db --platform web --release
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./ptcgp-db/dist
+          path: ./target/dx/ptcgp-db/release/web/public
 
       - name: Deploy to GitHub Pages
         id: deploy
