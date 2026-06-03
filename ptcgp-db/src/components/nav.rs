@@ -63,7 +63,7 @@ pub fn NavLayout() -> Element {
     let show_selector = !hides_profile_selector(&current);
 
     rsx! {
-        div { class: "flex h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100",
+        div { class: "flex h-dvh bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100",
 
             // ---- Wide sidebar (md+) ----
             nav { class: "hidden md:flex flex-col w-52 shrink-0 relative z-10 \
