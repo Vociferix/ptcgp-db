@@ -132,7 +132,10 @@ fn parse_token_response(val: JsValue) -> Result<TokenResponse, String> {
             .ok()
             .and_then(|v| v.as_f64())
             .unwrap_or(3600.0) as u32;
-        return Ok(TokenResponse { access_token: token, expires_in });
+        return Ok(TokenResponse {
+            access_token: token,
+            expires_in,
+        });
     }
     let error = get("error")
         .or_else(|| get("type"))

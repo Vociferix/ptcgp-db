@@ -1,5 +1,8 @@
 use dioxus::prelude::*;
-use ptcgp_db_core::{AppSettings, ProfileStore, ProfilesSaveData, SavedQueries, migrate_profiles, storage::Storage as _};
+use ptcgp_db_core::{
+    AppSettings, ProfileStore, ProfilesSaveData, SavedQueries, migrate_profiles,
+    storage::Storage as _,
+};
 
 use crate::app::{AppStorage, schedule_save};
 
@@ -193,7 +196,11 @@ pub fn OnboardingPage() -> Element {
         match &*ds {
             DriveState::Disconnected | DriveState::Error(_) => {
                 let is_error = matches!(*ds, DriveState::Error(_));
-                let err_msg = if let DriveState::Error(ref m) = *ds { Some(m.clone()) } else { None };
+                let err_msg = if let DriveState::Error(ref m) = *ds {
+                    Some(m.clone())
+                } else {
+                    None
+                };
                 drop(ds);
                 rsx! {
                     div { class: "space-y-1.5",

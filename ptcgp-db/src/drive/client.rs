@@ -53,7 +53,9 @@ pub struct DriveClient {
 impl DriveClient {
     /// Creates a new client.
     pub fn new() -> Self {
-        Self { http: Client::new() }
+        Self {
+            http: Client::new(),
+        }
     }
 
     /// Searches `appDataFolder` for the sync file. Returns the Drive file ID, or `None` when
@@ -109,7 +111,10 @@ impl DriveClient {
             .http
             .post("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart")
             .bearer_auth(token)
-            .header("Content-Type", format!("multipart/related; boundary={boundary}"))
+            .header(
+                "Content-Type",
+                format!("multipart/related; boundary={boundary}"),
+            )
             .body(body)
             .send()
             .await?;
@@ -125,9 +130,8 @@ impl DriveClient {
         file_id: &str,
         data: &DriveSyncData,
     ) -> Result<(), DriveError> {
-        let url = format!(
-            "https://www.googleapis.com/upload/drive/v3/files/{file_id}?uploadType=media"
-        );
+        let url =
+            format!("https://www.googleapis.com/upload/drive/v3/files/{file_id}?uploadType=media");
         let content = serde_json::to_string(data)?;
         let resp = self
             .http

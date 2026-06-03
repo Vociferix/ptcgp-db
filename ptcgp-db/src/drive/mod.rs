@@ -136,7 +136,10 @@ async fn acquire_token(prompt: &str) -> Result<DriveToken, String> {
     gis::ensure_gis_loaded().await?;
     let resp = gis::request_token(CLIENT_ID, SCOPE, prompt).await?;
     let expires_at = Utc::now() + Duration::seconds(resp.expires_in as i64);
-    Ok(DriveToken { access_token: resp.access_token, expires_at })
+    Ok(DriveToken {
+        access_token: resp.access_token,
+        expires_at,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +154,13 @@ pub async fn save_to_drive(mut drive_state: Signal<DriveState>, data: &DriveSync
     // Snapshot what we need without holding the read guard across await points.
     let (mut token, file_id) = {
         let state = drive_state.read();
-        let DriveState::Connected { ref token, ref file_id } = *state else { return };
+        let DriveState::Connected {
+            ref token,
+            ref file_id,
+        } = *state
+        else {
+            return;
+        };
         (token.clone(), file_id.clone())
     };
 
@@ -159,8 +168,9 @@ pub async fn save_to_drive(mut drive_state: Signal<DriveState>, data: &DriveSync
     if token.is_expired() {
         match acquire_token_silent().await {
             Ok(new_token) => {
-                if let DriveState::Connected { token: ref mut t, .. } =
-                    *drive_state.write()
+                if let DriveState::Connected {
+                    token: ref mut t, ..
+                } = *drive_state.write()
                 {
                     *t = new_token.clone();
                 }
@@ -176,9 +186,16 @@ pub async fn save_to_drive(mut drive_state: Signal<DriveState>, data: &DriveSync
     }
 
     let client = DriveClient::new();
-    match client.save(&token.access_token, file_id.as_deref(), data).await {
+    match client
+        .save(&token.access_token, file_id.as_deref(), data)
+        .await
+    {
         Ok(new_id) => {
-            if let DriveState::Connected { file_id: ref mut fid, .. } = *drive_state.write() {
+            if let DriveState::Connected {
+                file_id: ref mut fid,
+                ..
+            } = *drive_state.write()
+            {
                 *fid = Some(new_id);
             }
         }
@@ -215,13 +232,19 @@ pub async fn load_from_drive(
         Ok(id) => id,
         Err(e) => {
             tracing::error!("Drive file lookup failed: {e}");
-            drive_state.set(DriveState::Connected { token: token.clone(), file_id: None });
+            drive_state.set(DriveState::Connected {
+                token: token.clone(),
+                file_id: None,
+            });
             return None;
         }
     };
 
     let Some(ref id) = file_id else {
-        drive_state.set(DriveState::Connected { token: token.clone(), file_id: None });
+        drive_state.set(DriveState::Connected {
+            token: token.clone(),
+            file_id: None,
+        });
         return None;
     };
 
@@ -238,11 +261,17 @@ pub async fn load_from_drive(
             }
             settings.set(ptcgp_db_core::AppSettings::from_save_data(data.settings));
             queries.set(ptcgp_db_core::SavedQueries::from_save_data(data.queries));
-            drive_state.set(DriveState::Connected { token: token.clone(), file_id: file_id.clone() });
+            drive_state.set(DriveState::Connected {
+                token: token.clone(),
+                file_id: file_id.clone(),
+            });
         }
         Err(e) => {
             tracing::error!("Drive read failed: {e}");
-            drive_state.set(DriveState::Connected { token: token.clone(), file_id: file_id.clone() });
+            drive_state.set(DriveState::Connected {
+                token: token.clone(),
+                file_id: file_id.clone(),
+            });
         }
     }
 
@@ -411,7 +440,10 @@ async fn connect_drive(
     match client.save(&token.access_token, None, &sync_data).await {
         Ok(file_id) => {
             set_drive_enabled(true);
-            drive_state.set(DriveState::Connected { token, file_id: Some(file_id) });
+            drive_state.set(DriveState::Connected {
+                token,
+                file_id: Some(file_id),
+            });
         }
         Err(e) => {
             drive_state.set(DriveState::Error(format!("Drive upload failed: {e}")));
