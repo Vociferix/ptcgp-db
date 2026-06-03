@@ -418,6 +418,7 @@ pub fn App() -> Element {
 
     rsx! {
         document::Stylesheet { href: asset!("/public/tailwind.css") }
+        document::Link { rel: "icon", r#type: "image/png", href: asset!("/public/favicon.png") }
         {body}
     }
 }
