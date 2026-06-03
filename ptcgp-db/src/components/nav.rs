@@ -63,15 +63,17 @@ pub fn NavLayout() -> Element {
     let show_selector = !hides_profile_selector(&current);
 
     rsx! {
-        div { class: "flex h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100",
+        div { class: "flex h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100",
 
             // ---- Wide sidebar (md+) ----
-            nav { class: "hidden md:flex flex-col w-52 shrink-0 border-r \
-                        border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800",
+            nav { class: "hidden md:flex flex-col w-52 shrink-0 relative z-10 \
+                        border-r border-gray-200/60 dark:border-white/[0.07] \
+                        bg-white dark:bg-gray-800 \
+                        shadow-[2px_0_24px_rgba(0,0,0,0.14)] dark:shadow-[2px_0_24px_rgba(0,0,0,0.65)]",
 
                 // App title
                 div { class: "px-4 py-4 text-lg font-bold tracking-tight border-b \
-                              border-gray-200 dark:border-gray-700",
+                              border-gray-200/80 dark:border-gray-700/80",
                     "PTCGP DB"
                 }
 
@@ -82,9 +84,12 @@ pub fn NavLayout() -> Element {
                             Link {
                                 to: item.route,
                                 class: "block px-4 py-2 text-sm rounded-md mx-2 \
-                                        hover:bg-gray-200 dark:hover:bg-gray-700 \
-                                        text-gray-700 dark:text-gray-300",
-                                active_class: "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 font-medium",
+                                        hover:bg-gray-100 dark:hover:bg-gray-700 \
+                                        text-gray-700 dark:text-gray-300 transition-colors",
+                                active_class: "bg-blue-50 dark:bg-blue-950/60 \
+                                              text-blue-700 dark:text-blue-200 font-medium \
+                                              ring-1 ring-inset ring-blue-200 dark:ring-blue-800 \
+                                              shadow-sm",
                                 "{item.label}"
                             }
                         }
@@ -93,7 +98,7 @@ pub fn NavLayout() -> Element {
 
                 // Profile selector at the bottom of the sidebar
                 if show_selector {
-                    div { class: "p-3 border-t border-gray-200 dark:border-gray-700",
+                    div { class: "p-3 border-t border-gray-200/80 dark:border-gray-700/80",
                         ProfileSelector { open_upward: true }
                     }
                 }
@@ -104,7 +109,10 @@ pub fn NavLayout() -> Element {
 
                 // ---- Narrow top header (<md) ----
                 header { class: "md:hidden flex items-center gap-2 px-3 py-2 border-b \
-                            border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 shrink-0",
+                            border-gray-200/80 dark:border-white/[0.06] \
+                            bg-white dark:bg-gray-800 shrink-0 \
+                            shadow-[0_2px_8px_rgba(0,0,0,0.08)] dark:shadow-[0_2px_16px_rgba(0,0,0,0.6)] \
+                            relative z-10",
                     span { class: "font-bold tracking-tight text-base", "PTCGP DB" }
                     div { class: "flex-1",
                         if show_selector {
@@ -117,8 +125,10 @@ pub fn NavLayout() -> Element {
                 main { class: "flex-1 overflow-y-auto", Outlet::<Route> {} }
 
                 // ---- Narrow bottom nav (<md) ----
-                nav { class: "md:hidden flex border-t border-gray-200 dark:border-gray-700 \
-                            bg-gray-50 dark:bg-gray-800 shrink-0 divide-x divide-gray-200 dark:divide-gray-700",
+                nav { class: "md:hidden flex border-t border-gray-200/80 dark:border-white/[0.06] \
+                            bg-white dark:bg-gray-800 shrink-0 divide-x divide-gray-200/80 dark:divide-gray-700/80 \
+                            shadow-[0_-2px_8px_rgba(0,0,0,0.08)] dark:shadow-[0_-2px_16px_rgba(0,0,0,0.6)] \
+                            relative z-10",
                     for item in nav_items() {
                         Link {
                             key: "{item.short}",

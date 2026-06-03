@@ -39,7 +39,7 @@ pub fn CountSpinner(
     } else {
         "flex items-center justify-center w-7 h-7 rounded text-sm font-bold select-none \
          transition-colors bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 \
-         dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 cursor-pointer"
+         dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 cursor-pointer shadow-sm"
     };
     let increment_class = if disabled {
         "flex items-center justify-center w-7 h-7 rounded text-sm font-bold select-none \
@@ -48,7 +48,7 @@ pub fn CountSpinner(
     } else {
         "flex items-center justify-center w-7 h-7 rounded text-sm font-bold select-none \
          transition-colors bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 \
-         dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 cursor-pointer"
+         dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 cursor-pointer shadow-sm"
     };
 
     let input_class = if disabled {

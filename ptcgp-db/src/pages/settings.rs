@@ -91,7 +91,7 @@ pub fn SettingsPage() -> Element {
                     "Appearance"
                 }
                 div { class: "bg-white dark:bg-gray-800 rounded-lg border \
-                              border-gray-200 dark:border-gray-700 p-4",
+                              border-gray-200/80 dark:border-gray-700/80 p-4 shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.06]",
                     div { class: "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3",
                         div {
                             p { class: "text-sm font-medium text-gray-900 dark:text-gray-100",
@@ -111,9 +111,10 @@ pub fn SettingsPage() -> Element {
                                         settings.write().set_theme(value);
                                         persist_settings(settings, store);
                                     },
-                                    class: if theme == value { "px-3 py-1.5 text-sm font-medium bg-blue-600 text-white" } else { "px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 \
+                                    class: if theme == value { "px-3 py-1.5 text-sm font-medium bg-blue-600 text-white shadow-inner" } else { "px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 \
                                          bg-white dark:bg-gray-800 \
-                                         hover:bg-gray-100 dark:hover:bg-gray-700" },
+                                         hover:bg-gray-100 dark:hover:bg-gray-700 \
+                                         shadow-sm active:shadow-none active:translate-y-px" },
                                     "{label}"
                                 }
                             }
@@ -129,8 +130,8 @@ pub fn SettingsPage() -> Element {
                     "Collection"
                 }
                 div { class: "bg-white dark:bg-gray-800 rounded-lg border \
-                              border-gray-200 dark:border-gray-700 px-4 \
-                              divide-y divide-gray-100 dark:divide-gray-700",
+                              border-gray-200/80 dark:border-gray-700/80 px-4 \
+                              divide-y divide-gray-100 dark:divide-gray-700 shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.06]",
                     SettingToggle {
                         label: "Merge duplicate printings",
                         description: "Count reprinted cards as a single logical card; owned counts are summed across all versions.",
@@ -150,8 +151,8 @@ pub fn SettingsPage() -> Element {
                     "Filters"
                 }
                 div { class: "bg-white dark:bg-gray-800 rounded-lg border \
-                              border-gray-200 dark:border-gray-700 px-4 \
-                              divide-y divide-gray-100 dark:divide-gray-700",
+                              border-gray-200/80 dark:border-gray-700/80 px-4 \
+                              divide-y divide-gray-100 dark:divide-gray-700 shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.06]",
                     SettingToggle {
                         label: "Ignore unobtainable sets",
                         description: "Hide retired sets from the catalog, completion stats, and all probability calculations.",

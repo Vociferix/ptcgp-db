@@ -111,7 +111,7 @@ fn EditRow(
             }
             button {
                 r#type: "button",
-                class: "shrink-0 px-3 py-1.5 text-sm font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white",
+                class: "shrink-0 px-3 py-1.5 text-sm font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/30 dark:shadow-blue-900/70 active:shadow-sm active:translate-y-px",
                 onclick: {
                     let prof_name = prof_name.clone();
                     move |_| do_rename(prof_name.clone(), editing, edit_value, rename_error, store)
@@ -120,7 +120,7 @@ fn EditRow(
             }
             button {
                 r#type: "button",
-                class: "shrink-0 px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700",
+                class: "shrink-0 px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm active:shadow-none active:translate-y-px",
                 onclick: move |_| {
                     editing.set(None);
                     rename_error.set(None);
@@ -157,7 +157,7 @@ fn DisplayRow(
             if !is_primary_row {
                 button {
                     r#type: "button",
-                    class: "shrink-0 text-xs px-2 py-1 rounded-md border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700",
+                    class: "shrink-0 text-xs px-2 py-1 rounded-md border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm active:shadow-none active:translate-y-px",
                     onclick: {
                         let prof_name = prof_name.clone();
                         move |_| {
@@ -188,7 +188,7 @@ fn DisplayRow(
             button {
                 r#type: "button",
                 disabled: is_only,
-                class: if is_only { "shrink-0 text-xs px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed" } else { "shrink-0 text-xs px-2 py-1 rounded-md border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20" },
+                class: if is_only { "shrink-0 text-xs px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed" } else { "shrink-0 text-xs px-2 py-1 rounded-md border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 shadow-sm active:shadow-none active:translate-y-px" },
                 onclick: {
                     let prof_name = prof_name.clone();
                     move |_| {
@@ -218,7 +218,7 @@ fn DeleteConfirmDialog(
             class: "fixed inset-0 z-50 flex items-center justify-center bg-black/50",
             onclick: move |_| delete_target.set(None),
             div {
-                class: "bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 w-full max-w-sm mx-4 space-y-4",
+                class: "bg-white dark:bg-gray-800 rounded-xl shadow-2xl dark:shadow-[0_16px_48px_rgba(0,0,0,0.7)] ring-1 ring-black/10 dark:ring-white/10 p-6 w-full max-w-sm mx-4 space-y-4",
                 onclick: move |e| e.stop_propagation(),
                 h2 { class: "text-base font-semibold text-gray-900 dark:text-gray-100",
                     "Delete profile?"
@@ -229,13 +229,13 @@ fn DeleteConfirmDialog(
                 div { class: "flex justify-end gap-2",
                     button {
                         r#type: "button",
-                        class: "px-4 py-2 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700",
+                        class: "px-4 py-2 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm active:shadow-none active:translate-y-px",
                         onclick: move |_| delete_target.set(None),
                         "Cancel"
                     }
                     button {
                         r#type: "button",
-                        class: "px-4 py-2 text-sm font-medium rounded-md bg-red-600 hover:bg-red-700 text-white",
+                        class: "px-4 py-2 text-sm font-medium rounded-md bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-500/30 dark:shadow-red-900/70 active:shadow-sm active:translate-y-px",
                         onclick: {
                             let name = name.clone();
                             move |_| {
@@ -489,7 +489,7 @@ fn import_trigger(
                 class: "sr-only",
                 onchange: move |evt| handle_file_change(evt, store, import_step),
             }
-            span { class: "rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium px-4 py-2 text-sm transition-colors select-none",
+            span { class: "rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium px-4 py-2 text-sm transition-colors select-none shadow-sm",
                 "Choose JSON file…"
             }
         }
@@ -504,7 +504,7 @@ fn import_trigger(
     rsx! {
         button {
             r#type: "button",
-            class: "rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium px-4 py-2 text-sm transition-colors",
+            class: "rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium px-4 py-2 text-sm transition-colors shadow-sm active:shadow-none active:translate-y-px",
             onclick: move |_| handle_file_pick(store, import_step),
             "Choose JSON file…"
         }
@@ -619,7 +619,7 @@ pub fn ProfileManagerPage() -> Element {
 
             // ── Profile list ────────────────────────────────────────────────
             section {
-                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700",
+                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 divide-y divide-gray-100 dark:divide-gray-700 shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.06]",
                     for profile in &profiles {
                         {
                             let prof_name = profile.name.clone();
@@ -663,7 +663,7 @@ pub fn ProfileManagerPage() -> Element {
                 h2 { class: "text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3",
                     "New profile"
                 }
-                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4",
+                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-4 shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.06]",
                     div { class: "flex items-start gap-2",
                         div { class: "flex-1 space-y-1",
                             input {
@@ -689,7 +689,7 @@ pub fn ProfileManagerPage() -> Element {
                         }
                         button {
                             r#type: "button",
-                            class: "shrink-0 px-4 py-1.5 text-sm font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white",
+                            class: "shrink-0 px-4 py-1.5 text-sm font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/30 dark:shadow-blue-900/70 active:shadow-sm active:translate-y-px",
                             onclick: move |_| do_create(new_name, create_error, store),
                             "Create"
                         }
@@ -698,7 +698,7 @@ pub fn ProfileManagerPage() -> Element {
             }
 
             // ── Export ───────────────────────────────────────────────────────
-            section { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 space-y-3",
+            section { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-6 space-y-3 shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.06]",
                 h2 { class: "text-lg font-semibold text-gray-900 dark:text-gray-100",
                     "Export"
                 }
@@ -707,14 +707,14 @@ pub fn ProfileManagerPage() -> Element {
                 }
                 button {
                     r#type: "button",
-                    class: "rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium px-4 py-2 text-sm transition-colors",
+                    class: "rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium px-4 py-2 text-sm transition-colors shadow-md shadow-blue-500/30 dark:shadow-blue-900/70 active:shadow-sm active:translate-y-px",
                     onclick: move |_| do_export(store),
                     "Export to JSON"
                 }
             }
 
             // ── Import ───────────────────────────────────────────────────────
-            section { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 space-y-4",
+            section { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-6 space-y-4 shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.06]",
                 h2 { class: "text-lg font-semibold text-gray-900 dark:text-gray-100",
                     "Import"
                 }
@@ -755,13 +755,13 @@ pub fn ProfileManagerPage() -> Element {
                             div { class: "flex gap-3 pt-2",
                                 button {
                                     r#type: "button",
-                                    class: "rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium px-4 py-2 text-sm transition-colors",
+                                    class: "rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium px-4 py-2 text-sm transition-colors shadow-md shadow-blue-500/30 dark:shadow-blue-900/70 active:shadow-sm active:translate-y-px",
                                     onclick: move |_| confirm_import(import_step, store),
                                     "Confirm Import"
                                 }
                                 button {
                                     r#type: "button",
-                                    class: "rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium px-4 py-2 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-700",
+                                    class: "rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium px-4 py-2 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm active:shadow-none active:translate-y-px",
                                     onclick: move |_| import_step.set(ImportStep::Idle),
                                     "Cancel"
                                 }

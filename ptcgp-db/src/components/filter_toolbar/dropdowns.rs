@@ -11,7 +11,7 @@ use ptcgp_db_core::save_data::FilterConfig;
 
 const TRIGGER_CLS: &str = "flex items-center gap-1 px-2 h-8 rounded-md text-sm font-medium \
     bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 \
-    text-gray-800 dark:text-gray-100";
+    text-gray-800 dark:text-gray-100 shadow-sm active:shadow-none active:translate-y-px";
 
 #[component]
 fn DropdownPanel(open: Signal<bool>, extra_cls: &'static str, children: Element) -> Element {
@@ -23,8 +23,10 @@ fn DropdownPanel(open: Signal<bool>, extra_cls: &'static str, children: Element)
             }
             div { class: "absolute left-0 top-full mt-1 z-20 max-h-80 \
                         overflow-y-auto overflow-x-hidden \
-                        rounded-md border border-gray-200 dark:border-gray-700 \
-                        bg-white dark:bg-gray-800 shadow-lg py-1 {extra_cls}",
+                        rounded-md border border-gray-200/60 dark:border-gray-600/60 \
+                        bg-white dark:bg-gray-700 \
+                        shadow-xl dark:shadow-[0_4px_28px_rgba(0,0,0,0.7)] ring-1 ring-black/5 dark:ring-white/[0.09] \
+                        py-1 {extra_cls}",
                 {children}
             }
         }
@@ -36,8 +38,8 @@ fn DropdownPanel(open: Signal<bool>, extra_cls: &'static str, children: Element)
 #[component]
 fn DropdownHint() -> Element {
     rsx! {
-        div { class: "px-3 pt-0.5 pb-1 border-b border-gray-100 dark:border-gray-700 \
-                      text-xs text-gray-400 dark:text-gray-500",
+        div { class: "px-3 pt-0.5 pb-1 border-b border-gray-100 dark:border-gray-600 \
+                      text-xs text-gray-400 dark:text-gray-400",
             "Ctrl+Click to select multiple"
         }
     }
@@ -244,7 +246,7 @@ fn PackGroup(
     rsx! {
         if let Some(set) = Set::from_id(set_id) {
             div { class: "flex items-center px-3 py-1 \
-                          bg-gray-50 dark:bg-gray-900",
+                          bg-gray-50 dark:bg-gray-800/60",
                 img {
                     src: "{set.icon()}",
                     alt: "{set.code()}",
@@ -400,10 +402,10 @@ fn SourceItem(
 fn dropdown_row_cls(checked: bool) -> &'static str {
     if checked {
         "flex items-center gap-2 px-3 py-2 cursor-pointer select-none \
-         bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900"
+         bg-blue-50 dark:bg-blue-950/80 hover:bg-blue-100 dark:hover:bg-blue-900/60"
     } else {
         "flex items-center gap-2 px-3 py-2 cursor-pointer select-none \
-         hover:bg-gray-50 dark:hover:bg-gray-700"
+         hover:bg-gray-50 dark:hover:bg-gray-600"
     }
 }
 

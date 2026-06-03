@@ -391,7 +391,7 @@ pub fn CatalogPage() -> Element {
 #[component]
 fn SortHeader(sort_cfg: Signal<SortConfig>) -> Element {
     rsx! {
-        div { class: "flex items-center shrink-0 px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 gap-2",
+        div { class: "flex items-center shrink-0 px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200/80 dark:border-gray-600/60 bg-gray-50 dark:bg-gray-800/80 shadow dark:shadow-[0_2px_10px_rgba(0,0,0,0.5)] gap-2",
             div { class: "w-14 shrink-0" }
             SortBtn {
                 col: SortColumn::Name,
@@ -509,9 +509,9 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
 
     let is_selected = *selected.read() == Some(cv_id);
     let selected_class = if is_selected {
-        "bg-blue-50 dark:bg-blue-900/20"
+        "bg-blue-50 dark:bg-blue-900/20 ring-1 ring-inset ring-blue-200/60 dark:ring-blue-800/60 shadow-sm"
     } else {
-        "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+        "hover:bg-white dark:hover:bg-gray-700/50 hover:shadow-sm"
     };
 
     let pull_label = if pd.max_pull_rate_pct > 0.0 {

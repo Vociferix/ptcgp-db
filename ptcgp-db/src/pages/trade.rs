@@ -126,7 +126,8 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
         schedule_save();
     });
     let btn_cls = "px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white \
-                   hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed";
+                   hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed \
+                   shadow-md shadow-blue-500/30 dark:shadow-blue-900/70 active:shadow-sm active:translate-y-px";
 
     rsx! {
         div {
@@ -347,7 +348,8 @@ fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> El
                     r#type: "button",
                     class: "shrink-0 px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 \
                             text-white hover:bg-blue-700 disabled:opacity-40 \
-                            disabled:cursor-not-allowed",
+                            disabled:cursor-not-allowed \
+                            shadow-md shadow-blue-500/30 dark:shadow-blue-900/70 active:shadow-sm active:translate-y-px",
                     disabled,
                     onclick: on_transfer,
                     "Transfer"
@@ -618,8 +620,7 @@ pub fn TradePage() -> Element {
     candidates.truncate(*candidates_limit.read());
     let candidates_remaining = candidates_total - candidates.len();
 
-    let card_cls =
-        "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700";
+    let card_cls = "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.06]";
     let show_more_cls = "w-full px-4 py-3 text-center text-sm text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50 border-t border-gray-100 dark:border-gray-700";
 
     rsx! {

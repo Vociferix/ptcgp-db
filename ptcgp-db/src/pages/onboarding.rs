@@ -176,7 +176,7 @@ fn import_button(
                 class: "sr-only",
                 onchange: move |evt| do_import(evt, store, import_error),
             }
-            span { class: "flex w-full items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors select-none",
+            span { class: "flex w-full items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors select-none shadow-sm",
                 "Import existing data"
             }
         }
@@ -191,7 +191,7 @@ fn import_button(
     rsx! {
         button {
             r#type: "button",
-            class: "flex w-full items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors",
+            class: "flex w-full items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors shadow-sm active:shadow-none active:translate-y-px",
             onclick: move |_| do_import(store, import_error),
             "Import existing data"
         }
@@ -293,7 +293,8 @@ pub fn OnboardingPage() -> Element {
                 button {
                     r#type: "button",
                     class: "w-full rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 \
-                            text-white font-medium py-2 text-sm transition-colors",
+                            text-white font-medium py-2 text-sm transition-colors \
+                            shadow-md shadow-blue-500/30 dark:shadow-blue-900/70 active:shadow-sm active:translate-y-px",
                     onclick: move |_| do_submit(name, error, store),
                     "Get Started"
                 }
@@ -364,7 +365,8 @@ pub fn OnboardingPage() -> Element {
                                 r#type: "button",
                                 class: "w-full rounded-lg bg-blue-600 hover:bg-blue-700 \
                                         active:bg-blue-800 text-white font-medium py-2.5 \
-                                        text-sm transition-colors",
+                                        text-sm transition-colors \
+                                        shadow-md shadow-blue-500/30 dark:shadow-blue-900/70 active:shadow-sm active:translate-y-px",
                                 onclick: move |_| start_drive_connect(drive_state, store, settings, queries, step),
                                 "Sync with Google Drive"
                             }
@@ -379,7 +381,7 @@ pub fn OnboardingPage() -> Element {
                                 class: "w-full rounded-lg border border-gray-300 \
                                         dark:border-gray-600 text-gray-700 dark:text-gray-300 \
                                         font-medium py-2.5 text-sm \
-                                        hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors",
+                                        hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors shadow-sm active:shadow-none active:translate-y-px",
                                 onclick: move |_| step.set(Step::SetupProfile),
                                 "Work locally only"
                             }
@@ -398,8 +400,8 @@ pub fn OnboardingPage() -> Element {
     };
 
     rsx! {
-        div { class: "min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center gap-4 p-4",
-            div { class: "w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 space-y-6",
+        div { class: "min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col items-center justify-center gap-4 p-4",
+            div { class: "w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-2xl dark:shadow-[0_16px_48px_rgba(0,0,0,0.7)] ring-1 ring-black/5 dark:ring-white/10 p-8 space-y-6",
                 {body}
             }
             p { class: "w-full max-w-sm text-xs text-center text-gray-400 dark:text-gray-500 leading-relaxed",

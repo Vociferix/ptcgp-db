@@ -7,9 +7,9 @@ use dioxus::prelude::*;
 #[component]
 pub fn Toggle(checked: bool, on_change: EventHandler<bool>) -> Element {
     let track = if checked {
-        "bg-blue-600"
+        "bg-blue-600 shadow-inner"
     } else {
-        "bg-gray-300 dark:bg-gray-600"
+        "bg-gray-300 dark:bg-gray-600 shadow-inner"
     };
     let thumb = if checked {
         "translate-x-5"
@@ -28,7 +28,7 @@ pub fn Toggle(checked: bool, on_change: EventHandler<bool>) -> Element {
                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 \
                     dark:focus:ring-offset-gray-800 {track}",
             span { class: "pointer-events-none inline-block h-5 w-5 transform rounded-full \
-                        bg-white shadow ring-0 transition-transform duration-200 ease-in-out \
+                        bg-white shadow-md ring-0 transition-transform duration-200 ease-in-out \
                         {thumb}" }
         }
     }
