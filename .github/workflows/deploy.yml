@@ -1,0 +1,66 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+env:
+  CARGO_TERM_COLOR: always
+  DX_VERSION: 0.7.9
+
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Compute submodule hash
+        run: echo "SUBMODULE_HASH=$(git submodule status | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ env.SUBMODULE_HASH }}
+          cache-all-crates: "true"
+
+      - name: Cache dx binary
+        id: cache-dx
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/dx
+          key: dx-${{ runner.os }}-${{ env.DX_VERSION }}
+
+      - name: Install dx
+        if: steps.cache-dx.outputs.cache-hit != 'true'
+        run: cargo install dioxus-cli --version ${{ env.DX_VERSION }} --locked
+
+      - name: Cache dx tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/.dx/tools
+          key: dx-tools-${{ runner.os }}-${{ env.DX_VERSION }}
+
+      - name: Set base path for GitHub Pages
+        run: sed -i '/^\[web\.app\]/a base_path = "ptcgp-db"' ptcgp-db/Dioxus.toml
+
+      - name: Build web
+        working-directory: ptcgp-db
+        run: dx build --platform web --release
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./ptcgp-db/dist
+          publish_branch: master
+          destination_dir: ptcgp-db
+          keep_files: true
