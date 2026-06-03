@@ -63,9 +63,9 @@ pub fn ProfileSelector(#[props(default = false)] open_upward: bool) -> Element {
             if *open.read() {
                 div { class: if open_upward { "absolute left-0 z-20 bottom-full mb-1 min-w-full w-48 rounded-md \
                          bg-white dark:bg-gray-700 border border-gray-200/60 dark:border-gray-600/60 \
-                         shadow-xl ring-1 ring-black/5 dark:ring-white/[0.09] py-1" } else { "absolute left-0 z-20 mt-1 min-w-full w-48 rounded-md \
+                         shadow-xl dark:shadow-[0_4px_28px_rgba(0,0,0,0.7)] ring-1 ring-black/5 dark:ring-white/[0.09] py-1" } else { "absolute left-0 z-20 mt-1 min-w-full w-48 rounded-md \
                          bg-white dark:bg-gray-700 border border-gray-200/60 dark:border-gray-600/60 \
-                         shadow-xl ring-1 ring-black/5 dark:ring-white/[0.09] py-1" },
+                         shadow-xl dark:shadow-[0_4px_28px_rgba(0,0,0,0.7)] ring-1 ring-black/5 dark:ring-white/[0.09] py-1" },
                     for name in profile_names {
                         ProfileRow {
                             key: "{name}",

@@ -25,7 +25,7 @@ fn DropdownPanel(open: Signal<bool>, extra_cls: &'static str, children: Element)
                         overflow-y-auto overflow-x-hidden \
                         rounded-md border border-gray-200/60 dark:border-gray-600/60 \
                         bg-white dark:bg-gray-700 \
-                        shadow-xl ring-1 ring-black/5 dark:ring-white/[0.09] \
+                        shadow-xl dark:shadow-[0_4px_28px_rgba(0,0,0,0.7)] ring-1 ring-black/5 dark:ring-white/[0.09] \
                         py-1 {extra_cls}",
                 {children}
             }

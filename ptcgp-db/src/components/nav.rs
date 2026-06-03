@@ -63,13 +63,13 @@ pub fn NavLayout() -> Element {
     let show_selector = !hides_profile_selector(&current);
 
     rsx! {
-        div { class: "flex h-screen bg-gray-100 dark:bg-gray-950 text-gray-900 dark:text-gray-100",
+        div { class: "flex h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100",
 
             // ---- Wide sidebar (md+) ----
             nav { class: "hidden md:flex flex-col w-52 shrink-0 relative z-10 \
                         border-r border-gray-200/60 dark:border-white/[0.07] \
                         bg-white dark:bg-gray-800 \
-                        shadow-[2px_0_24px_rgba(0,0,0,0.14)] dark:shadow-none",
+                        shadow-[2px_0_24px_rgba(0,0,0,0.14)] dark:shadow-[2px_0_24px_rgba(0,0,0,0.65)]",
 
                 // App title
                 div { class: "px-4 py-4 text-lg font-bold tracking-tight border-b \
@@ -111,7 +111,7 @@ pub fn NavLayout() -> Element {
                 header { class: "md:hidden flex items-center gap-2 px-3 py-2 border-b \
                             border-gray-200/80 dark:border-white/[0.06] \
                             bg-white dark:bg-gray-800 shrink-0 \
-                            shadow-[0_2px_8px_rgba(0,0,0,0.08)] dark:shadow-none \
+                            shadow-[0_2px_8px_rgba(0,0,0,0.08)] dark:shadow-[0_2px_16px_rgba(0,0,0,0.6)] \
                             relative z-10",
                     span { class: "font-bold tracking-tight text-base", "PTCGP DB" }
                     div { class: "flex-1",
@@ -127,7 +127,7 @@ pub fn NavLayout() -> Element {
                 // ---- Narrow bottom nav (<md) ----
                 nav { class: "md:hidden flex border-t border-gray-200/80 dark:border-white/[0.06] \
                             bg-white dark:bg-gray-800 shrink-0 divide-x divide-gray-200/80 dark:divide-gray-700/80 \
-                            shadow-[0_-2px_8px_rgba(0,0,0,0.08)] dark:shadow-none \
+                            shadow-[0_-2px_8px_rgba(0,0,0,0.08)] dark:shadow-[0_-2px_16px_rgba(0,0,0,0.6)] \
                             relative z-10",
                     for item in nav_items() {
                         Link {

@@ -205,7 +205,7 @@ fn SavedQueriesDropdown(
                 div { class: "absolute left-0 top-full mt-1 z-20 max-h-80 overflow-y-auto \
                               overflow-x-hidden rounded-md border border-gray-200/60 \
                               dark:border-gray-600/60 bg-white dark:bg-gray-700 \
-                              shadow-xl ring-1 ring-black/5 dark:ring-white/[0.09] py-1 \
+                              shadow-xl dark:shadow-[0_4px_28px_rgba(0,0,0,0.7)] ring-1 ring-black/5 dark:ring-white/[0.09] py-1 \
                               min-w-48",
                     div {
                         class: "flex items-center px-3 py-2 cursor-pointer select-none \
@@ -287,7 +287,7 @@ fn SaveQueryDialog(
             class: "fixed inset-0 z-50 flex items-center justify-center bg-black/40",
             onclick: move |_| on_close.call(()),
             div {
-                class: "bg-white dark:bg-gray-800 rounded-xl shadow-2xl \
+                class: "bg-white dark:bg-gray-800 rounded-xl shadow-2xl dark:shadow-[0_16px_48px_rgba(0,0,0,0.7)] \
                         ring-1 ring-black/10 dark:ring-white/10 border \
                         border-gray-200/60 dark:border-gray-700/60 p-5 w-80 flex flex-col gap-4",
                 onclick: move |e| e.stop_propagation(),
@@ -606,7 +606,7 @@ pub fn SummaryPage() -> Element {
                 h2 { class: "text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3",
                     "Overall"
                 }
-                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-4 space-y-3 shadow-md dark:shadow-none dark:ring-1 dark:ring-white/[0.06]",
+                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-4 space-y-3 shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.06]",
                     if total_denom == 0 {
                         p { class: "text-sm text-gray-500 dark:text-gray-400",
                             "No cards match the current filters."
@@ -634,7 +634,7 @@ pub fn SummaryPage() -> Element {
                 h2 { class: "text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3",
                     "Next pack to open"
                 }
-                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-4 shadow-md dark:shadow-none dark:ring-1 dark:ring-white/[0.06]",
+                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-4 shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.06]",
                     if collection_complete {
                         p { class: "text-sm font-medium text-green-600 dark:text-green-400",
                             "Goal met for all matching cards!"
@@ -688,7 +688,7 @@ pub fn SummaryPage() -> Element {
                 h2 { class: "text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3",
                     "Set completion"
                 }
-                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 overflow-hidden shadow-md dark:shadow-none dark:ring-1 dark:ring-white/[0.06]",
+                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 overflow-hidden shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.06]",
                     div { class: "hidden sm:grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 bg-gray-50 dark:bg-gray-800/80 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200/80 dark:border-gray-700/80 shadow-sm",
                         span { "Set" }
                         span { "Completion" }

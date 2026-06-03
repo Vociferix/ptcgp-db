@@ -391,7 +391,7 @@ pub fn CatalogPage() -> Element {
 #[component]
 fn SortHeader(sort_cfg: Signal<SortConfig>) -> Element {
     rsx! {
-        div { class: "flex items-center shrink-0 px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200/80 dark:border-gray-600/60 bg-gray-50 dark:bg-gray-800/80 shadow dark:shadow-none gap-2",
+        div { class: "flex items-center shrink-0 px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200/80 dark:border-gray-600/60 bg-gray-50 dark:bg-gray-800/80 shadow dark:shadow-[0_2px_10px_rgba(0,0,0,0.5)] gap-2",
             div { class: "w-14 shrink-0" }
             SortBtn {
                 col: SortColumn::Name,

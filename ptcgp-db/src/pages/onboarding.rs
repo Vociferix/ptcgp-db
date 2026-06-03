@@ -399,7 +399,7 @@ pub fn OnboardingPage() -> Element {
 
     rsx! {
         div { class: "min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col items-center justify-center gap-4 p-4",
-            div { class: "w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-2xl ring-1 ring-black/5 dark:ring-white/10 p-8 space-y-6",
+            div { class: "w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-2xl dark:shadow-[0_16px_48px_rgba(0,0,0,0.7)] ring-1 ring-black/5 dark:ring-white/10 p-8 space-y-6",
                 {body}
             }
             p { class: "w-full max-w-sm text-xs text-center text-gray-400 dark:text-gray-500 leading-relaxed",

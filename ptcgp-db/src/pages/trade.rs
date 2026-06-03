@@ -618,7 +618,7 @@ pub fn TradePage() -> Element {
     candidates.truncate(*candidates_limit.read());
     let candidates_remaining = candidates_total - candidates.len();
 
-    let card_cls = "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 shadow-md dark:shadow-none dark:ring-1 dark:ring-white/[0.06]";
+    let card_cls = "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.06]";
     let show_more_cls = "w-full px-4 py-3 text-center text-sm text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/50 border-t border-gray-100 dark:border-gray-700";
 
     rsx! {
