@@ -1,4 +1,5 @@
 use super::*;
+use crate::save_data::CardVersionId;
 
 // A minimal in-memory Storage stub for unit tests.
 #[derive(Clone, Debug, Default)]
@@ -167,7 +168,7 @@ fn delete_nonprimary_inactive_profile() {
 fn delete_primary_promotes_profile_with_most_cards() {
     let mut store = store_with_profiles(&["Main", "Alt"]);
     // Give Alt one card so it has the highest count.
-    store.set_owned_count("Alt", 0, 5).unwrap();
+    store.set_owned_count("Alt", CardVersionId(0), 5).unwrap();
     store.delete_profile("Main").unwrap();
 
     assert_eq!(store.primary_profile_name(), "Alt");
@@ -280,17 +281,17 @@ fn deactivate_nonexistent_fails() {
 #[test]
 fn set_and_read_owned_count() {
     let mut store = store_with_profiles(&["Main"]);
-    store.set_owned_count("Main", 42, 3).unwrap();
-    assert_eq!(store.owned_count("Main", 42), 3);
+    store.set_owned_count("Main", CardVersionId(42), 3).unwrap();
+    assert_eq!(store.owned_count("Main", CardVersionId(42)), 3);
     assert!(store.needs_save());
 }
 
 #[test]
 fn set_zero_removes_entry() {
     let mut store = store_with_profiles(&["Main"]);
-    store.set_owned_count("Main", 42, 3).unwrap();
-    store.set_owned_count("Main", 42, 0).unwrap();
-    assert_eq!(store.owned_count("Main", 42), 0);
+    store.set_owned_count("Main", CardVersionId(42), 3).unwrap();
+    store.set_owned_count("Main", CardVersionId(42), 0).unwrap();
+    assert_eq!(store.owned_count("Main", CardVersionId(42)), 0);
     assert!(
         store
             .data
@@ -306,41 +307,43 @@ fn set_zero_removes_entry() {
 #[test]
 fn set_same_value_is_noop() {
     let mut store = store_with_profiles(&["Main"]);
-    store.set_owned_count("Main", 42, 3).unwrap();
+    store.set_owned_count("Main", CardVersionId(42), 3).unwrap();
     store.dirty = false;
-    store.set_owned_count("Main", 42, 3).unwrap();
+    store.set_owned_count("Main", CardVersionId(42), 3).unwrap();
     assert!(!store.needs_save());
 }
 
 #[test]
 fn set_owned_count_unknown_profile_fails() {
     let mut store = store_with_profiles(&["Main"]);
-    let err = store.set_owned_count("Ghost", 0, 1).unwrap_err();
+    let err = store
+        .set_owned_count("Ghost", CardVersionId(0), 1)
+        .unwrap_err();
     assert!(matches!(err, ProfileStoreError::NotFound(_)));
 }
 
 #[test]
 fn absent_entry_reads_as_zero() {
     let store = store_with_profiles(&["Main"]);
-    assert_eq!(store.owned_count("Main", 999), 0);
+    assert_eq!(store.owned_count("Main", CardVersionId(999)), 0);
 }
 
 #[test]
 fn aggregate_count_sums_active_profiles() {
     let mut store = store_with_profiles(&["Main", "Alt"]);
     store.activate_profile("Alt").unwrap();
-    store.set_owned_count("Main", 0, 2).unwrap();
-    store.set_owned_count("Alt", 0, 3).unwrap();
-    assert_eq!(store.aggregate_count(0), 5);
+    store.set_owned_count("Main", CardVersionId(0), 2).unwrap();
+    store.set_owned_count("Alt", CardVersionId(0), 3).unwrap();
+    assert_eq!(store.aggregate_count(CardVersionId(0)), 5);
 }
 
 #[test]
 fn aggregate_count_excludes_inactive_profiles() {
     let mut store = store_with_profiles(&["Main", "Alt"]);
     // Alt is not active; only Main is.
-    store.set_owned_count("Main", 0, 2).unwrap();
-    store.set_owned_count("Alt", 0, 10).unwrap();
-    assert_eq!(store.aggregate_count(0), 2);
+    store.set_owned_count("Main", CardVersionId(0), 2).unwrap();
+    store.set_owned_count("Alt", CardVersionId(0), 10).unwrap();
+    assert_eq!(store.aggregate_count(CardVersionId(0)), 2);
 }
 
 // --- replace_profile_counts ---
@@ -348,28 +351,28 @@ fn aggregate_count_excludes_inactive_profiles() {
 #[test]
 fn replace_counts_overwrites_existing_map() {
     let mut store = store_with_profiles(&["Main"]);
-    store.set_owned_count("Main", 1, 5).unwrap();
-    store.set_owned_count("Main", 2, 3).unwrap();
+    store.set_owned_count("Main", CardVersionId(1), 5).unwrap();
+    store.set_owned_count("Main", CardVersionId(2), 3).unwrap();
     store.dirty = false;
 
-    let new_counts = HashMap::from([(1usize, 10u32), (3, 7)]);
+    let new_counts = HashMap::from([(CardVersionId(1), 10u32), (CardVersionId(3), 7)]);
     store.replace_profile_counts("Main", new_counts).unwrap();
 
-    assert_eq!(store.owned_count("Main", 1), 10);
-    assert_eq!(store.owned_count("Main", 2), 0); // removed
-    assert_eq!(store.owned_count("Main", 3), 7);
+    assert_eq!(store.owned_count("Main", CardVersionId(1)), 10);
+    assert_eq!(store.owned_count("Main", CardVersionId(2)), 0); // removed
+    assert_eq!(store.owned_count("Main", CardVersionId(3)), 7);
     assert!(store.needs_save());
 }
 
 #[test]
 fn replace_counts_strips_zeros() {
     let mut store = store_with_profiles(&["Main"]);
-    let counts = HashMap::from([(1usize, 0u32), (2, 5)]);
+    let counts = HashMap::from([(CardVersionId(1), 0u32), (CardVersionId(2), 5)]);
     store.replace_profile_counts("Main", counts).unwrap();
 
     let profile = store.profiles().iter().find(|p| p.name == "Main").unwrap();
-    assert!(!profile.owned_counts.contains_key(&1));
-    assert_eq!(profile.owned_counts[&2], 5);
+    assert!(!profile.owned_counts.contains_key(&CardVersionId(1)));
+    assert_eq!(profile.owned_counts[&CardVersionId(2)], 5);
 }
 
 #[test]
@@ -397,12 +400,12 @@ async fn save_then_load_round_trip() {
     let storage = MemStorage::default();
     let mut store = ProfileStore::new(storage.clone());
     store.create_profile("Main".to_string()).unwrap();
-    store.set_owned_count("Main", 7, 4).unwrap();
+    store.set_owned_count("Main", CardVersionId(7), 4).unwrap();
     store.save().await.unwrap();
     assert!(!store.needs_save());
 
     let loaded = ProfileStore::load(storage).await.unwrap();
-    assert_eq!(loaded.owned_count("Main", 7), 4);
+    assert_eq!(loaded.owned_count("Main", CardVersionId(7)), 4);
     assert_eq!(loaded.primary_profile_name(), "Main");
     assert_eq!(loaded.active_profile_names(), &["Main"]);
 }

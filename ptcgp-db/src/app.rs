@@ -3,7 +3,7 @@ use std::time::Duration;
 use dioxus::prelude::*;
 use futures_channel::mpsc::UnboundedReceiver;
 use futures_util::StreamExt as _;
-use ptcgp_db_core::save_data::{FilterConfig, Theme};
+use ptcgp_db_core::save_data::{CardVersionId, FilterConfig, Theme};
 use ptcgp_db_core::storage::Storage as _;
 use ptcgp_db_core::{AppSettings, ProfileStore, SavedQueries};
 
@@ -148,7 +148,7 @@ pub(crate) fn set_card_count(
     {
         let mut s = store.write();
         let Some(s) = s.as_mut() else { return };
-        let _ = s.set_owned_count(&name, cv_id, new_count);
+        let _ = s.set_owned_count(&name, CardVersionId(cv_id), new_count);
     }
     schedule_save();
 }

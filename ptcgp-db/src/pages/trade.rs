@@ -3,7 +3,8 @@ use std::collections::HashSet;
 use dioxus::prelude::*;
 use ptcgp_db_core::{
     AppSettings, CandidateRec, ProfileStore, ShareRec, TradeRec, build_candidates, build_shares,
-    build_trades, save_data::FilterConfig,
+    build_trades,
+    save_data::{CardVersionId, FilterConfig},
 };
 use ptcgp_db_data::{Card, CardVersion, Prob};
 
@@ -116,6 +117,7 @@ fn ShareRow(rank: usize, rec: ShareRec, dest_name: String, disabled: bool) -> El
         e.stop_propagation();
         let mut s = store.write();
         if let Some(st) = s.as_mut() {
+            let cv_id = CardVersionId(cv_id);
             let src_c = st.owned_count(&source_name, cv_id);
             let _ = st.set_owned_count(&source_name, cv_id, src_c.saturating_sub(1));
             let dst_c = st.owned_count(&dest_for_xfer, cv_id);
@@ -305,6 +307,8 @@ fn TradeRow(rank: usize, rec: TradeRec, dest_name: String, disabled: bool) -> El
         e.stop_propagation();
         let mut s = store.write();
         if let Some(st) = s.as_mut() {
+            let cv_b_id = CardVersionId(cv_b_id);
+            let cv_a_id = CardVersionId(cv_a_id);
             let b_src = st.owned_count(&source, cv_b_id);
             let _ = st.set_owned_count(&source, cv_b_id, b_src.saturating_sub(1));
             let b_dst = st.owned_count(&dest_for_xfer, cv_b_id);
