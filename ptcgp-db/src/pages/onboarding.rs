@@ -398,9 +398,16 @@ pub fn OnboardingPage() -> Element {
     };
 
     rsx! {
-        div { class: "min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4",
+        div { class: "min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center gap-4 p-4",
             div { class: "w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 space-y-6",
                 {body}
+            }
+            p { class: "w-full max-w-sm text-xs text-center text-gray-400 dark:text-gray-500 leading-relaxed",
+                "The literal and graphical information presented in this application \
+                about Pokémon Trading Card Game Pocket, including card data, text and \
+                images, is copyright The Pokémon Company, DeNA Co., Ltd., and/or \
+                Creatures, Inc. This application is not produced by, endorsed by, \
+                supported by, or affiliated with any of those copyright holders."
             }
         }
     }

@@ -181,6 +181,24 @@ pub fn SettingsPage() -> Element {
                     }
                 }
             }
+
+            // ── About ───────────────────────────────────────────────────────
+            section {
+                h2 { class: "text-xs font-semibold uppercase tracking-wider \
+                              text-gray-500 dark:text-gray-400 mb-3",
+                    "About"
+                }
+                div { class: "bg-white dark:bg-gray-800 rounded-lg border \
+                              border-gray-200 dark:border-gray-700 p-4",
+                    p { class: "text-xs text-gray-500 dark:text-gray-400 leading-relaxed",
+                        "The literal and graphical information presented in this application \
+                        about Pokémon Trading Card Game Pocket, including card data, text and \
+                        images, is copyright The Pokémon Company, DeNA Co., Ltd., and/or \
+                        Creatures, Inc. This application is not produced by, endorsed by, \
+                        supported by, or affiliated with any of those copyright holders."
+                    }
+                }
+            }
         }
     }
 }
