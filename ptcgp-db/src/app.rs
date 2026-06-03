@@ -172,75 +172,27 @@ async fn startup_drive_sync(
     settings: Signal<AppSettings>,
     queries: Signal<SavedQueries>,
 ) {
-    let mut drive_state = drive_state;
-    let mut store = store;
-    let mut settings = settings;
-    let mut queries = queries;
+    let mut ds = drive_state;
     let token = match crate::drive::acquire_token_silent().await {
         Ok(t) => t,
         Err(e) => {
             tracing::warn!("Drive silent auth failed on startup: {e}");
-            drive_state.set(DriveState::Error(
+            ds.set(DriveState::Error(
                 "Could not reconnect to Google Drive. Open Settings to reconnect.".to_string(),
             ));
             return;
         }
     };
 
-    let client = crate::drive::DriveClient::new();
-    let file_id = match client.find_sync_file(&token.access_token).await {
-        Ok(id) => id,
-        Err(e) => {
-            tracing::error!("Drive file lookup failed on startup: {e}");
-            drive_state.set(DriveState::Connected { token, file_id: None });
-            return;
+    // Wait for IndexedDB load to finish before overwriting with Drive data.
+    loop {
+        if store.read().is_some() {
+            break;
         }
-    };
-
-    let Some(ref id) = file_id else {
-        // No sync file yet — this device is the first to connect. Mark connected so the
-        // next auto-save will upload the local data.
-        drive_state.set(DriveState::Connected { token, file_id: None });
-        return;
-    };
-
-    match client.read_sync_file(&token.access_token, id).await {
-        Ok(data) => {
-            // Wait for the local store to finish loading before overwriting.
-            loop {
-                if store.read().is_some() {
-                    break;
-                }
-                crate::app::sleep(std::time::Duration::from_millis(50)).await;
-            }
-
-            let storage = {
-                let guard = store.read();
-                guard.as_ref().map(|s| s.storage().clone())
-            };
-
-            if let Some(storage) = storage {
-                // Persist Drive data to IndexedDB so it survives offline sessions.
-                let _ = storage.save_profiles(&data.profiles).await;
-                let _ = storage.save_settings(&data.settings).await;
-                let _ = storage.save_saved_queries(&data.queries).await;
-
-                // Reload ProfileStore from the freshly-written IndexedDB data.
-                if let Ok(new_store) = ProfileStore::load(storage).await {
-                    store.set(Some(new_store));
-                }
-                settings.set(AppSettings::from_save_data(data.settings));
-                queries.set(SavedQueries::from_save_data(data.queries));
-            }
-
-            drive_state.set(DriveState::Connected { token, file_id });
-        }
-        Err(e) => {
-            tracing::error!("Drive read failed on startup: {e}");
-            // Still mark connected so future saves work; just skip the overwrite.
-            drive_state.set(DriveState::Connected { token, file_id });
-        }
+        sleep(Duration::from_millis(50)).await;
     }
+
+    crate::drive::load_from_drive(&token, drive_state, store, settings, queries).await;
 }
 
 // ---------------------------------------------------------------------------

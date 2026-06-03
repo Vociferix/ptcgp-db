@@ -12,6 +12,7 @@ pub use client::{DriveClient, DriveError};
 use chrono::{DateTime, Duration, Utc};
 use dioxus::prelude::*;
 use ptcgp_db_core::save_data::{AppSettingsSaveData, ProfilesSaveData, SavedQueriesSaveData};
+use ptcgp_db_core::storage::Storage as _;
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -192,6 +193,88 @@ pub async fn save_to_drive(mut drive_state: Signal<DriveState>, data: &DriveSync
             tracing::error!("Drive save failed: {e}");
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Shared load helper
+// ---------------------------------------------------------------------------
+
+/// Downloads the Drive sync file and writes it into IndexedDB and the in-memory signals.
+///
+/// Called by both the startup silent-auth path and the onboarding interactive-connect path.
+/// Returns the file ID that was read, or `None` if no sync file existed yet.
+pub async fn load_from_drive(
+    token: &DriveToken,
+    mut drive_state: Signal<DriveState>,
+    mut store: Signal<Option<ptcgp_db_core::ProfileStore<crate::app::AppStorage>>>,
+    mut settings: Signal<ptcgp_db_core::AppSettings>,
+    mut queries: Signal<ptcgp_db_core::SavedQueries>,
+) -> Option<String> {
+    let client = DriveClient::new();
+    let file_id = match client.find_sync_file(&token.access_token).await {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::error!("Drive file lookup failed: {e}");
+            drive_state.set(DriveState::Connected { token: token.clone(), file_id: None });
+            return None;
+        }
+    };
+
+    let Some(ref id) = file_id else {
+        drive_state.set(DriveState::Connected { token: token.clone(), file_id: None });
+        return None;
+    };
+
+    match client.read_sync_file(&token.access_token, id).await {
+        Ok(data) => {
+            let storage = store.read().as_ref().map(|s| s.storage().clone());
+            if let Some(storage) = storage {
+                let _ = storage.save_profiles(&data.profiles).await;
+                let _ = storage.save_settings(&data.settings).await;
+                let _ = storage.save_saved_queries(&data.queries).await;
+                if let Ok(new_store) = ptcgp_db_core::ProfileStore::load(storage).await {
+                    store.set(Some(new_store));
+                }
+            }
+            settings.set(ptcgp_db_core::AppSettings::from_save_data(data.settings));
+            queries.set(ptcgp_db_core::SavedQueries::from_save_data(data.queries));
+            drive_state.set(DriveState::Connected { token: token.clone(), file_id: file_id.clone() });
+        }
+        Err(e) => {
+            tracing::error!("Drive read failed: {e}");
+            drive_state.set(DriveState::Connected { token: token.clone(), file_id: file_id.clone() });
+        }
+    }
+
+    file_id
+}
+
+/// Interactive Drive connect for the first-run onboarding screen.
+///
+/// Unlike [`connect_drive`] (which uploads local data), this authenticates interactively and
+/// then downloads any existing Drive data into the app — allowing a returning user to recover
+/// their collection without a file export. If no Drive data exists yet the connection is
+/// established so the next auto-save will create the sync file.
+///
+/// When Drive data with profiles is loaded, `store` changes and the app automatically exits
+/// the onboarding screen. When Drive is connected but has no data, the onboarding stays
+/// visible so the user can still create their first profile.
+pub async fn onboarding_connect_drive(
+    mut drive_state: Signal<DriveState>,
+    store: Signal<Option<ptcgp_db_core::ProfileStore<crate::app::AppStorage>>>,
+    settings: Signal<ptcgp_db_core::AppSettings>,
+    queries: Signal<ptcgp_db_core::SavedQueries>,
+) {
+    let token = match acquire_token_interactive().await {
+        Ok(t) => t,
+        Err(e) => {
+            drive_state.set(DriveState::Error(format!("Sign-in failed: {e}")));
+            return;
+        }
+    };
+
+    set_drive_enabled(true);
+    load_from_drive(&token, drive_state, store, settings, queries).await;
 }
 
 // ---------------------------------------------------------------------------
