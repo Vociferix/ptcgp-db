@@ -14,21 +14,20 @@ use super::seg_btn_cls;
 pub fn NameFilter(config: Signal<FilterConfig>) -> Element {
     let value = config.read().name_query.clone().unwrap_or_default();
     rsx! {
-        div { class: "flex flex-col gap-0.5",
-            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Name" }
-            input {
-                r#type: "text",
-                placeholder: "Name…",
-                value: "{value}",
-                class: "px-2 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 \
-                        bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 \
-                        placeholder:text-gray-400 dark:placeholder:text-gray-500 \
-                        focus:outline-none focus:ring-2 focus:ring-blue-500 w-44",
-                oninput: move |evt| {
-                    let v = evt.value();
-                    config.write().name_query = if v.is_empty() { None } else { Some(v) };
-                },
-            }
+        input {
+            r#type: "text",
+            title: "Name",
+            placeholder: "Name…",
+            value: "{value}",
+            class: "shrink-0 px-2 py-1.5 text-sm rounded-md \
+                    border border-gray-300 dark:border-gray-600 \
+                    bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 \
+                    placeholder:text-gray-400 dark:placeholder:text-gray-500 \
+                    focus:outline-none focus:ring-2 focus:ring-blue-500 w-44",
+            oninput: move |evt| {
+                let v = evt.value();
+                config.write().name_query = if v.is_empty() { None } else { Some(v) };
+            },
         }
     }
 }
@@ -38,11 +37,21 @@ pub fn NameFilter(config: Signal<FilterConfig>) -> Element {
 // ---------------------------------------------------------------------------
 
 #[component]
-pub fn KindFilter(config: Signal<FilterConfig>) -> Element {
+pub fn KindFilter(config: Signal<FilterConfig>, #[props(default = true)] labeled: bool) -> Element {
     let card_kind = config.read().card_kind;
+    let wrapper_cls = if labeled {
+        "flex flex-col gap-0.5"
+    } else {
+        "flex items-center gap-1"
+    };
+    let label_cls = if labeled {
+        "text-xs font-medium text-gray-500 dark:text-gray-400"
+    } else {
+        "text-xs font-medium text-gray-400 dark:text-gray-500 select-none"
+    };
     rsx! {
-        div { class: "flex flex-col gap-0.5",
-            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Kind" }
+        div { class: "{wrapper_cls}",
+            span { class: "{label_cls}", "Kind" }
             div { class: "flex",
                 KindBtn {
                     btn_label: "All",
@@ -238,38 +247,43 @@ fn CountOpBtn(
 pub fn GoalFilter(config: Signal<FilterConfig>) -> Element {
     let goal = config.read().goal.max(1);
     rsx! {
-        div { class: "flex flex-col gap-0.5",
-            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Goal" }
-            div { class: "flex items-center divide-x divide-gray-300 dark:divide-gray-600 \
-                          border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden \
-                          bg-white dark:bg-gray-800",
-                button {
-                    r#type: "button",
-                    disabled: goal <= 1,
-                    class: "flex items-center justify-center w-7 h-8 shrink-0 \
-                            hover:bg-gray-100 dark:hover:bg-gray-700 \
-                            disabled:opacity-40 disabled:cursor-not-allowed",
-                    onclick: move |_| {
-                        let g = config.read().goal;
-                        if g > 1 {
-                            config.write().goal = g - 1;
-                        }
-                    },
-                    Minus { class: "w-3.5 h-3.5 text-gray-600 dark:text-gray-400" }
-                }
-                span { class: "w-8 text-center text-sm select-none text-gray-900 dark:text-gray-100",
-                    "{goal}"
-                }
-                button {
-                    r#type: "button",
-                    class: "flex items-center justify-center w-7 h-8 shrink-0 \
-                            hover:bg-gray-100 dark:hover:bg-gray-700",
-                    onclick: move |_| {
-                        let g = config.read().goal;
-                        config.write().goal = g.saturating_add(1);
-                    },
-                    Plus { class: "w-3.5 h-3.5 text-gray-600 dark:text-gray-400" }
-                }
+        div { class: "shrink-0 flex items-center border border-gray-300 dark:border-gray-600 \
+                      rounded-md overflow-hidden bg-white dark:bg-gray-800",
+            // Inline label prefix — gives context on mobile where tooltips don't appear
+            span { class: "px-2 h-8 flex items-center text-xs font-medium select-none \
+                           text-gray-500 dark:text-gray-400 \
+                           bg-gray-50 dark:bg-gray-700 \
+                           border-r border-gray-300 dark:border-gray-600",
+                "Goal"
+            }
+            button {
+                r#type: "button",
+                disabled: goal <= 1,
+                class: "flex items-center justify-center w-7 h-8 shrink-0 \
+                        border-r border-gray-300 dark:border-gray-600 \
+                        hover:bg-gray-100 dark:hover:bg-gray-700 \
+                        disabled:opacity-40 disabled:cursor-not-allowed",
+                onclick: move |_| {
+                    let g = config.read().goal;
+                    if g > 1 {
+                        config.write().goal = g - 1;
+                    }
+                },
+                Minus { class: "w-3.5 h-3.5 text-gray-600 dark:text-gray-400" }
+            }
+            span { class: "w-8 text-center text-sm select-none text-gray-900 dark:text-gray-100",
+                "{goal}"
+            }
+            button {
+                r#type: "button",
+                class: "flex items-center justify-center w-7 h-8 shrink-0 \
+                        border-l border-gray-300 dark:border-gray-600 \
+                        hover:bg-gray-100 dark:hover:bg-gray-700",
+                onclick: move |_| {
+                    let g = config.read().goal;
+                    config.write().goal = g.saturating_add(1);
+                },
+                Plus { class: "w-3.5 h-3.5 text-gray-600 dark:text-gray-400" }
             }
         }
     }

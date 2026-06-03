@@ -73,9 +73,11 @@ pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
                 class: "{TRIGGER_CLS}",
                 onclick: move |_| open.toggle(),
                 if let Some(src) = single_icon {
+                    // w-9 (36px) keeps the icon legible while staying within the 21px
+                    // headroom at the @lg breakpoint (measured row content 491px vs 512px).
                     img {
                         src: "{src}",
-                        class: "h-5 w-auto max-w-14 object-contain",
+                        class: "h-5 w-9 object-contain shrink-0",
                         alt: "Set",
                     }
                 } else {
