@@ -10,6 +10,9 @@ use ptcgp_db_core::{AppSettings, ProfileStore, SavedQueries};
 use crate::pages::OnboardingPage;
 use crate::routes::Route;
 
+#[cfg(target_arch = "wasm32")]
+use crate::drive::{DriveState, DriveSyncData};
+
 // ---------------------------------------------------------------------------
 // Dev helpers
 // ---------------------------------------------------------------------------
@@ -154,6 +157,45 @@ pub(crate) fn set_card_count(
 }
 
 // ---------------------------------------------------------------------------
+// Drive startup sync (web only)
+// ---------------------------------------------------------------------------
+
+/// Attempts a silent Drive token acquisition on startup and, if successful, loads the Drive
+/// sync file and overwrites the in-memory app state with its contents.
+///
+/// This runs concurrently with (and after) the IndexedDB load. The Drive version wins when
+/// it differs from local because Drive is the cross-device source of truth once enabled.
+#[cfg(target_arch = "wasm32")]
+async fn startup_drive_sync(
+    drive_state: Signal<DriveState>,
+    store: Signal<Option<ProfileStore<AppStorage>>>,
+    settings: Signal<AppSettings>,
+    queries: Signal<SavedQueries>,
+) {
+    let mut ds = drive_state;
+    let token = match crate::drive::acquire_token_silent().await {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::warn!("Drive silent auth failed on startup: {e}");
+            ds.set(DriveState::Error(
+                "Could not reconnect to Google Drive. Open Settings to reconnect.".to_string(),
+            ));
+            return;
+        }
+    };
+
+    // Wait for IndexedDB load to finish before overwriting with Drive data.
+    loop {
+        if store.read().is_some() {
+            break;
+        }
+        sleep(Duration::from_millis(50)).await;
+    }
+
+    crate::drive::load_from_drive(&token, drive_state, store, settings, queries).await;
+}
+
+// ---------------------------------------------------------------------------
 // App root
 // ---------------------------------------------------------------------------
 
@@ -179,6 +221,10 @@ pub fn App() -> Element {
     // Tracks which page the user navigated to CardDetailPage from, for the back button label/route.
     let _: Signal<CardDetailOrigin> =
         use_context_provider(|| Signal::new(CardDetailOrigin::default()));
+    // Drive sync state (web only; always provided so hook count is stable per platform).
+    #[cfg(target_arch = "wasm32")]
+    let mut drive_state: Signal<DriveState> =
+        use_context_provider(|| Signal::new(DriveState::default()));
     let mut load_error: Signal<Option<String>> = use_signal(|| None);
 
     // Auto-save coroutine: waits for ScheduleSave signals, debounces 2 s, then
@@ -192,7 +238,21 @@ pub fn App() -> Element {
             // Drain signals that arrived during the sleep to coalesce rapid edits.
             while rx.try_recv().is_ok() {}
 
-            // Read save data without holding the write lock during the await.
+            // Snapshot all save data before any async work.
+            #[cfg(target_arch = "wasm32")]
+            let drive_bundle: Option<DriveSyncData> = {
+                if drive_state.read().is_connected() {
+                    store.read().as_ref().map(|s| DriveSyncData {
+                        profiles: s.save_data_snapshot().clone(),
+                        settings: settings.read().as_save_data().clone(),
+                        queries: queries.read().as_save_data().clone(),
+                    })
+                } else {
+                    None
+                }
+            };
+
+            // Save profiles to local storage if dirty.
             let pending = {
                 let guard = store.read();
                 guard.as_ref().and_then(|s| {
@@ -213,6 +273,12 @@ pub fn App() -> Element {
                     }
                     Err(e) => tracing::error!("auto-save failed: {e}"),
                 }
+            }
+
+            // Save to Drive if connected.
+            #[cfg(target_arch = "wasm32")]
+            if let Some(bundle) = drive_bundle {
+                crate::drive::save_to_drive(drive_state, &bundle).await;
             }
         }
     });
@@ -313,6 +379,20 @@ pub fn App() -> Element {
             settings.set(loaded_settings);
             queries.set(loaded_queries);
             store.set(Some(loaded_store));
+        });
+    });
+
+    // Web: attempt silent Drive auth on startup if the user previously connected.
+    // Runs after the storage init above; if Drive data is loaded it overwrites the
+    // IndexedDB-loaded state so the most recent version (across devices) wins.
+    #[cfg(target_arch = "wasm32")]
+    use_effect(move || {
+        if !crate::drive::is_drive_enabled() {
+            return;
+        }
+        drive_state.set(DriveState::Connecting);
+        spawn(async move {
+            startup_drive_sync(drive_state, store, settings, queries).await;
         });
     });
 
