@@ -118,7 +118,7 @@ pub fn NavLayout() -> Element {
 
                 // ---- Narrow bottom nav (<md) ----
                 nav { class: "md:hidden flex border-t border-gray-200 dark:border-gray-700 \
-                            bg-gray-50 dark:bg-gray-800 shrink-0",
+                            bg-gray-50 dark:bg-gray-800 shrink-0 divide-x divide-gray-200 dark:divide-gray-700",
                     for item in nav_items() {
                         Link {
                             key: "{item.short}",
