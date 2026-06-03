@@ -28,7 +28,7 @@ pub fn Toggle(checked: bool, on_change: EventHandler<bool>) -> Element {
                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 \
                     dark:focus:ring-offset-gray-800 {track}",
             span { class: "pointer-events-none inline-block h-5 w-5 transform rounded-full \
-                        bg-white shadow ring-0 transition-transform duration-200 ease-in-out \
+                        bg-white shadow-md ring-0 transition-transform duration-200 ease-in-out \
                         {thumb}" }
         }
     }

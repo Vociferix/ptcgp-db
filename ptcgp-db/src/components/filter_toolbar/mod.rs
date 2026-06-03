@@ -105,8 +105,9 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
             // breakpoint are hidden here and surfaced in the floating panel.
             div { class: "flex flex-nowrap items-center gap-2 \
                           bg-white dark:bg-gray-800 \
-                          border border-gray-200 dark:border-gray-700 \
-                          rounded-lg px-3 py-2",
+                          border border-gray-200/80 dark:border-gray-700/80 \
+                          rounded-lg px-3 py-2 \
+                          shadow-sm",
                 // Name — Catalog and Trade only; Summary omits it to save space
                 if mode != FilterMode::Summary {
                     NameFilter { config }
@@ -168,8 +169,9 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
 
                 // Panel box — floating below the primary row
                 div { class: "absolute left-0 top-full mt-1 z-50 \
-                            rounded-lg border border-gray-200 dark:border-gray-700 \
-                            bg-gray-50 dark:bg-gray-900 shadow-lg \
+                            rounded-lg border border-gray-200/60 dark:border-gray-700/60 \
+                            bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm \
+                            shadow-2xl ring-1 ring-black/5 dark:ring-white/10 \
                             p-4 flex flex-col gap-3 \
                             min-w-64 max-w-[min(640px,calc(100vw-1rem))]",
 
@@ -355,12 +357,12 @@ pub(super) fn seg_btn_cls(active: bool) -> &'static str {
     if active {
         "relative px-2.5 py-1 text-xs font-medium border border-blue-600 dark:border-blue-500 \
          bg-blue-600 text-white z-10 -ml-px first:ml-0 first:rounded-l-md last:rounded-r-md \
-         focus:outline-none"
+         shadow-inner focus:outline-none"
     } else {
         "relative px-2.5 py-1 text-xs font-medium border border-gray-300 dark:border-gray-600 \
          bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 -ml-px first:ml-0 \
          first:rounded-l-md last:rounded-r-md hover:bg-gray-50 dark:hover:bg-gray-700 \
-         focus:outline-none"
+         shadow-sm focus:outline-none"
     }
 }
 

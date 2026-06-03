@@ -23,8 +23,10 @@ fn DropdownPanel(open: Signal<bool>, extra_cls: &'static str, children: Element)
             }
             div { class: "absolute left-0 top-full mt-1 z-20 max-h-80 \
                         overflow-y-auto overflow-x-hidden \
-                        rounded-md border border-gray-200 dark:border-gray-700 \
-                        bg-white dark:bg-gray-800 shadow-lg py-1 {extra_cls}",
+                        rounded-md border border-gray-200/60 dark:border-gray-700/60 \
+                        bg-white dark:bg-gray-800 \
+                        shadow-xl ring-1 ring-black/5 dark:ring-white/10 \
+                        py-1 {extra_cls}",
                 {children}
             }
         }

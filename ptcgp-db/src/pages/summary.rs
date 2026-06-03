@@ -203,8 +203,9 @@ fn SavedQueriesDropdown(
                     onclick: move |_| open.set(false),
                 }
                 div { class: "absolute left-0 top-full mt-1 z-20 max-h-80 overflow-y-auto \
-                              overflow-x-hidden rounded-md border border-gray-200 \
-                              dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg py-1 \
+                              overflow-x-hidden rounded-md border border-gray-200/60 \
+                              dark:border-gray-700/60 bg-white dark:bg-gray-800 \
+                              shadow-xl ring-1 ring-black/5 dark:ring-white/10 py-1 \
                               min-w-48",
                     div {
                         class: "flex items-center px-3 py-2 cursor-pointer select-none \
@@ -286,8 +287,9 @@ fn SaveQueryDialog(
             class: "fixed inset-0 z-50 flex items-center justify-center bg-black/40",
             onclick: move |_| on_close.call(()),
             div {
-                class: "bg-white dark:bg-gray-800 rounded-xl shadow-xl border \
-                        border-gray-200 dark:border-gray-700 p-5 w-80 flex flex-col gap-4",
+                class: "bg-white dark:bg-gray-800 rounded-xl shadow-2xl \
+                        ring-1 ring-black/10 dark:ring-white/10 border \
+                        border-gray-200/60 dark:border-gray-700/60 p-5 w-80 flex flex-col gap-4",
                 onclick: move |e| e.stop_propagation(),
                 h3 { class: "text-base font-semibold text-gray-900 dark:text-gray-100",
                     "Save Query"
@@ -435,7 +437,7 @@ fn SetCompletionRow(
     rsx! {
         div { class: "border-b border-gray-100 dark:border-gray-700 last:border-0",
             div {
-                class: "flex flex-col gap-y-1 sm:grid sm:grid-cols-[1fr_auto_auto] sm:gap-x-4 px-4 py-3 sm:items-center cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-700/50",
+                class: "flex flex-col gap-y-1 sm:grid sm:grid-cols-[1fr_auto_auto] sm:gap-x-4 px-4 py-3 sm:items-center cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors",
                 onclick: on_click,
                 div { class: "flex items-center gap-2 min-w-0",
                     if is_expandable {
@@ -604,7 +606,7 @@ pub fn SummaryPage() -> Element {
                 h2 { class: "text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3",
                     "Overall"
                 }
-                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3",
+                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-4 space-y-3 shadow-sm",
                     if total_denom == 0 {
                         p { class: "text-sm text-gray-500 dark:text-gray-400",
                             "No cards match the current filters."
@@ -618,9 +620,9 @@ pub fn SummaryPage() -> Element {
                                 "{total_owned} / {total_denom}"
                             }
                         }
-                        div { class: "h-2 rounded-full bg-gray-200 dark:bg-gray-700",
+                        div { class: "h-2 rounded-full bg-gray-200 dark:bg-gray-700 shadow-inner",
                             div {
-                                class: "h-2 rounded-full bg-blue-500 transition-all",
+                                class: "h-2 rounded-full bg-blue-500 transition-all shadow-sm",
                                 style: "width: {overall_pct:.4}%",
                             }
                         }
@@ -632,7 +634,7 @@ pub fn SummaryPage() -> Element {
                 h2 { class: "text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3",
                     "Next pack to open"
                 }
-                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4",
+                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-4 shadow-sm",
                     if collection_complete {
                         p { class: "text-sm font-medium text-green-600 dark:text-green-400",
                             "Goal met for all matching cards!"
@@ -650,7 +652,7 @@ pub fn SummaryPage() -> Element {
                             for (pack, rate) in best_packs.iter().copied() {
                                 div {
                                     key: "{pack.id()}",
-                                    class: "flex items-start gap-4 py-4 cursor-pointer rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/60",
+                                    class: "flex items-start gap-4 py-4 cursor-pointer rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/60 hover:shadow-sm transition-shadow",
                                     onclick: move |_| {
                                         apply_catalog_filter(CatalogNav::Pack(pack.id()), config, catalog_filter);
                                         drop(nav.push(Route::CatalogPage {}));
@@ -686,8 +688,8 @@ pub fn SummaryPage() -> Element {
                 h2 { class: "text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3",
                     "Set completion"
                 }
-                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden",
-                    div { class: "hidden sm:grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 bg-gray-50 dark:bg-gray-900/50 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700",
+                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 overflow-hidden shadow-sm",
+                    div { class: "hidden sm:grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 bg-gray-50 dark:bg-gray-800/80 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200/80 dark:border-gray-700/80 shadow-sm",
                         span { "Set" }
                         span { "Completion" }
                         span { "Best pull" }

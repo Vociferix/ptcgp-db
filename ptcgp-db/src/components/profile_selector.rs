@@ -61,9 +61,11 @@ pub fn ProfileSelector(#[props(default = false)] open_upward: bool) -> Element {
 
             // Dropdown
             if *open.read() {
-                div { class: if open_upward { "absolute left-0 z-20 bottom-full mb-1 min-w-full w-48 rounded-md shadow-lg \
-                         bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 py-1" } else { "absolute left-0 z-20 mt-1 min-w-full w-48 rounded-md shadow-lg \
-                         bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 py-1" },
+                div { class: if open_upward { "absolute left-0 z-20 bottom-full mb-1 min-w-full w-48 rounded-md \
+                         bg-white dark:bg-gray-800 border border-gray-200/60 dark:border-gray-600/60 \
+                         shadow-xl ring-1 ring-black/5 dark:ring-white/10 py-1" } else { "absolute left-0 z-20 mt-1 min-w-full w-48 rounded-md \
+                         bg-white dark:bg-gray-800 border border-gray-200/60 dark:border-gray-600/60 \
+                         shadow-xl ring-1 ring-black/5 dark:ring-white/10 py-1" },
                     for name in profile_names {
                         ProfileRow {
                             key: "{name}",
