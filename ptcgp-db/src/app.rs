@@ -6,6 +6,7 @@ use futures_util::StreamExt as _;
 use ptcgp_db_core::save_data::{CardVersionId, FilterConfig, Theme};
 use ptcgp_db_core::storage::Storage as _;
 use ptcgp_db_core::{AppSettings, ProfileStore, SavedQueries};
+use ptcgp_db_data::CardSource;
 
 use crate::pages::OnboardingPage;
 use crate::routes::Route;
@@ -418,7 +419,9 @@ pub fn App() -> Element {
 
     rsx! {
         document::Stylesheet { href: asset!("/public/tailwind.css") }
-        document::Link { rel: "icon", r#type: "image/png", href: asset!("/public/favicon.png") }
+        if let Some(src) = CardSource::ALL.iter().find(|s| &*s.name() == "Pack") {
+            document::Link { rel: "icon", r#type: "image/png", href: src.icon() }
+        }
         {body}
     }
 }
