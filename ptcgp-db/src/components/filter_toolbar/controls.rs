@@ -37,12 +37,13 @@ pub fn NameFilter(config: Signal<FilterConfig>) -> Element {
 // ---------------------------------------------------------------------------
 
 #[component]
-pub fn KindFilter(
-    config: Signal<FilterConfig>,
-    #[props(default = true)] labeled: bool,
-) -> Element {
+pub fn KindFilter(config: Signal<FilterConfig>, #[props(default = true)] labeled: bool) -> Element {
     let card_kind = config.read().card_kind;
-    let wrapper_cls = if labeled { "flex flex-col gap-0.5" } else { "flex items-center gap-1" };
+    let wrapper_cls = if labeled {
+        "flex flex-col gap-0.5"
+    } else {
+        "flex items-center gap-1"
+    };
     let label_cls = if labeled {
         "text-xs font-medium text-gray-500 dark:text-gray-400"
     } else {
