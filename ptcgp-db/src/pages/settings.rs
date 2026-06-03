@@ -92,7 +92,7 @@ pub fn SettingsPage() -> Element {
                 }
                 div { class: "bg-white dark:bg-gray-800 rounded-lg border \
                               border-gray-200 dark:border-gray-700 p-4",
-                    div { class: "flex items-center justify-between",
+                    div { class: "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3",
                         div {
                             p { class: "text-sm font-medium text-gray-900 dark:text-gray-100",
                                 "Theme"
@@ -102,7 +102,7 @@ pub fn SettingsPage() -> Element {
                             }
                         }
                         // Three-way segmented button
-                        div { class: "flex rounded-md overflow-hidden \
+                        div { class: "self-start sm:self-auto flex rounded-md overflow-hidden \
                                       border border-gray-200 dark:border-gray-600",
                             for (label, value) in [("System", Theme::System), ("Light", Theme::Light), ("Dark", Theme::Dark)] {
                                 button {

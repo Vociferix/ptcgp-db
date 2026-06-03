@@ -378,12 +378,18 @@ fn PackSubRow(
                 }
             }
             div { class: "text-right whitespace-nowrap shrink-0",
+                span { class: "block sm:hidden text-xs text-gray-400 dark:text-gray-500",
+                    "Completion"
+                }
                 span { class: "text-sm font-medium text-gray-900 dark:text-gray-100",
                     "{completion_pct:.3}%"
                 }
                 span { class: "text-xs text-gray-400 dark:text-gray-500 ml-1.5", "{owned}/{total}" }
             }
             div { class: "text-right w-20 whitespace-nowrap shrink-0",
+                span { class: "block sm:hidden text-xs text-gray-400 dark:text-gray-500",
+                    "Best pull"
+                }
                 if completion_pct >= 100.0 {
                     span { class: "text-sm text-green-600 dark:text-green-400 font-medium",
                         "Complete"
@@ -429,7 +435,7 @@ fn SetCompletionRow(
     rsx! {
         div { class: "border-b border-gray-100 dark:border-gray-700 last:border-0",
             div {
-                class: "grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-3 items-center cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-700/50",
+                class: "flex flex-col gap-y-1 sm:grid sm:grid-cols-[1fr_auto_auto] sm:gap-x-4 px-4 py-3 sm:items-center cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-700/50",
                 onclick: on_click,
                 div { class: "flex items-center gap-2 min-w-0",
                     if is_expandable {
@@ -462,23 +468,35 @@ fn SetCompletionRow(
                         }
                     }
                 }
-                div { class: "text-right whitespace-nowrap",
-                    span { class: "text-sm font-medium text-gray-900 dark:text-gray-100",
-                        "{completion_pct:.3}%"
-                    }
-                    span { class: "text-xs text-gray-400 dark:text-gray-500 ml-1.5",
-                        "{owned}/{total}"
-                    }
-                }
-                div { class: "text-right w-20 whitespace-nowrap",
-                    if is_promo || (best_pack.is_none() && completion_pct < 100.0) {
-                        span { class: "text-sm text-gray-400 dark:text-gray-500", "—" }
-                    } else if completion_pct >= 100.0 && !is_promo {
-                        span { class: "text-sm text-green-600 dark:text-green-400 font-medium",
-                            "Complete"
+                div { class: "flex justify-end gap-4 mt-1 sm:contents",
+                    div { class: "text-right whitespace-nowrap",
+                        span { class: "block sm:hidden text-xs text-gray-400 dark:text-gray-500",
+                            "Completion"
                         }
-                    } else {
-                        span { class: "text-sm text-gray-900 dark:text-gray-100", "{best_rate_pct:.3}%" }
+                        span { class: "text-sm font-medium text-gray-900 dark:text-gray-100",
+                            "{completion_pct:.3}%"
+                        }
+                        span { class: "text-xs text-gray-400 dark:text-gray-500 ml-1.5",
+                            "{owned}/{total}"
+                        }
+                    }
+                    div { class: "text-right w-20 whitespace-nowrap",
+                        span { class: "block sm:hidden text-xs text-gray-400 dark:text-gray-500",
+                            "Best pull"
+                        }
+                        if is_promo || (best_pack.is_none() && completion_pct < 100.0) {
+                            span { class: "text-sm text-gray-400 dark:text-gray-500",
+                                "—"
+                            }
+                        } else if completion_pct >= 100.0 && !is_promo {
+                            span { class: "text-sm text-green-600 dark:text-green-400 font-medium",
+                                "Complete"
+                            }
+                        } else {
+                            span { class: "text-sm text-gray-900 dark:text-gray-100",
+                                "{best_rate_pct:.3}%"
+                            }
+                        }
                     }
                 }
             }
@@ -669,7 +687,7 @@ pub fn SummaryPage() -> Element {
                     "Set completion"
                 }
                 div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden",
-                    div { class: "grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 bg-gray-50 dark:bg-gray-900/50 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700",
+                    div { class: "hidden sm:grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 bg-gray-50 dark:bg-gray-900/50 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700",
                         span { "Set" }
                         span { "Completion" }
                         span { "Best pull" }
