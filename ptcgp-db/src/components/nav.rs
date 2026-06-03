@@ -37,11 +37,6 @@ fn nav_items() -> impl IntoIterator<Item = NavItem> {
             short: "Profiles",
         },
         NavItem {
-            label: "Import / Export",
-            route: Route::ImportExportPage {},
-            short: "Import",
-        },
-        NavItem {
             label: "Settings",
             route: Route::SettingsPage {},
             short: "Settings",
@@ -51,7 +46,7 @@ fn nav_items() -> impl IntoIterator<Item = NavItem> {
 
 /// Returns true for pages where the Profile Selector is hidden.
 fn hides_profile_selector(route: &Route) -> bool {
-    matches!(route, Route::SettingsPage {} | Route::ImportExportPage {})
+    matches!(route, Route::SettingsPage {})
 }
 
 // ---------------------------------------------------------------------------

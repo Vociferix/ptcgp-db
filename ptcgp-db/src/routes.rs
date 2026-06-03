@@ -2,8 +2,7 @@ use dioxus::prelude::*;
 
 use crate::components::nav::NavLayout;
 use crate::pages::{
-    CardDetailPage, CatalogPage, ImportExportPage, ProfileManagerPage, SettingsPage, SummaryPage,
-    TradePage,
+    CardDetailPage, CatalogPage, ProfileManagerPage, SettingsPage, SummaryPage, TradePage,
 };
 
 /// App routes. Web builds use hash routing (e.g. `/#/catalog`); desktop/mobile use the default
@@ -22,8 +21,6 @@ pub enum Route {
     TradePage {},
     #[route("/profiles")]
     ProfileManagerPage {},
-    #[route("/import-export")]
-    ImportExportPage {},
     #[route("/settings")]
     SettingsPage {},
 }
