@@ -1,3 +1,9 @@
+//! First-run onboarding flow.
+//!
+//! On web builds the user first chooses between Drive sync and local-only, then (if they
+//! have no existing profiles) proceeds to the profile-creation step. On desktop the sync
+//! choice is skipped and the user goes straight to profile creation.
+
 use dioxus::prelude::*;
 use ptcgp_db_core::{
     AppSettings, ProfileStore, ProfilesSaveData, SavedQueries, migrate_profiles,
@@ -5,6 +11,52 @@ use ptcgp_db_core::{
 };
 
 use crate::app::{AppStorage, schedule_save};
+
+// ---------------------------------------------------------------------------
+// Step discriminant
+// ---------------------------------------------------------------------------
+
+/// Which screen of the two-step onboarding flow is currently shown.
+#[derive(Clone, PartialEq, Default)]
+enum Step {
+    /// "Sync with Google Drive" vs "Work locally only" (web only; skipped on desktop).
+    #[default]
+    ChooseSync,
+    /// Create a profile or import existing data.
+    SetupProfile,
+}
+
+// ---------------------------------------------------------------------------
+// Step 1 — Drive connect handler (web only)
+// ---------------------------------------------------------------------------
+
+/// Launches the interactive Drive connect flow and advances to `SetupProfile` on success.
+///
+/// Extracted as a named function so that the RSX `onclick` closure remains a single line,
+/// which prevents `dx fmt` from corrupting the multi-line `spawn(async move { … })` block.
+#[cfg(target_arch = "wasm32")]
+fn start_drive_connect(
+    mut drive_state: Signal<crate::drive::DriveState>,
+    store: Signal<Option<ProfileStore<AppStorage>>>,
+    settings: Signal<AppSettings>,
+    queries: Signal<SavedQueries>,
+    mut step: Signal<Step>,
+) {
+    use crate::drive::DriveState;
+    drive_state.set(DriveState::Connecting);
+    spawn(async move {
+        crate::drive::onboarding_connect_drive(drive_state, store, settings, queries).await;
+        // If Drive connected but no profiles were found, advance to profile setup.
+        // When profiles were loaded, App re-renders to Router before this line is reached.
+        if drive_state.read().is_connected() {
+            step.set(Step::SetupProfile);
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Step 2 — Profile creation / import helpers
+// ---------------------------------------------------------------------------
 
 fn do_submit(
     name: Signal<String>,
@@ -22,10 +74,6 @@ fn do_submit(
     }
     schedule_save();
 }
-
-// ---------------------------------------------------------------------------
-// Import — shared text processing
-// ---------------------------------------------------------------------------
 
 async fn apply_import_text(
     text: String,
@@ -66,12 +114,8 @@ async fn apply_import_text(
     if let Err(e) = storage.save_profiles(&snapshot).await {
         tracing::error!("onboarding import save: {e}");
     }
-    // Store now has profiles → App re-renders → OnboardingPage is replaced by Router
+    // Store now has profiles → App re-renders → OnboardingPage is replaced by Router.
 }
-
-// ---------------------------------------------------------------------------
-// Import — platform-specific file reading
-// ---------------------------------------------------------------------------
 
 #[cfg(target_arch = "wasm32")]
 fn do_import(
@@ -119,10 +163,6 @@ fn do_import(
     });
 }
 
-// ---------------------------------------------------------------------------
-// Import button element (platform-specific)
-// ---------------------------------------------------------------------------
-
 #[cfg(target_arch = "wasm32")]
 fn import_button(
     store: Signal<Option<ProfileStore<AppStorage>>>,
@@ -158,10 +198,6 @@ fn import_button(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Dismiss (skip onboarding)
-// ---------------------------------------------------------------------------
-
 fn do_dismiss(mut store: Signal<Option<ProfileStore<AppStorage>>>) {
     if let Some(s) = store.write().as_mut() {
         let _ = s.create_profile("Main".to_string());
@@ -180,178 +216,191 @@ pub fn OnboardingPage() -> Element {
     let settings = use_context::<Signal<AppSettings>>();
     #[cfg_attr(not(target_arch = "wasm32"), allow(unused_variables))]
     let queries = use_context::<Signal<SavedQueries>>();
+
+    // On web start at ChooseSync; on desktop skip straight to SetupProfile.
+    #[cfg(target_arch = "wasm32")]
+    let mut step = use_signal(|| Step::ChooseSync);
+    #[cfg(not(target_arch = "wasm32"))]
+    let step = use_signal(|| Step::SetupProfile);
+
+    // Declared unconditionally so hook order is stable across renders.
     let mut name = use_signal(String::new);
     let mut error = use_signal(|| None::<String>);
     let import_error = use_signal(|| None::<String>);
 
-    // Drive sync state — only meaningful on web builds.
     #[cfg(target_arch = "wasm32")]
     let drive_state = use_context::<Signal<crate::drive::DriveState>>();
 
-    // Build the Drive section once (web only) so the RSX below stays readable.
-    #[cfg(target_arch = "wasm32")]
-    let drive_section = {
-        use crate::drive::DriveState;
-        let ds = drive_state.read();
-        match &*ds {
-            DriveState::Disconnected | DriveState::Error(_) => {
-                let is_error = matches!(*ds, DriveState::Error(_));
-                let err_msg = if let DriveState::Error(ref m) = *ds {
-                    Some(m.clone())
-                } else {
-                    None
-                };
-                drop(ds);
-                rsx! {
-                    div { class: "space-y-1.5",
-                        if let Some(msg) = err_msg {
-                            p { class: "text-xs text-center text-red-600 dark:text-red-400",
-                                "{msg}"
+    let body = if *step.read() == Step::SetupProfile {
+        // ── Step 2: profile creation / import ─────────────────────────────
+
+        #[cfg(target_arch = "wasm32")]
+        let drive_badge = if drive_state.read().is_connected() {
+            rsx! {
+                p { class: "text-xs text-center font-medium text-green-600 dark:text-green-400",
+                    "Connected to Google Drive — your profile will sync automatically."
+                }
+            }
+        } else {
+            rsx! {}
+        };
+        #[cfg(not(target_arch = "wasm32"))]
+        let drive_badge = rsx! {};
+
+        rsx! {
+            div { class: "text-center space-y-2",
+                h1 { class: "text-2xl font-bold text-gray-900 dark:text-gray-100",
+                    "Set up your profile"
+                }
+                p { class: "text-sm text-gray-500 dark:text-gray-400",
+                    "Create a profile to start tracking your collection."
+                }
+            }
+
+            {drive_badge}
+
+            div { class: "space-y-3",
+                div { class: "space-y-1.5",
+                    label {
+                        r#for: "profile-name",
+                        class: "block text-sm font-medium text-gray-700 dark:text-gray-300",
+                        "Profile name"
+                    }
+                    input {
+                        id: "profile-name",
+                        r#type: "text",
+                        placeholder: "My profile",
+                        autofocus: true,
+                        class: "w-full rounded-lg border border-gray-300 dark:border-gray-600 \
+                                bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 \
+                                placeholder-gray-400 dark:placeholder-gray-500 \
+                                px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500",
+                        value: name.read().clone(),
+                        oninput: move |e| {
+                            name.set(e.value());
+                            error.set(None);
+                        },
+                        onkeydown: move |e| {
+                            if e.key() == Key::Enter {
+                                do_submit(name, error, store);
                             }
-                        }
-                        button {
-                            r#type: "button",
-                            class: "flex w-full items-center justify-center rounded-lg border \
-                                    border-gray-200 dark:border-gray-700 text-gray-700 \
-                                    dark:text-gray-300 font-medium py-2 text-sm \
-                                    hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors",
-                            onclick: move |_| {
-                                let mut ds = drive_state;
-                                ds.set(DriveState::Connecting);
-                                spawn(async move {
-                                    crate::drive::onboarding_connect_drive(drive_state, store, settings, queries)
-                                        .await;
-                                });
-                            },
-                            if is_error {
-                                "Retry Google Drive"
-                            } else {
-                                "Sync with Google Drive"
-                            }
-                        }
+                        },
+                    }
+                    if let Some(err) = error.read().as_deref() {
+                        p { class: "text-xs text-red-600 dark:text-red-400", "{err}" }
+                    }
+                }
+                button {
+                    r#type: "button",
+                    class: "w-full rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 \
+                            text-white font-medium py-2 text-sm transition-colors",
+                    onclick: move |_| do_submit(name, error, store),
+                    "Get Started"
+                }
+            }
+
+            div { class: "flex items-center gap-3",
+                div { class: "flex-1 border-t border-gray-200 dark:border-gray-700" }
+                span { class: "text-xs text-gray-400 dark:text-gray-500", "or" }
+                div { class: "flex-1 border-t border-gray-200 dark:border-gray-700" }
+            }
+
+            div { class: "space-y-1.5",
+                {import_button(store, import_error)}
+                if let Some(err) = import_error.read().as_deref() {
+                    p { class: "text-xs text-center text-red-600 dark:text-red-400",
+                        "{err}"
                     }
                 }
             }
-            DriveState::Connecting => {
-                drop(ds);
-                rsx! {
-                    p { class: "text-sm text-center text-gray-500 dark:text-gray-400",
-                        "Connecting to Google Drive…"
-                    }
-                }
-            }
-            DriveState::Connected { .. } => {
-                drop(ds);
-                rsx! {
-                    p { class: "text-sm text-center text-green-600 dark:text-green-400 font-medium",
-                        "Connected to Google Drive"
-                    }
+
+            div { class: "text-center",
+                button {
+                    r#type: "button",
+                    class: "text-xs text-gray-400 dark:text-gray-500 \
+                            hover:text-gray-600 dark:hover:text-gray-300 transition-colors",
+                    onclick: move |_| do_dismiss(store),
+                    "Skip — set up later"
                 }
             }
         }
-    };
-    #[cfg(not(target_arch = "wasm32"))]
-    let drive_section = rsx! {};
+    } else {
+        // ── Step 1: choose sync mode (web only) ───────────────────────────
 
-    // On web, hide the file-import and skip controls while Drive is connecting so the
-    // user doesn't accidentally start two flows simultaneously.
-    #[cfg(target_arch = "wasm32")]
-    let drive_connecting = matches!(*drive_state.read(), crate::drive::DriveState::Connecting);
-    #[cfg(not(target_arch = "wasm32"))]
-    let drive_connecting = false;
+        #[cfg(target_arch = "wasm32")]
+        {
+            use crate::drive::DriveState;
+            let is_connecting = matches!(*drive_state.read(), DriveState::Connecting);
+            let err_msg = if let DriveState::Error(ref m) = *drive_state.read() {
+                Some(m.clone())
+            } else {
+                None
+            };
 
-    rsx! {
-        div { class: "min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4",
-            div { class: "w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 space-y-6",
-
-                // Header
+            rsx! {
                 div { class: "text-center space-y-2",
                     h1 { class: "text-2xl font-bold text-gray-900 dark:text-gray-100",
                         "Welcome to PTCGP DB"
                     }
                     p { class: "text-sm text-gray-500 dark:text-gray-400",
-                        "Create your first profile to start tracking your collection."
+                        "How would you like to store your collection?"
                     }
                 }
 
-                // Profile name input + submit
-                div { class: "space-y-3",
-                    div { class: "space-y-1.5",
-                        label {
-                            r#for: "profile-name",
-                            class: "block text-sm font-medium text-gray-700 dark:text-gray-300",
-                            "Profile name"
-                        }
-                        input {
-                            id: "profile-name",
-                            r#type: "text",
-                            placeholder: "My profile",
-                            autofocus: true,
-                            class: "w-full rounded-lg border border-gray-300 dark:border-gray-600 \
-                                    bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 \
-                                    placeholder-gray-400 dark:placeholder-gray-500 \
-                                    px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500",
-                            value: name.read().clone(),
-                            oninput: move |e| {
-                                name.set(e.value());
-                                error.set(None);
-                            },
-                            onkeydown: move |e| {
-                                if e.key() == Key::Enter {
-                                    do_submit(name, error, store);
-                                }
-                            },
-                        }
-                        if let Some(err) = error.read().as_deref() {
-                            p { class: "text-xs text-red-600 dark:text-red-400", "{err}" }
-                        }
+                if is_connecting {
+                    p { class: "text-sm text-center text-gray-500 dark:text-gray-400",
+                        "Connecting to Google Drive…"
                     }
-                    button {
-                        r#type: "button",
-                        class: "w-full rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 \
-                                text-white font-medium py-2 text-sm transition-colors",
-                        onclick: move |_| do_submit(name, error, store),
-                        "Get Started"
-                    }
-                }
+                } else {
+                    div { class: "space-y-3",
+                        if let Some(msg) = err_msg {
+                            p { class: "text-xs text-center text-red-600 dark:text-red-400",
+                                "{msg}"
+                            }
+                        }
 
-                // Divider
-                div { class: "flex items-center gap-3",
-                    div { class: "flex-1 border-t border-gray-200 dark:border-gray-700" }
-                    span { class: "text-xs text-gray-400 dark:text-gray-500", "or" }
-                    div { class: "flex-1 border-t border-gray-200 dark:border-gray-700" }
-                }
+                        div {
+                            button {
+                                r#type: "button",
+                                class: "w-full rounded-lg bg-blue-600 hover:bg-blue-700 \
+                                        active:bg-blue-800 text-white font-medium py-2.5 \
+                                        text-sm transition-colors",
+                                onclick: move |_| start_drive_connect(drive_state, store, settings, queries, step),
+                                "Sync with Google Drive"
+                            }
+                            p { class: "mt-1.5 text-xs text-center text-gray-500 dark:text-gray-400",
+                                "Keep your collection in sync across all your devices."
+                            }
+                        }
 
-                // Alternative onboarding paths
-                div { class: "space-y-2",
-                    // Google Drive sync (web only)
-                    {drive_section}
-
-                    // Import from file
-                    if !drive_connecting {
-                        div { class: "space-y-1.5",
-                            {import_button(store, import_error)}
-                            if let Some(err) = import_error.read().as_deref() {
-                                p { class: "text-xs text-center text-red-600 dark:text-red-400",
-                                    "{err}"
-                                }
+                        div {
+                            button {
+                                r#type: "button",
+                                class: "w-full rounded-lg border border-gray-300 \
+                                        dark:border-gray-600 text-gray-700 dark:text-gray-300 \
+                                        font-medium py-2.5 text-sm \
+                                        hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors",
+                                onclick: move |_| step.set(Step::SetupProfile),
+                                "Work locally only"
+                            }
+                            p { class: "mt-1.5 text-xs text-center text-gray-500 dark:text-gray-400",
+                                "Your data stays in this browser."
                             }
                         }
                     }
                 }
+            }
+        }
 
-                // Skip
-                if !drive_connecting {
-                    div { class: "text-center pt-2",
-                        button {
-                            r#type: "button",
-                            class: "text-xs text-gray-400 dark:text-gray-500 \
-                                    hover:text-gray-600 dark:hover:text-gray-300 transition-colors",
-                            onclick: move |_| do_dismiss(store),
-                            "Skip — set up later"
-                        }
-                    }
-                }
+        // Desktop never reaches Step::ChooseSync, but the compiler requires a value here.
+        #[cfg(not(target_arch = "wasm32"))]
+        rsx! {}
+    };
+
+    rsx! {
+        div { class: "min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4",
+            div { class: "w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 space-y-6",
+                {body}
             }
         }
     }
