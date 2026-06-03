@@ -107,7 +107,7 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                           bg-white dark:bg-gray-800 \
                           border border-gray-200/80 dark:border-gray-700/80 \
                           rounded-lg px-3 py-2 \
-                          shadow-sm",
+                          shadow dark:shadow-none dark:ring-1 dark:ring-white/[0.07]",
                 // Name — Catalog and Trade only; Summary omits it to save space
                 if mode != FilterMode::Summary {
                     NameFilter { config }
@@ -169,9 +169,9 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
 
                 // Panel box — floating below the primary row
                 div { class: "absolute left-0 top-full mt-1 z-50 \
-                            rounded-lg border border-gray-200/60 dark:border-gray-700/60 \
-                            bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm \
-                            shadow-2xl ring-1 ring-black/5 dark:ring-white/10 \
+                            rounded-lg border border-gray-200/60 dark:border-gray-600/60 \
+                            bg-white/95 dark:bg-gray-700/95 backdrop-blur-sm \
+                            shadow-2xl ring-1 ring-black/5 dark:ring-white/[0.09] \
                             p-4 flex flex-col gap-3 \
                             min-w-64 max-w-[min(640px,calc(100vw-1rem))]",
 

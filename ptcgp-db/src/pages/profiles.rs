@@ -619,7 +619,7 @@ pub fn ProfileManagerPage() -> Element {
 
             // ── Profile list ────────────────────────────────────────────────
             section {
-                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 divide-y divide-gray-100 dark:divide-gray-700 shadow-sm",
+                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 divide-y divide-gray-100 dark:divide-gray-700 shadow-md dark:shadow-none dark:ring-1 dark:ring-white/[0.06]",
                     for profile in &profiles {
                         {
                             let prof_name = profile.name.clone();
@@ -663,7 +663,7 @@ pub fn ProfileManagerPage() -> Element {
                 h2 { class: "text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3",
                     "New profile"
                 }
-                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-4 shadow-sm",
+                div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-4 shadow-md dark:shadow-none dark:ring-1 dark:ring-white/[0.06]",
                     div { class: "flex items-start gap-2",
                         div { class: "flex-1 space-y-1",
                             input {
@@ -698,7 +698,7 @@ pub fn ProfileManagerPage() -> Element {
             }
 
             // ── Export ───────────────────────────────────────────────────────
-            section { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-6 space-y-3 shadow-sm",
+            section { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-6 space-y-3 shadow-md dark:shadow-none dark:ring-1 dark:ring-white/[0.06]",
                 h2 { class: "text-lg font-semibold text-gray-900 dark:text-gray-100",
                     "Export"
                 }
@@ -714,7 +714,7 @@ pub fn ProfileManagerPage() -> Element {
             }
 
             // ── Import ───────────────────────────────────────────────────────
-            section { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-6 space-y-4 shadow-sm",
+            section { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 p-6 space-y-4 shadow-md dark:shadow-none dark:ring-1 dark:ring-white/[0.06]",
                 h2 { class: "text-lg font-semibold text-gray-900 dark:text-gray-100",
                     "Import"
                 }

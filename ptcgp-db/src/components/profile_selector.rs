@@ -62,10 +62,10 @@ pub fn ProfileSelector(#[props(default = false)] open_upward: bool) -> Element {
             // Dropdown
             if *open.read() {
                 div { class: if open_upward { "absolute left-0 z-20 bottom-full mb-1 min-w-full w-48 rounded-md \
-                         bg-white dark:bg-gray-800 border border-gray-200/60 dark:border-gray-600/60 \
-                         shadow-xl ring-1 ring-black/5 dark:ring-white/10 py-1" } else { "absolute left-0 z-20 mt-1 min-w-full w-48 rounded-md \
-                         bg-white dark:bg-gray-800 border border-gray-200/60 dark:border-gray-600/60 \
-                         shadow-xl ring-1 ring-black/5 dark:ring-white/10 py-1" },
+                         bg-white dark:bg-gray-700 border border-gray-200/60 dark:border-gray-600/60 \
+                         shadow-xl ring-1 ring-black/5 dark:ring-white/[0.09] py-1" } else { "absolute left-0 z-20 mt-1 min-w-full w-48 rounded-md \
+                         bg-white dark:bg-gray-700 border border-gray-200/60 dark:border-gray-600/60 \
+                         shadow-xl ring-1 ring-black/5 dark:ring-white/[0.09] py-1" },
                     for name in profile_names {
                         ProfileRow {
                             key: "{name}",
@@ -75,8 +75,8 @@ pub fn ProfileSelector(#[props(default = false)] open_upward: bool) -> Element {
                             store,
                         }
                     }
-                    div { class: "px-3 pt-1 pb-0.5 border-t border-gray-100 dark:border-gray-700 \
-                                  text-xs text-gray-400 dark:text-gray-500",
+                    div { class: "px-3 pt-1 pb-0.5 border-t border-gray-100 dark:border-gray-600 \
+                                  text-xs text-gray-400 dark:text-gray-400",
                         "Ctrl+Click to select multiple"
                     }
                 }
@@ -95,7 +95,7 @@ fn ProfileRow(
     rsx! {
         div {
             class: "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer \
-                    hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-100",
+                    hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100",
             onclick: {
                 let name = name.clone();
                 move |e: MouseEvent| {
