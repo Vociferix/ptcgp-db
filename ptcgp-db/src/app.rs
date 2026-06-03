@@ -157,6 +157,21 @@ pub(crate) fn set_card_count(
     schedule_save();
 }
 
+const fn favicon() -> Asset {
+    let mut srcs = CardSource::ALL;
+
+    while let Some((src, tail)) = srcs.split_first() {
+        srcs = tail;
+        if src.name().as_str().eq_ignore_ascii_case("Pack") {
+            return src.icon();
+        }
+    }
+
+    panic!("Card source 'Pack' not found")
+}
+
+const FAVICON: Asset = favicon();
+
 // ---------------------------------------------------------------------------
 // Drive startup sync (web only)
 // ---------------------------------------------------------------------------
@@ -419,9 +434,7 @@ pub fn App() -> Element {
 
     rsx! {
         document::Stylesheet { href: asset!("/public/tailwind.css") }
-        if let Some(src) = CardSource::ALL.iter().find(|s| &*s.name() == "Pack") {
-            document::Link { rel: "icon", r#type: "image/png", href: src.icon() }
-        }
+        document::Link { rel: "icon", r#type: "image/png", href: FAVICON }
         {body}
     }
 }
