@@ -457,21 +457,23 @@ fn PackSubRow(
     };
     rsx! {
         div {
-            class: "flex items-center gap-3 py-2 pl-8 pr-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/60",
+            class: "grid grid-cols-[1fr_auto_auto] gap-x-4 py-2 pl-8 pr-4 items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/60",
             onclick: on_click,
-            img {
-                src: "{pack.image()}",
-                alt: "",
-                class: "h-24 w-auto object-contain shrink-0",
-            }
-            div { class: "hidden sm:block flex-1 min-w-0",
+            div { class: "flex items-center gap-3 min-w-0",
                 img {
-                    src: "{pack.logo()}",
-                    alt: "{pack.title()}",
-                    class: "h-12 w-auto max-w-56 object-contain",
+                    src: "{pack.image()}",
+                    alt: "",
+                    class: "h-24 w-auto object-contain shrink-0",
+                }
+                div { class: "hidden sm:block min-w-0",
+                    img {
+                        src: "{pack.logo()}",
+                        alt: "{pack.title()}",
+                        class: "h-12 w-auto max-w-56 object-contain",
+                    }
                 }
             }
-            div { class: "text-right whitespace-nowrap shrink-0",
+            div { class: "text-right whitespace-nowrap",
                 span { class: "text-sm font-medium text-gray-900 dark:text-gray-100",
                     "{completion_pct:.3}%"
                 }
@@ -479,7 +481,7 @@ fn PackSubRow(
                     "{owned}/{total}"
                 }
             }
-            div { class: "text-right w-20 whitespace-nowrap shrink-0",
+            div { class: "text-right w-20 whitespace-nowrap",
                 if completion_pct >= 100.0 {
                     span { class: "text-sm text-green-600 dark:text-green-400 font-medium",
                         "Complete"
