@@ -123,9 +123,9 @@ fn gen_rarity_groups(data: &Dataset) -> TokenStream {
                 id: #id,
                 name_id: #name_id,
                 #[cfg(feature = "images")]
-                icon: asset!(#icon_path),
+                icon: asset!(#icon_path, AssetOptions::image().with_format(ImageFormat::Webp)),
                 #[cfg(feature = "images")]
-                symbol: asset!(#symbol_path),
+                symbol: asset!(#symbol_path, AssetOptions::image().with_format(ImageFormat::Webp)),
             }
         }
     });
@@ -149,9 +149,9 @@ fn gen_rarity_classes(data: &Dataset) -> TokenStream {
                 group_id: #group_id,
                 count: #count,
                 #[cfg(feature = "images")]
-                icon: asset!(#icon_path),
+                icon: asset!(#icon_path, AssetOptions::image().with_format(ImageFormat::Webp)),
                 #[cfg(feature = "images")]
-                symbol: asset!(#symbol_path),
+                symbol: asset!(#symbol_path, AssetOptions::image().with_format(ImageFormat::Webp)),
             }
         }
     });
@@ -244,9 +244,9 @@ fn gen_sets(data: &Dataset) -> TokenStream {
                 pack_ids: #packs_start..#packs_end,
                 card_version_ids: #cards_start..#cards_end,
                 #[cfg(feature = "images")]
-                logo: asset!(#logo_path),
+                logo: asset!(#logo_path, AssetOptions::image().with_format(ImageFormat::Webp)),
                 #[cfg(feature = "images")]
-                icon: asset!(#icon_path),
+                icon: asset!(#icon_path, AssetOptions::image().with_format(ImageFormat::Webp)),
             }
         }
     });
@@ -277,9 +277,9 @@ fn gen_packs(data: &Dataset) -> TokenStream {
                 card_version_ids: &[#(#card_ids,)*],
                 variant_ids: #variants_start..#variants_end,
                 #[cfg(feature = "images")]
-                image: asset!(#image_path),
+                image: asset!(#image_path, AssetOptions::image().with_format(ImageFormat::Webp)),
                 #[cfg(feature = "images")]
-                logo: asset!(#logo_path),
+                logo: asset!(#logo_path, AssetOptions::image().with_format(ImageFormat::Webp)),
             }
         }
     });
@@ -412,7 +412,7 @@ fn gen_card_versions(data: &Dataset) -> TokenStream {
                 is_tradable: #is_tradable,
                 duplicate_ids: &[#(#duplicate_ids,)*],
                 #[cfg(feature = "images")]
-                image: asset!(#image_path),
+                image: asset!(#image_path, AssetOptions::image().with_format(ImageFormat::Webp)),
             }
         }
     });
@@ -435,7 +435,7 @@ fn gen_card_sources(data: &Dataset) -> TokenStream {
                 name_id: #name_id,
                 description_id: #description_id,
                 #[cfg(feature = "images")]
-                icon: asset!(#icon_path),
+                icon: asset!(#icon_path, AssetOptions::image().with_format(ImageFormat::Webp)),
             }
         }
     });
@@ -463,9 +463,9 @@ fn gen_elements(data: &Dataset) -> TokenStream {
                 code: #code,
                 name_id: #name_id,
                 #[cfg(feature = "images")]
-                icon: asset!(#icon_path),
+                icon: asset!(#icon_path, AssetOptions::image().with_format(ImageFormat::Webp)),
                 #[cfg(feature = "images")]
-                symbol: asset!(#symbol_path),
+                symbol: asset!(#symbol_path, AssetOptions::image().with_format(ImageFormat::Webp)),
             }
         }
     });
