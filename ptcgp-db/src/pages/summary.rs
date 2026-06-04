@@ -652,7 +652,11 @@ pub fn SummaryPage() -> Element {
                             .completion_pct
                             .partial_cmp(&b.completion_pct)
                             .unwrap_or(std::cmp::Ordering::Equal);
-                        let cmp = if sc.dir == SortDir::Asc { cmp } else { cmp.reverse() };
+                        let cmp = if sc.dir == SortDir::Asc {
+                            cmp
+                        } else {
+                            cmp.reverse()
+                        };
                         cmp.then(a.pack.id().cmp(&b.pack.id()))
                     });
                 }
@@ -661,14 +665,18 @@ pub fn SummaryPage() -> Element {
                         .completion_pct
                         .partial_cmp(&b.completion_pct)
                         .unwrap_or(std::cmp::Ordering::Equal);
-                    let cmp = if sc.dir == SortDir::Asc { cmp } else { cmp.reverse() };
+                    let cmp = if sc.dir == SortDir::Asc {
+                        cmp
+                    } else {
+                        cmp.reverse()
+                    };
                     cmp.then(a.set.id().cmp(&b.set.id()))
                 });
             }
             SortColumn::BestPull => {
                 for row in set_rows.iter_mut() {
-                    row.pack_rows.sort_by(|a, b| {
-                        match (a.rate_pct > 0.0, b.rate_pct > 0.0) {
+                    row.pack_rows
+                        .sort_by(|a, b| match (a.rate_pct > 0.0, b.rate_pct > 0.0) {
                             (true, false) => std::cmp::Ordering::Less,
                             (false, true) => std::cmp::Ordering::Greater,
                             (false, false) => a.pack.id().cmp(&b.pack.id()),
@@ -677,14 +685,17 @@ pub fn SummaryPage() -> Element {
                                     .rate_pct
                                     .partial_cmp(&b.rate_pct)
                                     .unwrap_or(std::cmp::Ordering::Equal);
-                                let cmp = if sc.dir == SortDir::Asc { cmp } else { cmp.reverse() };
+                                let cmp = if sc.dir == SortDir::Asc {
+                                    cmp
+                                } else {
+                                    cmp.reverse()
+                                };
                                 cmp.then(a.pack.id().cmp(&b.pack.id()))
                             }
-                        }
-                    });
+                        });
                 }
-                set_rows.sort_by(|a, b| {
-                    match (a.best_pack.is_some(), b.best_pack.is_some()) {
+                set_rows.sort_by(
+                    |a, b| match (a.best_pack.is_some(), b.best_pack.is_some()) {
                         (true, false) => std::cmp::Ordering::Less,
                         (false, true) => std::cmp::Ordering::Greater,
                         (false, false) => a.set.id().cmp(&b.set.id()),
@@ -693,11 +704,15 @@ pub fn SummaryPage() -> Element {
                                 .best_rate_pct
                                 .partial_cmp(&b.best_rate_pct)
                                 .unwrap_or(std::cmp::Ordering::Equal);
-                            let cmp = if sc.dir == SortDir::Asc { cmp } else { cmp.reverse() };
+                            let cmp = if sc.dir == SortDir::Asc {
+                                cmp
+                            } else {
+                                cmp.reverse()
+                            };
                             cmp.then(a.set.id().cmp(&b.set.id()))
                         }
-                    }
-                });
+                    },
+                );
             }
         }
     }
