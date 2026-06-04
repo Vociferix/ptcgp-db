@@ -86,7 +86,7 @@ jobs:
         with:
           key: ${{ env.SUBMODULE_HASH }}
           cache-all-crates: "true"
-      - uses: browser-actions/setup-chrome@v1
+      - uses: browser-actions/setup-chrome@v2
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-pack
@@ -111,7 +111,7 @@ jobs:
           cache-all-crates: "true"
       - name: Cache dx binary
         id: cache-dx
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cargo/bin/dx
           key: dx-${{ runner.os }}-${{ env.DX_VERSION }}
@@ -139,7 +139,7 @@ jobs:
           cache-all-crates: "true"
       - name: Cache dx binary
         id: cache-dx
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cargo/bin/dx
           key: dx-${{ runner.os }}-${{ env.DX_VERSION }}
@@ -147,7 +147,7 @@ jobs:
         if: steps.cache-dx.outputs.cache-hit != 'true'
         run: cargo install dioxus-cli --version ${{ env.DX_VERSION }} --locked
       - name: Cache dx tools
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.local/share/.dx/tools
           key: dx-tools-${{ runner.os }}-${{ env.DX_VERSION }}
