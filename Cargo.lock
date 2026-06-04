@@ -4042,7 +4042,7 @@ checksum = "33cb294fe86a74cbcf50d4445b37da762029549ebeea341421c7c70370f86cac"
 
 [[package]]
 name = "ptcgp-db"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "dioxus",
@@ -4066,7 +4066,7 @@ dependencies = [
 
 [[package]]
 name = "ptcgp-db-core"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "dirs",
@@ -4083,7 +4083,7 @@ dependencies = [
 
 [[package]]
 name = "ptcgp-db-data"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "chrono",
