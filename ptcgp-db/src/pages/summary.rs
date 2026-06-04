@@ -347,6 +347,95 @@ fn SaveQueryDialog(
 }
 
 // ---------------------------------------------------------------------------
+// Sort state
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq, Default)]
+enum SortColumn {
+    #[default]
+    Default,
+    Completion,
+    BestPull,
+}
+
+#[derive(Clone, Copy, PartialEq, Default)]
+enum SortDir {
+    #[default]
+    Asc,
+    Desc,
+}
+
+impl SortDir {
+    fn toggle(self) -> Self {
+        match self {
+            Self::Asc => Self::Desc,
+            Self::Desc => Self::Asc,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Default)]
+struct SortConfig {
+    column: SortColumn,
+    dir: SortDir,
+}
+
+fn handle_sort_click(col: SortColumn, mut sort_cfg: Signal<SortConfig>) {
+    let mut sc = sort_cfg.write();
+    if sc.column == col {
+        if sc.dir == SortDir::Desc {
+            *sc = SortConfig::default();
+        } else {
+            sc.dir = sc.dir.toggle();
+        }
+    } else {
+        *sc = SortConfig {
+            column: col,
+            dir: SortDir::Asc,
+        };
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Column sort button
+// ---------------------------------------------------------------------------
+
+#[component]
+fn SortBtn(
+    col: SortColumn,
+    label: &'static str,
+    flex_class: &'static str,
+    sort_cfg: Signal<SortConfig>,
+) -> Element {
+    let sc = sort_cfg.read();
+    let active = sc.column == col;
+    let dir = if active { Some(sc.dir) } else { None };
+    drop(sc);
+    let cls = if active {
+        "cursor-pointer select-none text-blue-600 dark:text-blue-400"
+    } else {
+        "cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300"
+    };
+    rsx! {
+        button {
+            r#type: "button",
+            class: "{flex_class} {cls}",
+            onclick: move |_| handle_sort_click(col, sort_cfg),
+            span { class: "inline-flex items-center gap-0.5",
+                "{label}"
+                if let Some(d) = dir {
+                    if d == SortDir::Asc {
+                        ChevronUp { class: "w-3 h-3".to_string() }
+                    } else {
+                        ChevronDown { class: "w-3 h-3".to_string() }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Per-pack sub-row
 // ---------------------------------------------------------------------------
 
@@ -383,18 +472,12 @@ fn PackSubRow(
                 }
             }
             div { class: "text-right whitespace-nowrap shrink-0",
-                span { class: "block sm:hidden text-xs text-gray-400 dark:text-gray-500",
-                    "Completion"
-                }
                 span { class: "text-sm font-medium text-gray-900 dark:text-gray-100",
                     "{completion_pct:.3}%"
                 }
                 span { class: "text-xs text-gray-400 dark:text-gray-500 ml-1.5", "{owned}/{total}" }
             }
             div { class: "text-right w-20 whitespace-nowrap shrink-0",
-                span { class: "block sm:hidden text-xs text-gray-400 dark:text-gray-500",
-                    "Best pull"
-                }
                 if completion_pct >= 100.0 {
                     span { class: "text-sm text-green-600 dark:text-green-400 font-medium",
                         "Complete"
@@ -440,7 +523,7 @@ fn SetCompletionRow(
     rsx! {
         div { class: "border-b border-gray-100 dark:border-gray-700 last:border-0",
             div {
-                class: "flex flex-col gap-y-1 sm:grid sm:grid-cols-[1fr_auto_auto] sm:gap-x-4 px-4 py-3 sm:items-center cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors",
+                class: "grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-3 items-center cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors",
                 onclick: on_click,
                 div { class: "flex items-center gap-2 min-w-0",
                     if is_expandable {
@@ -457,15 +540,17 @@ fn SetCompletionRow(
                             }
                         }
                     }
-                    img {
-                        src: "{set.icon()}",
-                        alt: "",
-                        class: "h-5 w-auto max-w-14 object-contain shrink-0",
-                    }
-                    img {
-                        src: "{set.logo()}",
-                        alt: "{set_name}",
-                        class: "h-10 w-auto max-w-32 object-contain shrink-0",
+                    div { class: "flex flex-col sm:flex-row items-center gap-1 sm:gap-2",
+                        img {
+                            src: "{set.icon()}",
+                            alt: "",
+                            class: "h-5 w-auto max-w-14 object-contain shrink-0",
+                        }
+                        img {
+                            src: "{set.logo()}",
+                            alt: "{set_name}",
+                            class: "h-10 w-auto max-w-32 object-contain shrink-0",
+                        }
                     }
                     if !is_obtainable {
                         span { class: "shrink-0 text-xs px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400",
@@ -473,35 +558,23 @@ fn SetCompletionRow(
                         }
                     }
                 }
-                div { class: "flex justify-end gap-4 mt-1 sm:contents",
-                    div { class: "text-right whitespace-nowrap",
-                        span { class: "block sm:hidden text-xs text-gray-400 dark:text-gray-500",
-                            "Completion"
-                        }
-                        span { class: "text-sm font-medium text-gray-900 dark:text-gray-100",
-                            "{completion_pct:.3}%"
-                        }
-                        span { class: "text-xs text-gray-400 dark:text-gray-500 ml-1.5",
-                            "{owned}/{total}"
-                        }
+                div { class: "text-right whitespace-nowrap",
+                    span { class: "text-sm font-medium text-gray-900 dark:text-gray-100",
+                        "{completion_pct:.3}%"
                     }
-                    div { class: "text-right w-20 whitespace-nowrap",
-                        span { class: "block sm:hidden text-xs text-gray-400 dark:text-gray-500",
-                            "Best pull"
+                    span { class: "block sm:inline text-xs text-gray-400 dark:text-gray-500 sm:ml-1.5",
+                        "{owned}/{total}"
+                    }
+                }
+                div { class: "text-right w-20 whitespace-nowrap",
+                    if is_promo || (best_pack.is_none() && completion_pct < 100.0) {
+                        span { class: "text-sm text-gray-400 dark:text-gray-500", "—" }
+                    } else if completion_pct >= 100.0 && !is_promo {
+                        span { class: "text-sm text-green-600 dark:text-green-400 font-medium",
+                            "Complete"
                         }
-                        if is_promo || (best_pack.is_none() && completion_pct < 100.0) {
-                            span { class: "text-sm text-gray-400 dark:text-gray-500",
-                                "—"
-                            }
-                        } else if completion_pct >= 100.0 && !is_promo {
-                            span { class: "text-sm text-green-600 dark:text-green-400 font-medium",
-                                "Complete"
-                            }
-                        } else {
-                            span { class: "text-sm text-gray-900 dark:text-gray-100",
-                                "{best_rate_pct:.3}%"
-                            }
-                        }
+                    } else {
+                        span { class: "text-sm text-gray-900 dark:text-gray-100", "{best_rate_pct:.3}%" }
                     }
                 }
             }
@@ -539,6 +612,7 @@ pub fn SummaryPage() -> Element {
 
     let mut summary_state_ctx = use_context::<Signal<SummaryPageState>>();
     let config: Signal<FilterConfig> = use_signal(|| summary_state_ctx.read().config.clone());
+    let sort_cfg: Signal<SortConfig> = use_signal(SortConfig::default);
 
     use_drop(move || {
         summary_state_ctx.write().config = config.read().clone();
@@ -557,11 +631,45 @@ pub fn SummaryPage() -> Element {
     };
 
     let SummaryData {
-        set_rows,
+        mut set_rows,
         best_packs,
         total_owned,
         total_denom,
     } = compute_summary(store_ref, &cfg, &settings_guard, today);
+
+    {
+        let sc = sort_cfg.read();
+        match sc.column {
+            SortColumn::Default => {}
+            SortColumn::Completion => {
+                set_rows.sort_by(|a, b| {
+                    let cmp = a
+                        .completion_pct
+                        .partial_cmp(&b.completion_pct)
+                        .unwrap_or(std::cmp::Ordering::Equal);
+                    let cmp = if sc.dir == SortDir::Asc { cmp } else { cmp.reverse() };
+                    cmp.then(a.set.id().cmp(&b.set.id()))
+                });
+            }
+            SortColumn::BestPull => {
+                set_rows.sort_by(|a, b| {
+                    match (a.best_pack.is_some(), b.best_pack.is_some()) {
+                        (true, false) => std::cmp::Ordering::Less,
+                        (false, true) => std::cmp::Ordering::Greater,
+                        (false, false) => a.set.id().cmp(&b.set.id()),
+                        (true, true) => {
+                            let cmp = a
+                                .best_rate_pct
+                                .partial_cmp(&b.best_rate_pct)
+                                .unwrap_or(std::cmp::Ordering::Equal);
+                            let cmp = if sc.dir == SortDir::Asc { cmp } else { cmp.reverse() };
+                            cmp.then(a.set.id().cmp(&b.set.id()))
+                        }
+                    }
+                });
+            }
+        }
+    }
 
     let overall_pct = if total_denom > 0 {
         total_owned as f64 / total_denom as f64 * 100.0
@@ -692,10 +800,20 @@ pub fn SummaryPage() -> Element {
                     "Set completion"
                 }
                 div { class: "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 dark:border-gray-700/80 overflow-hidden shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.06]",
-                    div { class: "hidden sm:grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 bg-gray-50 dark:bg-gray-800/80 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200/80 dark:border-gray-700/80 shadow-sm",
+                    div { class: "grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 bg-gray-50 dark:bg-gray-800/80 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200/80 dark:border-gray-700/80 shadow-sm",
                         span { "Set" }
-                        span { "Completion" }
-                        span { "Best pull" }
+                        SortBtn {
+                            col: SortColumn::Completion,
+                            label: "Completion",
+                            flex_class: "text-right",
+                            sort_cfg,
+                        }
+                        SortBtn {
+                            col: SortColumn::BestPull,
+                            label: "Best pull",
+                            flex_class: "w-20 text-right",
+                            sort_cfg,
+                        }
                     }
                     if set_rows.is_empty() {
                         p { class: "px-4 py-6 text-sm text-gray-500 dark:text-gray-400",
