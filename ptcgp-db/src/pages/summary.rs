@@ -464,7 +464,7 @@ fn PackSubRow(
                 alt: "",
                 class: "h-24 w-auto object-contain shrink-0",
             }
-            div { class: "flex-1 min-w-0",
+            div { class: "hidden sm:block flex-1 min-w-0",
                 img {
                     src: "{pack.logo()}",
                     alt: "{pack.title()}",
@@ -475,7 +475,9 @@ fn PackSubRow(
                 span { class: "text-sm font-medium text-gray-900 dark:text-gray-100",
                     "{completion_pct:.3}%"
                 }
-                span { class: "text-xs text-gray-400 dark:text-gray-500 ml-1.5", "{owned}/{total}" }
+                span { class: "block sm:inline text-xs text-gray-400 dark:text-gray-500 sm:ml-1.5",
+                    "{owned}/{total}"
+                }
             }
             div { class: "text-right w-20 whitespace-nowrap shrink-0",
                 if completion_pct >= 100.0 {
@@ -642,6 +644,16 @@ pub fn SummaryPage() -> Element {
         match sc.column {
             SortColumn::Default => {}
             SortColumn::Completion => {
+                for row in set_rows.iter_mut() {
+                    row.pack_rows.sort_by(|a, b| {
+                        let cmp = a
+                            .completion_pct
+                            .partial_cmp(&b.completion_pct)
+                            .unwrap_or(std::cmp::Ordering::Equal);
+                        let cmp = if sc.dir == SortDir::Asc { cmp } else { cmp.reverse() };
+                        cmp.then(a.pack.id().cmp(&b.pack.id()))
+                    });
+                }
                 set_rows.sort_by(|a, b| {
                     let cmp = a
                         .completion_pct
@@ -652,6 +664,23 @@ pub fn SummaryPage() -> Element {
                 });
             }
             SortColumn::BestPull => {
+                for row in set_rows.iter_mut() {
+                    row.pack_rows.sort_by(|a, b| {
+                        match (a.rate_pct > 0.0, b.rate_pct > 0.0) {
+                            (true, false) => std::cmp::Ordering::Less,
+                            (false, true) => std::cmp::Ordering::Greater,
+                            (false, false) => a.pack.id().cmp(&b.pack.id()),
+                            (true, true) => {
+                                let cmp = a
+                                    .rate_pct
+                                    .partial_cmp(&b.rate_pct)
+                                    .unwrap_or(std::cmp::Ordering::Equal);
+                                let cmp = if sc.dir == SortDir::Asc { cmp } else { cmp.reverse() };
+                                cmp.then(a.pack.id().cmp(&b.pack.id()))
+                            }
+                        }
+                    });
+                }
                 set_rows.sort_by(|a, b| {
                     match (a.best_pack.is_some(), b.best_pack.is_some()) {
                         (true, false) => std::cmp::Ordering::Less,
