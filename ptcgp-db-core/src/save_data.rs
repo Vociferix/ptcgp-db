@@ -205,6 +205,11 @@ pub struct FilterConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mega: Option<bool>,
 
+    /// Trainer kind filter (single-select). Value is a `TrainerKind::id()`. When `Some`,
+    /// only Trainer cards whose kind matches pass the filter; Pokémon cards are excluded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trainer_kind: Option<usize>,
+
     /// Stage filter (single-select). Value is a `Stage::id()`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stage: Option<usize>,
@@ -216,6 +221,11 @@ pub struct FilterConfig {
     /// Foil filter. `Some(true)` = foil only; `Some(false)` = non-foil only; `None` = no filter.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub foil: Option<bool>,
+
+    /// Tradable filter. `Some(true)` = tradable only; `Some(false)` = non-tradable only;
+    /// `None` = no filter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tradable: Option<bool>,
 
     /// Card source filter (multi-select). Values are `CardSource::id()`s.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

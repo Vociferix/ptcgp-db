@@ -4,7 +4,7 @@ mod pickers;
 
 use controls::{
     AnyVersionFilter, CountFilter, ExcessThresholdFilter, GoalFilter, KindFilter, NameFilter,
-    TriStateFilter,
+    TrainerKindFilter, TriStateFilter,
 };
 use dropdowns::{PackDropdown, SetDropdown, SourceDropdown};
 use pickers::{ElementGroup, RarityGroup};
@@ -42,13 +42,14 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
     let ignore_unobtainable = settings.read().ignore_unobtainable_sets();
     let mut panel_open = use_signal(|| false);
 
-    let (total_active, ex, mega, foil, obtainable) = {
+    let (total_active, ex, mega, foil, tradable, obtainable) = {
         let cfg = config.read();
         (
             count_active(&cfg, ignore_unobtainable),
             cfg.ex,
             cfg.mega,
             cfg.foil,
+            cfg.tradable,
             cfg.obtainable,
         )
     };
@@ -217,12 +218,22 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                         value: mega,
                         on_change: move |v: Option<bool>| config.write().mega = v,
                     }
+                    TrainerKindFilter { config }
                     TriStateFilter {
                         filter_label: "Foil",
                         only_text: "Foil only",
                         exclude_text: "Non-foil",
                         value: foil,
                         on_change: move |v: Option<bool>| config.write().foil = v,
+                    }
+                    if mode != FilterMode::Trade {
+                        TriStateFilter {
+                            filter_label: "Tradable",
+                            only_text: "Tradable",
+                            exclude_text: "Non-tradable",
+                            value: tradable,
+                            on_change: move |v: Option<bool>| config.write().tradable = v,
+                        }
                     }
                     if !ignore_unobtainable {
                         TriStateFilter {
@@ -421,7 +432,13 @@ fn count_advanced_active(config: &FilterConfig, ignore_unobtainable: bool) -> us
     if config.mega.is_some() {
         n += 1;
     }
+    if config.trainer_kind.is_some() {
+        n += 1;
+    }
     if config.foil.is_some() {
+        n += 1;
+    }
+    if config.tradable.is_some() {
         n += 1;
     }
     if !ignore_unobtainable && config.obtainable.is_some() {
