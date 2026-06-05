@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 use ptcgp_db_core::save_data::{CardKindFilter, CountThreshold, FilterConfig};
+use ptcgp_db_data::TrainerKind;
 
 use crate::components::icons::{Minus, Plus};
 use crate::components::toggle::Toggle;
@@ -89,6 +90,59 @@ fn KindBtn(
             r#type: "button",
             class: "{cls}",
             onclick: move |_| config.write().card_kind = target,
+            "{btn_label}"
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TrainerKindFilter — segmented button group (All / Item / Supporter / Stadium / Tool)
+// ---------------------------------------------------------------------------
+
+/// Segmented filter for Trainer card categories (Item, Supporter, Stadium, Tool).
+///
+/// Selecting a trainer kind implicitly excludes all Pokémon cards, since only Trainer cards
+/// have a kind. "All" resets the filter to accept every card.
+#[component]
+pub fn TrainerKindFilter(config: Signal<FilterConfig>) -> Element {
+    let trainer_kind = config.read().trainer_kind;
+    rsx! {
+        div { class: "flex flex-col gap-0.5",
+            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Trainer Kind" }
+            div { class: "flex flex-wrap gap-y-px",
+                TrainerKindBtn {
+                    btn_label: "All",
+                    active: trainer_kind.is_none(),
+                    target: None,
+                    config,
+                }
+                for tk in TrainerKind::ALL {
+                    TrainerKindBtn {
+                        key: "{tk.id()}",
+                        btn_label: "{tk.name()}",
+                        active: trainer_kind == Some(tk.id()),
+                        target: Some(tk.id()),
+                        config,
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn TrainerKindBtn(
+    btn_label: String,
+    active: bool,
+    target: Option<usize>,
+    config: Signal<FilterConfig>,
+) -> Element {
+    let cls = seg_btn_cls(active);
+    rsx! {
+        button {
+            r#type: "button",
+            class: "{cls}",
+            onclick: move |_| config.write().trainer_kind = target,
             "{btn_label}"
         }
     }

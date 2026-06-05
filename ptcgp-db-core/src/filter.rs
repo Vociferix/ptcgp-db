@@ -67,6 +67,11 @@ pub fn filter_card(
     {
         return false;
     }
+    if let Some(kind_id) = cfg.trainer_kind
+        && cv.card().trainer().is_none_or(|t| t.kind().id() != kind_id)
+    {
+        return false;
+    }
     if let Some(stage_id) = cfg.stage
         && pkmn.is_none_or(|p| p.stage().id() != stage_id)
     {
@@ -76,6 +81,9 @@ pub fn filter_card(
         return false;
     }
     if cfg.foil.is_some_and(|f| cv.is_foil() != f) {
+        return false;
+    }
+    if cfg.tradable.is_some_and(|t| cv.is_tradable() != t) {
         return false;
     }
     if !cfg.sources.is_empty() && !cfg.sources.contains(&cv.source().id()) {
