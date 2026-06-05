@@ -12,12 +12,43 @@ mod token_exchange;
 pub use client::{DriveClient, DriveError};
 pub use token_exchange::DriveAuthError;
 
+use std::cell::OnceCell;
+
 use chrono::{DateTime, Duration, Utc};
 use dioxus::prelude::*;
 use ptcgp_db_core::save_data::{AppSettingsSaveData, ProfilesSaveData, SavedQueriesSaveData};
 use ptcgp_db_core::storage::Storage as _;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::JsValue;
+
+// ---------------------------------------------------------------------------
+// Startup URL capture
+// ---------------------------------------------------------------------------
+
+thread_local! {
+    // Stores window.location.search as captured in main() before Dioxus launches.
+    // HashHistory rewrites the URL during initialization, stripping query params;
+    // capturing early ensures the OAuth callback code is never lost.
+    static STARTUP_SEARCH: OnceCell<String> = const { OnceCell::new() };
+}
+
+/// Captures `window.location.search` before Dioxus initializes.
+///
+/// Must be called at the very top of `main()`, before `dioxus::launch()`, because
+/// `HashHistory` calls `history.replaceState` during initialization to add `#/`, which
+/// drops any query params (including the OAuth `?code=…`) from the URL.
+pub fn capture_startup_search() {
+    STARTUP_SEARCH.with(|cell| {
+        let search = web_sys::window()
+            .and_then(|w| w.location().search().ok())
+            .unwrap_or_default();
+        let _ = cell.set(search);
+    });
+}
+
+fn startup_search() -> String {
+    STARTUP_SEARCH.with(|cell| cell.get().cloned().unwrap_or_default())
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -211,14 +242,16 @@ pub fn initiate_auth_redirect() {
 pub async fn handle_auth_callback() -> Result<DriveToken, String> {
     let window = web_sys::window().ok_or("no window object")?;
     let location = window.location();
-    let search = location.search().map_err(|_| "failed to read URL search")?;
+
+    // Use the search string captured in main() before HashHistory stripped it.
+    let search = startup_search();
 
     let params = web_sys::UrlSearchParams::new_with_str(&search)
         .map_err(|_| "failed to parse URL query params")?;
 
     // Google redirects with ?error=… when the user denies or an error occurs.
     if let Some(error) = params.get("error") {
-        let _ = pkce::take_from_session(); // clean up regardless
+        let _ = pkce::take_from_session();
         restore_url(&window, "");
         let desc = params.get("error_description").unwrap_or_default();
         return Err(if error == "access_denied" {
@@ -228,7 +261,12 @@ pub async fn handle_auth_callback() -> Result<DriveToken, String> {
         });
     }
 
-    let code = params.get("code").ok_or("no authorization code in URL")?;
+    // If neither code nor error is present, the PKCE session data is stale (e.g., from an
+    // abandoned auth flow). Clean it up so we don't loop on the next page load.
+    let Some(code) = params.get("code") else {
+        let _ = pkce::take_from_session();
+        return Err("no authorization code in URL".to_string());
+    };
     let returned_state = params.get("state").ok_or("no state in URL")?;
 
     // Verify CSRF state and retrieve the PKCE verifier.
@@ -254,20 +292,23 @@ pub async fn handle_auth_callback() -> Result<DriveToken, String> {
     set_drive_enabled(true);
 
     // Clean the URL: remove query params and restore the pre-redirect hash.
-    restore_url(&window, &return_hash);
+    // If return_hash is empty (e.g., connected from onboarding), fall back to the hash
+    // that HashHistory set during initialization so the router stays consistent.
+    let hash = if return_hash.is_empty() {
+        location.hash().unwrap_or_default()
+    } else {
+        return_hash
+    };
+    restore_url(&window, &hash);
 
     Ok(token)
 }
 
-/// Replaces the current URL with just the pathname + the given hash, removing all query params.
+/// Replaces the current URL with `pathname + hash`, removing all query params.
 fn restore_url(window: &web_sys::Window, hash: &str) {
     let location = window.location();
     let pathname = location.pathname().unwrap_or_default();
-    let target = if hash.is_empty() {
-        pathname
-    } else {
-        format!("{pathname}{hash}")
-    };
+    let target = format!("{pathname}{hash}");
     if let Ok(history) = window.history() {
         let _ = history.replace_state_with_url(&JsValue::NULL, "", Some(&target));
     }
