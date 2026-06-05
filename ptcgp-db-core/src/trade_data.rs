@@ -348,7 +348,7 @@ pub fn build_trades<S: Storage + Clone>(
 
 /// Returns a ranked list of trade candidates: cards the destination holds in excess of `goal`.
 ///
-/// Only cards with a non-zero pull rate are included (untradable / no-pack cards are excluded).
+/// Only tradable cards with a non-zero pull rate are included.
 /// Retired-set cards are filtered by `show_unobtainable`.
 pub fn build_candidates<S: Storage + Clone>(
     store: &ProfileStore<S>,
@@ -365,6 +365,9 @@ pub fn build_candidates<S: Storage + Clone>(
 
     for cv in CardVersion::ALL {
         if merge_dupes && !cv.is_original() && !cv.duplicates().is_empty() {
+            continue;
+        }
+        if !cv.is_tradable() {
             continue;
         }
         if !filter_card(cv, cfg, settings, today, matched_name_ids, None) {
@@ -699,6 +702,33 @@ mod tests {
         };
         let result = build_candidates(&store, &settings, &cfg, today(), None, true);
         assert!(result.iter().any(|r| r.cv.id() == cv.id()));
+    }
+
+    #[test]
+    fn build_candidates_excludes_non_tradable_cards() {
+        let mut store = store_with_two_profiles();
+        // Find a card version that is not tradable but has a non-zero pull rate (pack card).
+        let Some(cv) = CardVersion::ALL
+            .iter()
+            .find(|c| !c.is_tradable() && !c.packs().is_empty())
+        else {
+            return; // no such card in data set — skip
+        };
+        // Own excess copies.
+        store
+            .set_owned_count("Dest", CardVersionId(cv.id()), 5)
+            .unwrap();
+
+        let settings = AppSettings::default();
+        let cfg = FilterConfig {
+            goal: 1,
+            ..Default::default()
+        };
+        let result = build_candidates(&store, &settings, &cfg, today(), None, true);
+        assert!(
+            !result.iter().any(|r| r.cv.id() == cv.id()),
+            "non-tradable card should not appear in candidates"
+        );
     }
 
     #[test]
