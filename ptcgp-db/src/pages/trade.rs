@@ -513,26 +513,23 @@ fn SourceProfileDropdown(selected: Signal<Vec<String>>) -> Element {
     let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
     let mut open = use_signal(|| false);
 
-    let inactive_names: Vec<String> = {
-        let guard = store.read();
-        let Some(ref s) = *guard else {
-            return rsx! {};
-        };
-        let active_set: HashSet<&str> = s
-            .active_profile_names()
-            .iter()
-            .map(|n| n.as_str())
-            .collect();
-        s.profiles()
-            .iter()
-            .filter(|p| !active_set.contains(p.name.as_str()))
-            .map(|p| p.name.clone())
-            .collect()
+    // Hold the guard across RSX so profile names can be borrowed as &str
+    // rather than cloned into a Vec<String>.
+    let guard = store.read();
+    let Some(ref s) = *guard else {
+        return rsx! {};
     };
+    let active_names = s.active_profile_names();
+    let profiles = s.profiles();
 
     let sel = selected.read();
-    let count = sel.iter().filter(|n| inactive_names.contains(n)).count();
+    let count = sel
+        .iter()
+        .filter(|n| profiles.iter().any(|p| &p.name == *n) && !active_names.contains(*n))
+        .count();
     drop(sel);
+
+    let open_now = *open.read();
 
     rsx! {
         div { class: "relative",
@@ -546,14 +543,14 @@ fn SourceProfileDropdown(selected: Signal<Vec<String>>) -> Element {
                         "{count}"
                     }
                 }
-                if *open.read() {
+                if open_now {
                     ChevronUp { class: "w-4 h-4 text-gray-500 dark:text-gray-400" }
                 } else {
                     ChevronDown { class: "w-4 h-4 text-gray-500 dark:text-gray-400" }
                 }
             }
 
-            if *open.read() {
+            if open_now {
                 div {
                     class: "fixed inset-0 z-10",
                     onclick: move |_| open.set(false),
@@ -577,10 +574,10 @@ fn SourceProfileDropdown(selected: Signal<Vec<String>>) -> Element {
                             "Clear"
                         }
                     }
-                    for name in inactive_names {
+                    for profile in profiles.iter().filter(|p| !active_names.contains(&p.name)) {
                         SourceProfileItem {
-                            key: "{name}",
-                            name: name.clone(),
+                            key: "{profile.name}",
+                            name: profile.name.clone(),
                             selected,
                             open,
                         }
@@ -714,18 +711,20 @@ pub fn TradePage() -> Element {
 
     // Restrict to explicitly selected sources when the user has filtered the dropdown;
     // an empty selection means "all inactive profiles".
-    let effective_inactive: Vec<String> = {
-        let sel = source_profiles.read();
-        if sel.is_empty() {
-            inactive_names.clone()
-        } else {
-            inactive_names
-                .iter()
-                .filter(|n| sel.contains(n))
-                .cloned()
-                .collect()
-        }
+    // Declare `filtered` here so its lifetime covers the build calls below.
+    let sel = source_profiles.read();
+    let filtered: Vec<String>;
+    let effective_inactive: &[String] = if sel.is_empty() {
+        &inactive_names
+    } else {
+        filtered = inactive_names
+            .iter()
+            .filter(|n| sel.contains(n))
+            .cloned()
+            .collect();
+        &filtered
     };
+    drop(sel);
 
     let has_sources = !inactive_names.is_empty();
     let has_multiple_sources = inactive_names.len() > 1;
@@ -749,7 +748,7 @@ pub fn TradePage() -> Element {
             &settings_guard,
             &cfg,
             today,
-            &effective_inactive,
+            effective_inactive,
             matched_name_ids.as_deref(),
         )
     } else {
@@ -762,7 +761,7 @@ pub fn TradePage() -> Element {
             &settings_guard,
             &cfg,
             today,
-            &effective_inactive,
+            effective_inactive,
             matched_name_ids.as_deref(),
         )
     } else {
