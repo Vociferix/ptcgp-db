@@ -289,6 +289,66 @@ pub fn GoalFilter(config: Signal<FilterConfig>) -> Element {
     }
 }
 
+/// Inline spinner for the trade excess threshold ("Keep ≥ N").
+///
+/// Sits in the primary toolbar row for Trade mode.  Displays the effective threshold
+/// — `max(stored, goal)` — so it always reflects the value that `build_trades` enforces.
+/// The minus button is disabled when the effective value equals `goal`; the stored value
+/// is always written as the effective value so it stays in sync with what is displayed.
+#[component]
+pub fn ExcessThresholdFilter(config: Signal<FilterConfig>) -> Element {
+    let cfg = config.read();
+    let goal = cfg.goal.max(1);
+    let effective = cfg.trade_excess_threshold.max(goal);
+    drop(cfg);
+    rsx! {
+        div { class: "shrink-0 flex items-center border border-gray-300 dark:border-gray-600 \
+                      rounded-md overflow-hidden bg-white dark:bg-gray-800",
+            span { class: "px-2 h-8 flex items-center text-xs font-medium select-none \
+                           text-gray-500 dark:text-gray-400 \
+                           bg-gray-50 dark:bg-gray-700 \
+                           border-r border-gray-300 dark:border-gray-600",
+                "Keep ≥"
+            }
+            button {
+                r#type: "button",
+                disabled: effective <= goal,
+                class: "flex items-center justify-center w-7 h-8 shrink-0 \
+                        border-r border-gray-300 dark:border-gray-600 \
+                        hover:bg-gray-100 dark:hover:bg-gray-700 \
+                        disabled:opacity-40 disabled:cursor-not-allowed",
+                onclick: move |_| {
+                    let cfg = config.read();
+                    let g = cfg.goal.max(1);
+                    let eff = cfg.trade_excess_threshold.max(g);
+                    drop(cfg);
+                    if eff > g {
+                        config.write().trade_excess_threshold = eff - 1;
+                    }
+                },
+                Minus { class: "w-3.5 h-3.5 text-gray-600 dark:text-gray-400" }
+            }
+            span { class: "w-8 text-center text-sm select-none text-gray-900 dark:text-gray-100",
+                "{effective}"
+            }
+            button {
+                r#type: "button",
+                class: "flex items-center justify-center w-7 h-8 shrink-0 \
+                        border-l border-gray-300 dark:border-gray-600 \
+                        hover:bg-gray-100 dark:hover:bg-gray-700",
+                onclick: move |_| {
+                    let cfg = config.read();
+                    let g = cfg.goal.max(1);
+                    let eff = cfg.trade_excess_threshold.max(g);
+                    drop(cfg);
+                    config.write().trade_excess_threshold = eff.saturating_add(1);
+                },
+                Plus { class: "w-3.5 h-3.5 text-gray-600 dark:text-gray-400" }
+            }
+        }
+    }
+}
+
 #[component]
 pub fn AnyVersionFilter(config: Signal<FilterConfig>) -> Element {
     let any_version_owned = config.read().any_version_owned;

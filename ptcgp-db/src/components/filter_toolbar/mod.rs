@@ -2,7 +2,10 @@ mod controls;
 mod dropdowns;
 mod pickers;
 
-use controls::{AnyVersionFilter, CountFilter, GoalFilter, KindFilter, NameFilter, TriStateFilter};
+use controls::{
+    AnyVersionFilter, CountFilter, ExcessThresholdFilter, GoalFilter, KindFilter, NameFilter,
+    TriStateFilter,
+};
 use dropdowns::{PackDropdown, SetDropdown, SourceDropdown};
 use pickers::{ElementGroup, RarityGroup};
 
@@ -52,8 +55,8 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
 
     // Set + Pack: show as early as possible without overflowing the container.
     // Catalog/Summary fit at @lg (512px) — measured min content 491px, 21px margin.
-    // Trade needs @xl (576px) — Name+Goal+Set+Pack fills ~541px; the sidebar appearing
-    // at md drops the container to 528px, so @xl avoids rendering below that floor.
+    // Trade needs @xl (576px) — Goal+ExcessThreshold+Set+Pack fills ~513px; the sidebar
+    // appearing at md drops the container to 528px, so @xl avoids rendering below that floor.
     let (sp_row_cls, sp_panel_cls) = if mode == FilterMode::Trade {
         (
             "hidden @xl:flex items-center gap-2",
@@ -66,7 +69,7 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
         )
     };
     // Source: Catalog/Summary can share the sp threshold (still fits at @lg).
-    // Trade adds Source at @2xl (672px) — adding Source brings the total to ~625px,
+    // Trade adds Source at @2xl (672px) — Goal+ExcessThreshold+Set+Pack+Source ~597px,
     // which needs more room than @xl provides.
     let (source_row_cls, source_panel_cls) = if mode == FilterMode::Trade {
         (
@@ -89,7 +92,7 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
             "hidden @3xl:flex items-center gap-2",
             "flex flex-col gap-3 @3xl:hidden",
         ),
-        // Trade: Kind doesn't fit alongside Name+Goal+Set+Pack+Source+Series (~760px total).
+        // Trade: Kind doesn't fit alongside Goal+ExcessThreshold+Set+Pack+Source+Series (~760px).
         // Catalog: the fixed 808px container can't fit Kind either (~870px needed), and
         // using a threshold above 808px causes a jarring jump when the xl detail panel appears.
         FilterMode::Trade | FilterMode::Catalog => ("hidden", "flex flex-col gap-3"),
@@ -108,14 +111,19 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                           border border-gray-200/80 dark:border-gray-700/80 \
                           rounded-lg px-3 py-2 \
                           shadow dark:shadow-[0_2px_12px_rgba(0,0,0,0.5)] dark:ring-1 dark:ring-white/[0.07]",
-                // Name — Catalog and Trade only; Summary omits it to save space
-                if mode != FilterMode::Summary {
+                // Name — Catalog only; Trade uses Goal+ExcessThreshold instead, Summary omits it
+                if mode == FilterMode::Catalog {
                     NameFilter { config }
                 }
 
                 // Goal — Trade and Summary modes
                 if mode == FilterMode::Trade || mode == FilterMode::Summary {
                     GoalFilter { config }
+                }
+
+                // Excess threshold — Trade only; directly follows Goal
+                if mode == FilterMode::Trade {
+                    ExcessThresholdFilter { config }
                 }
 
                 // Series → Set → Pack: series contain sets, sets contain packs

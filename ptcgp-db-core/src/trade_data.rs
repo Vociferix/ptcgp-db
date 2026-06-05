@@ -221,6 +221,7 @@ pub fn build_trades<S: Storage + Clone>(
     matched_name_ids: Option<&[usize]>,
 ) -> Vec<TradeRec> {
     let goal = cfg.goal.max(1);
+    let excess_threshold = cfg.trade_excess_threshold.max(goal);
     let merge_dupes = settings.merge_duplicate_printings();
     let any_version = cfg.any_version_owned;
 
@@ -307,13 +308,13 @@ pub fn build_trades<S: Storage + Clone>(
                 .zip(src_counts.iter())
                 .filter(|(d, src_cnt)| {
                     d.rarity_class_id == rarity_class_id
-                        && d.dest_raw > goal
+                        && d.dest_raw > excess_threshold
                         && **src_cnt < goal
                         && d.max_rate != Prob::ZERO
                 })
                 .min_by(|(da, _), (db, _)| {
-                    let va = 1.0 / (da.max_rate.as_f64() * (da.dest_raw - goal) as f64);
-                    let vb = 1.0 / (db.max_rate.as_f64() * (db.dest_raw - goal) as f64);
+                    let va = 1.0 / (da.max_rate.as_f64() * (da.dest_raw - excess_threshold) as f64);
+                    let vb = 1.0 / (db.max_rate.as_f64() * (db.dest_raw - excess_threshold) as f64);
                     va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
                 });
 

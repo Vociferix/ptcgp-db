@@ -242,11 +242,22 @@ pub struct FilterConfig {
     /// is treated as owned if any version of the same abstract card has aggregate count > 0.
     #[serde(default)]
     pub any_version_owned: bool,
+
+    /// Minimum owned count required before a card is eligible to give away in a trade
+    /// (Trades tab only). A card is only offered as a give-away when
+    /// `owned_count > trade_excess_threshold`. Values below `goal` are ignored; the backend
+    /// clamps to `max(trade_excess_threshold, goal)`.  Defaults to `2`.
+    #[serde(default = "FilterConfig::default_trade_excess_threshold")]
+    pub trade_excess_threshold: u32,
 }
 
 impl FilterConfig {
     fn default_goal() -> u32 {
         1
+    }
+
+    fn default_trade_excess_threshold() -> u32 {
+        2
     }
 }
 

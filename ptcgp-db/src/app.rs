@@ -47,6 +47,7 @@ impl Default for TradePageState {
         Self {
             config: FilterConfig {
                 goal: 1,
+                trade_excess_threshold: 2,
                 ..FilterConfig::default()
             },
             show_unobtainable: false,
