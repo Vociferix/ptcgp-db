@@ -6,10 +6,9 @@
         "hooks": [
           {
             "type": "command",
-            "if": "Bash(git push*)",
             "timeout": 300,
             "statusMessage": "Running CI checks before push…",
-            "command": "cargo fmt --all -- --check 1>&2 || { echo '{\"continue\":false,\"stopReason\":\"Pre-push blocked: cargo fmt --all -- --check failed. Run: cargo fmt --all\"}'; exit 1; }; dx fmt --check -p ptcgp-db 1>&2 || { echo '{\"continue\":false,\"stopReason\":\"Pre-push blocked: dx fmt --check -p ptcgp-db failed. Run: dx fmt -p ptcgp-db && cargo fmt --all\"}'; exit 1; }; cargo clippy --workspace -- -D warnings 1>&2 || { echo '{\"continue\":false,\"stopReason\":\"Pre-push blocked: cargo clippy --workspace -- -D warnings failed. Fix clippy warnings before pushing.\"}'; exit 1; }; RUSTFLAGS=\"-D warnings\" cargo test --workspace 1>&2 || { echo '{\"continue\":false,\"stopReason\":\"Pre-push blocked: cargo test --workspace failed. Fix failing tests before pushing.\"}'; exit 1; }"
+            "command": "jq -r '.tool_input.command' | grep -q 'git push' || exit 0; cargo fmt --all -- --check 1>&2 || { echo '{\"continue\":false,\"stopReason\":\"Pre-push blocked: cargo fmt --all -- --check failed. Run: cargo fmt --all\"}'; exit 1; }; dx fmt --check -p ptcgp-db 1>&2 || { echo '{\"continue\":false,\"stopReason\":\"Pre-push blocked: dx fmt --check -p ptcgp-db failed. Run: dx fmt -p ptcgp-db && cargo fmt --all\"}'; exit 1; }; cargo clippy --workspace -- -D warnings 1>&2 || { echo '{\"continue\":false,\"stopReason\":\"Pre-push blocked: cargo clippy --workspace -- -D warnings failed. Fix clippy warnings before pushing.\"}'; exit 1; }; RUSTFLAGS=\"-D warnings\" cargo test --workspace 1>&2 || { echo '{\"continue\":false,\"stopReason\":\"Pre-push blocked: cargo test --workspace failed. Fix failing tests before pushing.\"}'; exit 1; }"
           }
         ]
       }
