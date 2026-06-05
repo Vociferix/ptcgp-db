@@ -239,6 +239,11 @@ Currently available:
 | `Minus` | `minus` | Count decrement |
 | `ArrowLeft` | `arrow-left` | Back navigation |
 | `XMark` | `x-mark` | Delete / dismiss |
+| `HomeIcon` | `home` | Bottom nav — Summary |
+| `Squares2x2` | `squares-2x2` | Bottom nav — Card Catalog |
+| `ArrowsRightLeft` | `arrows-right-left` | Bottom nav — Trade |
+| `UserIcon` | `user` | Bottom nav — Profiles |
+| `AdjustmentsHorizontal` | `adjustments-horizontal` | Bottom nav — Settings |
 
 Each component takes a `class: String` prop for Tailwind sizing and color (e.g.
 `class: "w-4 h-4 text-gray-500 dark:text-gray-400"`). Icons render at `currentColor` so
