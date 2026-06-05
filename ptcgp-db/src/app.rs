@@ -40,6 +40,8 @@ pub(crate) struct TradePageState {
     pub config: FilterConfig,
     pub show_unobtainable: bool,
     pub active_tab: u8, // 0=Shares, 1=Trades, 2=Candidates
+    /// Explicitly selected source profiles. Empty means "all inactive profiles".
+    pub source_profiles: Vec<String>,
 }
 
 impl Default for TradePageState {
@@ -52,6 +54,7 @@ impl Default for TradePageState {
             },
             show_unobtainable: false,
             active_tab: 0,
+            source_profiles: Vec::new(),
         }
     }
 }
