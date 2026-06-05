@@ -364,9 +364,25 @@ pub fn App() -> Element {
             let data = s.save_data_snapshot().clone();
             drop(guard);
 
+            // Build Drive bundle before spawning so signal reads stay synchronous.
+            let drive_bundle = if drive_state.read().is_connected() {
+                Some(crate::drive::DriveSyncData {
+                    profiles: data.clone(),
+                    settings: settings.read().as_save_data().clone(),
+                    queries: queries.read().as_save_data().clone(),
+                })
+            } else {
+                None
+            };
+
             wasm_bindgen_futures::spawn_local(async move {
                 if let Err(e) = storage.save_profiles(&data).await {
                     tracing::error!("visibility-change save failed: {e}");
+                }
+                // Drive save on close: browsers don't guarantee fetch completes after
+                // the page is hidden, but it usually does and closes the data-loss window.
+                if let Some(bundle) = drive_bundle {
+                    crate::drive::save_to_drive(drive_state, &bundle).await;
                 }
             });
         });
