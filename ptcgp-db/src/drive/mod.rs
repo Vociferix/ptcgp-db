@@ -517,6 +517,66 @@ pub async fn load_from_drive(
 }
 
 // ---------------------------------------------------------------------------
+// Reconnect modal
+// ---------------------------------------------------------------------------
+
+/// Full-screen modal shown whenever Drive access has been revoked (`NeedsReconnect` state).
+///
+/// Renders over whatever page is currently active so the user cannot unknowingly continue
+/// with sync silently broken. Both buttons resolve the state: "Reconnect" starts a new
+/// OAuth redirect; "Continue without sync" clears all Drive credentials and sets the state
+/// to `Disconnected`.
+#[component]
+pub fn DriveReconnectModal() -> Element {
+    let mut drive_state = use_context::<Signal<DriveState>>();
+
+    if !matches!(*drive_state.read(), DriveState::NeedsReconnect) {
+        return rsx! {};
+    }
+
+    rsx! {
+        div { class: "fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4",
+            div { class: "bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-md w-full \
+                        border border-gray-200 dark:border-gray-700 \
+                        dark:shadow-[0_8px_40px_rgba(0,0,0,0.7)] dark:ring-1 dark:ring-white/[0.07]",
+                h2 { class: "text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2",
+                    "Google Drive sync disconnected"
+                }
+                p { class: "text-sm text-gray-600 dark:text-gray-400 mb-6",
+                    "Your Google Drive access was revoked. Your local data is safe, but changes \
+                     will not sync until you reconnect. Reconnect now, or continue using the app \
+                     locally and reconnect later from Settings."
+                }
+                div { class: "flex flex-col-reverse sm:flex-row gap-3 sm:justify-end",
+                    button {
+                        r#type: "button",
+                        class: "px-4 py-2 text-sm font-medium rounded-md \
+                                border border-gray-300 dark:border-gray-600 \
+                                text-gray-700 dark:text-gray-300 \
+                                hover:bg-gray-100 dark:hover:bg-gray-700",
+                        onclick: move |_| {
+                            clear_refresh_token();
+                            set_drive_enabled(false);
+                            drive_state.set(DriveState::Disconnected);
+                        },
+                        "Continue without sync"
+                    }
+                    button {
+                        r#type: "button",
+                        class: "px-4 py-2 text-sm font-medium rounded-md \
+                                bg-blue-600 text-white hover:bg-blue-700",
+                        onclick: move |_| {
+                            initiate_auth_redirect();
+                        },
+                        "Reconnect"
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Settings UI component
 // ---------------------------------------------------------------------------
 

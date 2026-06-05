@@ -454,9 +454,17 @@ pub fn App() -> Element {
         }
     };
 
+    #[cfg(target_arch = "wasm32")]
+    let reconnect_modal = rsx! {
+        crate::drive::DriveReconnectModal {}
+    };
+    #[cfg(not(target_arch = "wasm32"))]
+    let reconnect_modal = rsx! {};
+
     rsx! {
         document::Stylesheet { href: asset!("/public/tailwind.css") }
         document::Link { rel: "icon", r#type: "image/png", href: FAVICON }
         {body}
+        {reconnect_modal}
     }
 }
