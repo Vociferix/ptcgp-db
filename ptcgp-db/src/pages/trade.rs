@@ -9,9 +9,14 @@ use ptcgp_db_core::{
 use ptcgp_db_data::{Card, CardVersion, Prob};
 
 use crate::app::{AppStorage, CardDetailOrigin, TradePageState, schedule_save};
-use crate::components::toggle::Toggle;
+use crate::components::icons::{ChevronDown, ChevronUp};
+use crate::components::toggle::{Toggle, ToggleCheckbox};
 use crate::components::{FilterMode, FilterToolbar};
 use crate::routes::Route;
+
+const DROPDOWN_TRIGGER_CLS: &str = "flex items-center gap-1 px-2 h-8 rounded-md text-sm font-medium \
+     bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 \
+     text-gray-800 dark:text-gray-100 shadow-sm active:shadow-none active:translate-y-px";
 
 // ---------------------------------------------------------------------------
 // Tab state
@@ -496,6 +501,157 @@ fn empty_state_sources(single_profile: bool) -> Element {
 }
 
 // ---------------------------------------------------------------------------
+// Source profile dropdown
+// ---------------------------------------------------------------------------
+
+/// Multi-select dropdown for choosing which inactive profiles act as sources.
+///
+/// An empty selection means "all inactive profiles". Selecting specific profiles
+/// restricts share/trade results to those sources only.
+#[component]
+fn SourceProfileDropdown(selected: Signal<Vec<String>>) -> Element {
+    let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
+    let mut open = use_signal(|| false);
+
+    let inactive_names: Vec<String> = {
+        let guard = store.read();
+        let Some(ref s) = *guard else {
+            return rsx! {};
+        };
+        let active_set: HashSet<&str> = s
+            .active_profile_names()
+            .iter()
+            .map(|n| n.as_str())
+            .collect();
+        s.profiles()
+            .iter()
+            .filter(|p| !active_set.contains(p.name.as_str()))
+            .map(|p| p.name.clone())
+            .collect()
+    };
+
+    let sel = selected.read();
+    let count = sel.iter().filter(|n| inactive_names.contains(n)).count();
+    drop(sel);
+
+    rsx! {
+        div { class: "relative",
+            button {
+                r#type: "button",
+                class: DROPDOWN_TRIGGER_CLS,
+                onclick: move |_| open.toggle(),
+                "Sources"
+                if count > 0 {
+                    span { class: "px-1.5 py-0.5 text-xs rounded-full bg-blue-600 text-white",
+                        "{count}"
+                    }
+                }
+                if *open.read() {
+                    ChevronUp { class: "w-4 h-4 text-gray-500 dark:text-gray-400" }
+                } else {
+                    ChevronDown { class: "w-4 h-4 text-gray-500 dark:text-gray-400" }
+                }
+            }
+
+            if *open.read() {
+                div {
+                    class: "fixed inset-0 z-10",
+                    onclick: move |_| open.set(false),
+                }
+                div { class: "absolute left-0 top-full mt-1 z-20 min-w-48 \
+                              max-h-80 overflow-y-auto overflow-x-hidden \
+                              rounded-md border border-gray-200/60 dark:border-gray-600/60 \
+                              bg-white dark:bg-gray-700 \
+                              shadow-xl dark:shadow-[0_4px_28px_rgba(0,0,0,0.7)] \
+                              ring-1 ring-black/5 dark:ring-white/[0.09] py-1",
+                    if count > 0 {
+                        button {
+                            r#type: "button",
+                            class: "w-full px-3 py-1.5 text-xs text-center \
+                                    text-gray-400 dark:text-gray-500 \
+                                    hover:text-gray-600 dark:hover:text-gray-300 \
+                                    hover:bg-gray-50 dark:hover:bg-gray-600/40 \
+                                    active:bg-gray-100 dark:active:bg-gray-500/40 \
+                                    border-b border-gray-100 dark:border-gray-600",
+                            onclick: move |_| selected.write().clear(),
+                            "Clear"
+                        }
+                    }
+                    for name in inactive_names {
+                        SourceProfileItem {
+                            key: "{name}",
+                            name: name.clone(),
+                            selected,
+                            open,
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// One row in the source profile dropdown.
+///
+/// Clicking the row body selects only this profile and closes the dropdown
+/// (clicking again when already the only selection clears it back to "all").
+/// Clicking the checkbox on the right toggles without closing.
+#[component]
+fn SourceProfileItem(
+    name: String,
+    selected: Signal<Vec<String>>,
+    mut open: Signal<bool>,
+) -> Element {
+    let checked = selected.read().contains(&name);
+    let row_cls = if checked {
+        "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer select-none \
+         bg-blue-50 dark:bg-blue-950/80 hover:bg-blue-100 dark:hover:bg-blue-900/60"
+    } else {
+        "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer select-none \
+         hover:bg-gray-50 dark:hover:bg-gray-600"
+    };
+    let on_select = {
+        let name = name.clone();
+        move |_| {
+            let mut sel = selected.write();
+            let already_only = sel.len() == 1 && sel[0] == name;
+            if already_only {
+                sel.clear();
+            } else {
+                *sel = vec![name.clone()];
+            }
+            drop(sel);
+            open.set(false);
+        }
+    };
+    let on_toggle = {
+        let name = name.clone();
+        move |e: MouseEvent| {
+            e.stop_propagation();
+            let mut sel = selected.write();
+            if checked {
+                sel.retain(|n| n != &name);
+            } else {
+                sel.push(name.clone());
+            }
+        }
+    };
+
+    rsx! {
+        div { class: "{row_cls}", onclick: on_select,
+            span { class: "flex-1 truncate text-gray-800 dark:text-gray-100", "{name}" }
+            button {
+                r#type: "button",
+                class: "shrink-0 p-2 -mr-1 rounded \
+                        hover:bg-gray-200/60 dark:hover:bg-gray-500/40",
+                onclick: on_toggle,
+                ToggleCheckbox { checked }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Trade page
 // ---------------------------------------------------------------------------
 
@@ -513,6 +669,7 @@ pub fn TradePage() -> Element {
         2 => Tab::Candidates,
         _ => Tab::Shares,
     });
+    let source_profiles: Signal<Vec<String>> = use_signal(|| init.source_profiles.clone());
     drop(init);
 
     let mut shares_limit = use_signal(|| 10usize);
@@ -528,6 +685,7 @@ pub fn TradePage() -> Element {
             Tab::Trades => 1,
             Tab::Candidates => 2,
         };
+        state.source_profiles = source_profiles.read().clone();
     });
 
     let store_guard = store.read();
@@ -554,7 +712,23 @@ pub fn TradePage() -> Element {
         .map(|p| p.name.clone())
         .collect();
 
+    // Restrict to explicitly selected sources when the user has filtered the dropdown;
+    // an empty selection means "all inactive profiles".
+    let effective_inactive: Vec<String> = {
+        let sel = source_profiles.read();
+        if sel.is_empty() {
+            inactive_names.clone()
+        } else {
+            inactive_names
+                .iter()
+                .filter(|n| sel.contains(n))
+                .cloned()
+                .collect()
+        }
+    };
+
     let has_sources = !inactive_names.is_empty();
+    let has_multiple_sources = inactive_names.len() > 1;
     let single_profile = store_ref.profiles().len() == 1;
     let multi_active = store_ref.active_profile_names().len() > 1;
 
@@ -575,7 +749,7 @@ pub fn TradePage() -> Element {
             &settings_guard,
             &cfg,
             today,
-            &inactive_names,
+            &effective_inactive,
             matched_name_ids.as_deref(),
         )
     } else {
@@ -588,7 +762,7 @@ pub fn TradePage() -> Element {
             &settings_guard,
             &cfg,
             today,
-            &inactive_names,
+            &effective_inactive,
             matched_name_ids.as_deref(),
         )
     } else {
@@ -643,58 +817,72 @@ pub fn TradePage() -> Element {
 
             match *active_tab.read() {
                 Tab::Shares => rsx! {
-                    div { class: "{card_cls}",
-                        if !has_sources {
-                            {empty_state_sources(single_profile)}
-                        } else if shares.is_empty() {
-                            p { class: "p-6 text-sm text-gray-500 dark:text-gray-400",
-                                "No sharing recommendations match the current filters."
+                    div {
+                        if has_multiple_sources {
+                            div { class: "flex items-center gap-2 mb-3",
+                                SourceProfileDropdown { selected: source_profiles }
                             }
-                        } else {
-                            for (rank, rec) in shares.into_iter().enumerate() {
-                                ShareRow {
-                                    key: "{rec.cv.id()}",
-                                    rank: rank + 1,
-                                    rec,
-                                    dest_name: dest_name.clone(),
-                                    disabled: multi_active,
+                        }
+                        div { class: "{card_cls}",
+                            if !has_sources {
+                                {empty_state_sources(single_profile)}
+                            } else if shares.is_empty() {
+                                p { class: "p-6 text-sm text-gray-500 dark:text-gray-400",
+                                    "No sharing recommendations match the current filters."
                                 }
-                            }
-                            if shares_remaining > 0 {
-                                button {
-                                    r#type: "button",
-                                    class: "{show_more_cls}",
-                                    onclick: move |_| *shares_limit.write() += 10,
-                                    "Show more ({shares_remaining} remaining)"
+                            } else {
+                                for (rank, rec) in shares.into_iter().enumerate() {
+                                    ShareRow {
+                                        key: "{rec.cv.id()}",
+                                        rank: rank + 1,
+                                        rec,
+                                        dest_name: dest_name.clone(),
+                                        disabled: multi_active,
+                                    }
+                                }
+                                if shares_remaining > 0 {
+                                    button {
+                                        r#type: "button",
+                                        class: "{show_more_cls}",
+                                        onclick: move |_| *shares_limit.write() += 10,
+                                        "Show more ({shares_remaining} remaining)"
+                                    }
                                 }
                             }
                         }
                     }
                 },
                 Tab::Trades => rsx! {
-                    div { class: "{card_cls}",
-                        if !has_sources {
-                            {empty_state_sources(single_profile)}
-                        } else if trades.is_empty() {
-                            p { class: "p-6 text-sm text-gray-500 dark:text-gray-400",
-                                "No trading recommendations match the current filters."
+                    div {
+                        if has_multiple_sources {
+                            div { class: "flex items-center gap-2 mb-3",
+                                SourceProfileDropdown { selected: source_profiles }
                             }
-                        } else {
-                            for (rank, rec) in trades.into_iter().enumerate() {
-                                TradeRow {
-                                    key: "{rec.source_name}-{rec.card_b.id()}-{rec.card_a.id()}",
-                                    rank: rank + 1,
-                                    rec,
-                                    dest_name: dest_name.clone(),
-                                    disabled: multi_active,
+                        }
+                        div { class: "{card_cls}",
+                            if !has_sources {
+                                {empty_state_sources(single_profile)}
+                            } else if trades.is_empty() {
+                                p { class: "p-6 text-sm text-gray-500 dark:text-gray-400",
+                                    "No trading recommendations match the current filters."
                                 }
-                            }
-                            if trades_remaining > 0 {
-                                button {
-                                    r#type: "button",
-                                    class: "{show_more_cls}",
-                                    onclick: move |_| *trades_limit.write() += 10,
-                                    "Show more ({trades_remaining} remaining)"
+                            } else {
+                                for (rank, rec) in trades.into_iter().enumerate() {
+                                    TradeRow {
+                                        key: "{rec.source_name}-{rec.card_b.id()}-{rec.card_a.id()}",
+                                        rank: rank + 1,
+                                        rec,
+                                        dest_name: dest_name.clone(),
+                                        disabled: multi_active,
+                                    }
+                                }
+                                if trades_remaining > 0 {
+                                    button {
+                                        r#type: "button",
+                                        class: "{show_more_cls}",
+                                        onclick: move |_| *trades_limit.write() += 10,
+                                        "Show more ({trades_remaining} remaining)"
+                                    }
                                 }
                             }
                         }
