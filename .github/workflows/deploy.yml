@@ -39,7 +39,7 @@ jobs:
 
       - name: Cache dx binary
         id: cache-dx
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cargo/bin/dx
           key: dx-${{ runner.os }}-${{ env.DX_VERSION }}
@@ -49,7 +49,7 @@ jobs:
         run: cargo install dioxus-cli --version ${{ env.DX_VERSION }} --locked
 
       - name: Cache dx tools
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.local/share/.dx/tools
           key: dx-tools-${{ runner.os }}-${{ env.DX_VERSION }}
@@ -61,10 +61,10 @@ jobs:
         run: dx build -p ptcgp-db --platform web --release
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ./target/dx/ptcgp-db/release/web/public
 
       - name: Deploy to GitHub Pages
         id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
