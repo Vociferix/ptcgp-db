@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use ptcgp_db_core::save_data::Theme;
-use ptcgp_db_core::{AppSettings, ProfileStore, SavedQueries};
+use ptcgp_db_core::{AppSettings, ProfileStore};
 
 use crate::app::{AppStorage, schedule_save};
 use crate::components::toggle::Toggle;
@@ -58,9 +58,6 @@ fn SettingToggle(
 pub fn SettingsPage() -> Element {
     let mut settings = use_context::<Signal<AppSettings>>();
     let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
-    #[cfg_attr(not(target_arch = "wasm32"), allow(unused_variables))]
-    let queries = use_context::<Signal<SavedQueries>>();
-
     let (theme, ignore_unobtainable, ignore_premium, ignore_gold, merge_dupes) = {
         let s = settings.read();
         (
@@ -74,7 +71,7 @@ pub fn SettingsPage() -> Element {
 
     #[cfg(target_arch = "wasm32")]
     let drive_section = rsx! {
-        crate::drive::DriveSyncSection { store, settings, queries }
+        crate::drive::DriveSyncSection {}
     };
     #[cfg(not(target_arch = "wasm32"))]
     let drive_section = rsx! {};

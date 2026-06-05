@@ -176,11 +176,14 @@ const FAVICON: Asset = favicon();
 // Drive startup sync (web only)
 // ---------------------------------------------------------------------------
 
-/// Attempts a silent Drive token acquisition on startup and, if successful, loads the Drive
-/// sync file and overwrites the in-memory app state with its contents.
+/// Acquires a valid Drive access token on startup and loads the Drive sync file.
 ///
-/// This runs concurrently with (and after) the IndexedDB load. The Drive version wins when
-/// it differs from local because Drive is the cross-device source of truth once enabled.
+/// Handles two cases:
+/// - **OAuth callback**: the URL has `?code=…` from a redirect; exchanges it for tokens.
+/// - **Normal page load**: uses the stored refresh token to silently get a new access token.
+///
+/// The Drive version of the data overwrites the IndexedDB-loaded state because Drive is the
+/// cross-device source of truth once enabled.
 #[cfg(target_arch = "wasm32")]
 async fn startup_drive_sync(
     drive_state: Signal<DriveState>,
@@ -189,14 +192,34 @@ async fn startup_drive_sync(
     queries: Signal<SavedQueries>,
 ) {
     let mut ds = drive_state;
-    let token = match crate::drive::acquire_token_silent().await {
-        Ok(t) => t,
-        Err(e) => {
-            tracing::warn!("Drive silent auth failed on startup: {e}");
-            ds.set(DriveState::Error(
-                "Could not reconnect to Google Drive. Open Settings to reconnect.".to_string(),
-            ));
-            return;
+
+    // If returning from an OAuth redirect, handle the callback first.
+    let token = if crate::drive::is_auth_callback_pending() {
+        match crate::drive::handle_auth_callback().await {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::error!("Drive OAuth callback failed: {e}");
+                crate::drive::set_drive_enabled(false);
+                ds.set(DriveState::Error(format!("Sign-in failed: {e}")));
+                return;
+            }
+        }
+    } else {
+        // Normal page load: silently refresh using the stored refresh token.
+        match crate::drive::acquire_token_silent().await {
+            Ok(t) => t,
+            Err(crate::drive::DriveConnectError::Revoked)
+            | Err(crate::drive::DriveConnectError::NotConfigured) => {
+                ds.set(DriveState::NeedsReconnect);
+                return;
+            }
+            Err(e) => {
+                tracing::warn!("Drive silent auth failed on startup: {e}");
+                ds.set(DriveState::Error(
+                    "Could not reconnect to Google Drive. Open Settings to reconnect.".to_string(),
+                ));
+                return;
+            }
         }
     };
 
@@ -398,12 +421,11 @@ pub fn App() -> Element {
         });
     });
 
-    // Web: attempt silent Drive auth on startup if the user previously connected.
-    // Runs after the storage init above; if Drive data is loaded it overwrites the
-    // IndexedDB-loaded state so the most recent version (across devices) wins.
+    // Web: connect to Drive on startup when Drive was previously enabled OR when the page
+    // is returning from an OAuth redirect (first-time connect, drive_enabled not yet set).
     #[cfg(target_arch = "wasm32")]
     use_effect(move || {
-        if !crate::drive::is_drive_enabled() {
+        if !crate::drive::is_drive_enabled() && !crate::drive::is_auth_callback_pending() {
             return;
         }
         drive_state.set(DriveState::Connecting);

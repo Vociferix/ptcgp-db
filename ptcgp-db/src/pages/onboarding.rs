@@ -5,10 +5,7 @@
 //! choice is skipped and the user goes straight to profile creation.
 
 use dioxus::prelude::*;
-use ptcgp_db_core::{
-    AppSettings, ProfileStore, ProfilesSaveData, SavedQueries, migrate_profiles,
-    storage::Storage as _,
-};
+use ptcgp_db_core::{ProfileStore, ProfilesSaveData, migrate_profiles, storage::Storage as _};
 
 use crate::app::{AppStorage, schedule_save};
 
@@ -30,28 +27,15 @@ enum Step {
 // Step 1 — Drive connect handler (web only)
 // ---------------------------------------------------------------------------
 
-/// Launches the interactive Drive connect flow and advances to `SetupProfile` on success.
+/// Initiates the Google Drive OAuth redirect from the onboarding screen.
 ///
-/// Extracted as a named function so that the RSX `onclick` closure remains a single line,
-/// which prevents `dx fmt` from corrupting the multi-line `spawn(async move { … })` block.
+/// The browser navigates away to Google's auth page. On return, `startup_drive_sync` in
+/// `app.rs` handles the callback, acquires tokens, and loads Drive data. The onboarding
+/// component then re-renders: if profiles were found it exits automatically; if not it
+/// advances to `SetupProfile` (detected via the `use_effect` below).
 #[cfg(target_arch = "wasm32")]
-fn start_drive_connect(
-    mut drive_state: Signal<crate::drive::DriveState>,
-    store: Signal<Option<ProfileStore<AppStorage>>>,
-    settings: Signal<AppSettings>,
-    queries: Signal<SavedQueries>,
-    mut step: Signal<Step>,
-) {
-    use crate::drive::DriveState;
-    drive_state.set(DriveState::Connecting);
-    spawn(async move {
-        crate::drive::onboarding_connect_drive(drive_state, store, settings, queries).await;
-        // If Drive connected but no profiles were found, advance to profile setup.
-        // When profiles were loaded, App re-renders to Router before this line is reached.
-        if drive_state.read().is_connected() {
-            step.set(Step::SetupProfile);
-        }
-    });
+fn start_drive_connect() {
+    crate::drive::initiate_auth_redirect();
 }
 
 // ---------------------------------------------------------------------------
@@ -212,10 +196,6 @@ fn do_dismiss(mut store: Signal<Option<ProfileStore<AppStorage>>>) {
 #[component]
 pub fn OnboardingPage() -> Element {
     let store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
-    #[cfg_attr(not(target_arch = "wasm32"), allow(unused_variables))]
-    let settings = use_context::<Signal<AppSettings>>();
-    #[cfg_attr(not(target_arch = "wasm32"), allow(unused_variables))]
-    let queries = use_context::<Signal<SavedQueries>>();
 
     // On web start at ChooseSync; on desktop skip straight to SetupProfile.
     #[cfg(target_arch = "wasm32")]
@@ -230,6 +210,16 @@ pub fn OnboardingPage() -> Element {
 
     #[cfg(target_arch = "wasm32")]
     let drive_state = use_context::<Signal<crate::drive::DriveState>>();
+
+    // When the OAuth redirect completes and Drive connects, advance from ChooseSync to
+    // SetupProfile. (If profiles were loaded from Drive, App has already re-rendered to
+    // Router and this effect never fires.)
+    #[cfg(target_arch = "wasm32")]
+    use_effect(move || {
+        if drive_state.read().is_connected() && *step.read() == Step::ChooseSync {
+            step.set(Step::SetupProfile);
+        }
+    });
 
     let body = if *step.read() == Step::SetupProfile {
         // ── Step 2: profile creation / import ─────────────────────────────
@@ -367,7 +357,7 @@ pub fn OnboardingPage() -> Element {
                                         active:bg-blue-800 text-white font-medium py-2.5 \
                                         text-sm transition-colors \
                                         shadow-md shadow-blue-500/30 dark:shadow-blue-900/70 active:shadow-sm active:translate-y-px",
-                                onclick: move |_| start_drive_connect(drive_state, store, settings, queries, step),
+                                onclick: move |_| start_drive_connect(),
                                 "Sync with Google Drive"
                             }
                             p { class: "mt-1.5 text-xs text-center text-gray-500 dark:text-gray-400",
