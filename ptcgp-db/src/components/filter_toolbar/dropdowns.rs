@@ -404,14 +404,16 @@ fn dropdown_row_cls(checked: bool) -> &'static str {
 #[component]
 fn DropdownClearBtn(on_clear: EventHandler<MouseEvent>) -> Element {
     rsx! {
-        div { class: "px-3 py-1.5",
-            button {
-                r#type: "button",
-                class: "text-xs text-gray-400 dark:text-gray-500 \
-                        hover:text-gray-600 dark:hover:text-gray-300",
-                onclick: move |e| on_clear.call(e),
-                "Clear"
-            }
+        button {
+            r#type: "button",
+            class: "w-full px-3 py-1.5 text-xs text-center \
+                    text-gray-400 dark:text-gray-500 \
+                    hover:text-gray-600 dark:hover:text-gray-300 \
+                    hover:bg-gray-50 dark:hover:bg-gray-600/40 \
+                    active:bg-gray-100 dark:active:bg-gray-500/40 \
+                    border-b border-gray-100 dark:border-gray-600",
+            onclick: move |e| on_clear.call(e),
+            "Clear"
         }
     }
 }
