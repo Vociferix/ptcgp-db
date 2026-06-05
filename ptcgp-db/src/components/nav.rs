@@ -1,5 +1,8 @@
 use dioxus::prelude::*;
 
+use crate::components::icons::{
+    AdjustmentsHorizontal, ArrowsRightLeft, HomeIcon, Squares2x2, UserIcon,
+};
 use crate::components::profile_selector::ProfileSelector;
 use crate::routes::Route;
 
@@ -7,11 +10,22 @@ use crate::routes::Route;
 // Nav items
 // ---------------------------------------------------------------------------
 
+/// Icon variant for each bottom-nav entry.
+#[derive(Clone, Copy)]
+enum NavIcon {
+    Home,
+    Cards,
+    Trade,
+    Profiles,
+    Settings,
+}
+
 struct NavItem {
     label: &'static str,
     route: Route,
     /// Short label for the narrow bottom bar.
     short: &'static str,
+    icon: NavIcon,
 }
 
 fn nav_items() -> impl IntoIterator<Item = NavItem> {
@@ -20,28 +34,54 @@ fn nav_items() -> impl IntoIterator<Item = NavItem> {
             label: "Summary",
             route: Route::SummaryPage {},
             short: "Home",
+            icon: NavIcon::Home,
         },
         NavItem {
             label: "Card Catalog",
             route: Route::CatalogPage {},
             short: "Cards",
+            icon: NavIcon::Cards,
         },
         NavItem {
             label: "Trade",
             route: Route::TradePage {},
             short: "Trade",
+            icon: NavIcon::Trade,
         },
         NavItem {
             label: "Profiles",
             route: Route::ProfileManagerPage {},
             short: "Profiles",
+            icon: NavIcon::Profiles,
         },
         NavItem {
             label: "Settings",
             route: Route::SettingsPage {},
             short: "Settings",
+            icon: NavIcon::Settings,
         },
     ]
+}
+
+/// Renders the icon for a bottom-nav item.
+fn bottom_nav_icon(icon: NavIcon) -> Element {
+    match icon {
+        NavIcon::Home => rsx! {
+            HomeIcon { class: "w-6 h-6" }
+        },
+        NavIcon::Cards => rsx! {
+            Squares2x2 { class: "w-6 h-6" }
+        },
+        NavIcon::Trade => rsx! {
+            ArrowsRightLeft { class: "w-6 h-6" }
+        },
+        NavIcon::Profiles => rsx! {
+            UserIcon { class: "w-6 h-6" }
+        },
+        NavIcon::Settings => rsx! {
+            AdjustmentsHorizontal { class: "w-6 h-6" }
+        },
+    }
 }
 
 /// Returns true for pages where the Profile Selector is hidden.
@@ -128,15 +168,16 @@ pub fn NavLayout() -> Element {
                 nav { class: "md:hidden flex border-t border-gray-200/80 dark:border-white/[0.06] \
                             bg-white dark:bg-gray-800 shrink-0 divide-x divide-gray-200/80 dark:divide-gray-700/80 \
                             shadow-[0_-2px_8px_rgba(0,0,0,0.08)] dark:shadow-[0_-2px_16px_rgba(0,0,0,0.6)] \
-                            relative z-10",
+                            relative z-10 pb-[env(safe-area-inset-bottom)]",
                     for item in nav_items() {
                         Link {
                             key: "{item.short}",
                             to: item.route,
-                            class: "flex-1 flex flex-col items-center py-2 text-xs \
+                            class: "flex-1 flex flex-col items-center gap-1 py-3 text-xs \
                                     text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400",
                             active_class: "text-blue-600 dark:text-blue-400 font-semibold",
-                            "{item.short}"
+                            {bottom_nav_icon(item.icon)}
+                            span { "{item.short}" }
                         }
                     }
                 }
