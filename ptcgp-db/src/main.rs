@@ -8,6 +8,10 @@ mod routes;
 fn main() {
     #[cfg(target_arch = "wasm32")]
     {
+        // Capture window.location.search before Dioxus initializes. HashHistory rewrites the
+        // URL during setup (adding #/) which drops any query params, including the OAuth ?code=.
+        drive::capture_startup_search();
+
         use dioxus::web::{Config, HashHistory};
         use std::rc::Rc;
         dioxus::LaunchBuilder::web()
