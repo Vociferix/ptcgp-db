@@ -6,7 +6,7 @@ use chrono::{Duration, Utc};
 use reqwest::Client;
 use serde::Deserialize;
 
-use super::{CLIENT_ID, DriveToken};
+use super::{CLIENT_ID, CLIENT_SECRET, DriveToken};
 
 const TOKEN_ENDPOINT: &str = "https://oauth2.googleapis.com/token";
 
@@ -68,6 +68,7 @@ pub async fn exchange_code(
     let params = [
         ("code", code),
         ("client_id", CLIENT_ID),
+        ("client_secret", CLIENT_SECRET),
         ("redirect_uri", redirect_uri),
         ("grant_type", "authorization_code"),
         ("code_verifier", verifier),
@@ -113,6 +114,7 @@ pub async fn exchange_code(
 pub async fn refresh_access_token(refresh_token: &str) -> Result<DriveToken, DriveAuthError> {
     let params = [
         ("client_id", CLIENT_ID),
+        ("client_secret", CLIENT_SECRET),
         ("grant_type", "refresh_token"),
         ("refresh_token", refresh_token),
     ];

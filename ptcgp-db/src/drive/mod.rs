@@ -58,6 +58,13 @@ fn startup_search() -> String {
 pub(crate) const CLIENT_ID: &str =
     "353554631088-jf3omarc3aoh0dibng0g6l6up0u3vl8c.apps.googleusercontent.com";
 
+/// OAuth2 client secret for Google Drive access.
+///
+/// Web Application OAuth clients are confidential clients; Google requires the secret
+/// in the token exchange even with PKCE. For a browser-only app the secret is
+/// technically visible in the binary, but the `drive.appdata` scope limits exposure.
+pub(crate) const CLIENT_SECRET: &str = "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";
+
 /// Drive scope that grants access only to files created by this app.
 const SCOPE: &str = "https://www.googleapis.com/auth/drive.appdata";
 
