@@ -289,6 +289,61 @@ pub fn GoalFilter(config: Signal<FilterConfig>) -> Element {
     }
 }
 
+/// Spinner control for the trade excess threshold ("Keep ≥ N").
+///
+/// Appears in the floating panel for Trade mode only.  The backend clamps this to at least
+/// `goal`, so values below `goal` are silently treated as equal to it.
+#[component]
+pub fn ExcessThresholdFilter(config: Signal<FilterConfig>) -> Element {
+    let threshold = config.read().trade_excess_threshold.max(1);
+    rsx! {
+        div { class: "flex flex-col gap-0.5",
+            span { class: "text-xs font-medium text-gray-500 dark:text-gray-400", "Trade threshold" }
+            div { class: "flex items-center gap-2",
+                div { class: "shrink-0 flex items-center border border-gray-300 dark:border-gray-600 \
+                              rounded-md overflow-hidden bg-white dark:bg-gray-800",
+                    span { class: "px-2 h-8 flex items-center text-xs font-medium select-none \
+                                   text-gray-500 dark:text-gray-400 \
+                                   bg-gray-50 dark:bg-gray-700 \
+                                   border-r border-gray-300 dark:border-gray-600",
+                        "Keep ≥"
+                    }
+                    button {
+                        r#type: "button",
+                        disabled: threshold <= 1,
+                        class: "flex items-center justify-center w-7 h-8 shrink-0 \
+                                border-r border-gray-300 dark:border-gray-600 \
+                                hover:bg-gray-100 dark:hover:bg-gray-700 \
+                                disabled:opacity-40 disabled:cursor-not-allowed",
+                        onclick: move |_| {
+                            let t = config.read().trade_excess_threshold;
+                            if t > 1 {
+                                config.write().trade_excess_threshold = t - 1;
+                            }
+                        },
+                        Minus { class: "w-3.5 h-3.5 text-gray-600 dark:text-gray-400" }
+                    }
+                    span { class: "w-8 text-center text-sm select-none text-gray-900 dark:text-gray-100",
+                        "{threshold}"
+                    }
+                    button {
+                        r#type: "button",
+                        class: "flex items-center justify-center w-7 h-8 shrink-0 \
+                                border-l border-gray-300 dark:border-gray-600 \
+                                hover:bg-gray-100 dark:hover:bg-gray-700",
+                        onclick: move |_| {
+                            let t = config.read().trade_excess_threshold;
+                            config.write().trade_excess_threshold = t.saturating_add(1);
+                        },
+                        Plus { class: "w-3.5 h-3.5 text-gray-600 dark:text-gray-400" }
+                    }
+                }
+                span { class: "text-xs text-gray-500 dark:text-gray-400", "before trading away" }
+            }
+        }
+    }
+}
+
 #[component]
 pub fn AnyVersionFilter(config: Signal<FilterConfig>) -> Element {
     let any_version_owned = config.read().any_version_owned;

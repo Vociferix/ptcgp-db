@@ -2,7 +2,10 @@ mod controls;
 mod dropdowns;
 mod pickers;
 
-use controls::{AnyVersionFilter, CountFilter, GoalFilter, KindFilter, NameFilter, TriStateFilter};
+use controls::{
+    AnyVersionFilter, CountFilter, ExcessThresholdFilter, GoalFilter, KindFilter, NameFilter,
+    TriStateFilter,
+};
 use dropdowns::{PackDropdown, SetDropdown, SourceDropdown};
 use pickers::{ElementGroup, RarityGroup};
 
@@ -229,8 +232,12 @@ pub fn FilterToolbar(config: Signal<FilterConfig>, mode: FilterMode) -> Element 
                         FilterMode::Catalog => rsx! {
                             CountFilter { config }
                         },
-                        FilterMode::Trade | FilterMode::Summary => rsx! {
+                        FilterMode::Summary => rsx! {
                             AnyVersionFilter { config }
+                        },
+                        FilterMode::Trade => rsx! {
+                            AnyVersionFilter { config }
+                            ExcessThresholdFilter { config }
                         },
                     }
                 }
