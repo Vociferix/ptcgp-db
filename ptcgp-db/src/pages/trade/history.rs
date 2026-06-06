@@ -73,6 +73,7 @@ pub(super) fn CompletedShareSection(
     let h = history.read();
     let shares: Vec<(u64, usize, String)> = h
         .iter()
+        .rev()
         .filter_map(|t| {
             if let CompletedTransfer::Share {
                 id,
@@ -99,7 +100,7 @@ pub(super) fn CompletedShareSection(
         div { class: "mb-3",
             {section_header(count, expanded)}
             if *expanded.read() {
-                div { class: "{CARD_CLS} mt-1 max-h-64 overflow-y-auto",
+                div { class: "{CARD_CLS} mt-1",
                     for (id, cv_id, source_name) in shares {
                         CompletedShareRow {
                             key: "{id}",
@@ -234,6 +235,7 @@ pub(super) fn CompletedTradeSection(
     let h = history.read();
     let trades: Vec<(u64, usize, usize, String)> = h
         .iter()
+        .rev()
         .filter_map(|t| {
             if let CompletedTransfer::Trade {
                 id,
@@ -261,7 +263,7 @@ pub(super) fn CompletedTradeSection(
         div { class: "mb-3",
             {section_header(count, expanded)}
             if *expanded.read() {
-                div { class: "{CARD_CLS} mt-1 max-h-64 overflow-y-auto",
+                div { class: "{CARD_CLS} mt-1",
                     for (id, cv_b_id, cv_a_id, source_name) in trades {
                         CompletedTradeRow {
                             key: "{id}",
