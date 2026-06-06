@@ -37,13 +37,17 @@ const CHECK_BADGE_CLS: &str = "shrink-0 w-8 h-8 flex items-center justify-center
 
 fn section_header(count: usize, mut expanded: Signal<bool>) -> Element {
     let exp = *expanded.read();
+    let border = if exp {
+        "border-b border-gray-100 dark:border-gray-700"
+    } else {
+        ""
+    };
     rsx! {
         button {
             r#type: "button",
-            class: "w-full flex items-center justify-between px-4 py-2.5 rounded-lg \
-                    bg-green-50 dark:bg-green-950/30 border border-green-200/60 \
-                    dark:border-green-800/40 text-sm font-medium \
-                    text-green-800 dark:text-green-300 \
+            class: "w-full flex items-center justify-between px-4 py-2.5 \
+                    bg-green-50 dark:bg-green-950/30 {border} \
+                    text-sm font-medium text-green-800 dark:text-green-300 \
                     hover:bg-green-100 dark:hover:bg-green-900/40",
             onclick: move |_| expanded.toggle(),
             span { "Completed ({count})" }
@@ -97,19 +101,17 @@ pub(super) fn CompletedShareSection(
     let count = shares.len();
 
     rsx! {
-        div { class: "mb-3",
+        div { class: "{CARD_CLS} overflow-hidden mb-3",
             {section_header(count, expanded)}
             if *expanded.read() {
-                div { class: "{CARD_CLS} mt-1",
-                    for (id, cv_id, source_name) in shares {
-                        CompletedShareRow {
-                            key: "{id}",
-                            transfer_id: id,
-                            cv_id,
-                            source_name,
-                            dest_name: dest_name.clone(),
-                            history,
-                        }
+                for (id, cv_id, source_name) in shares {
+                    CompletedShareRow {
+                        key: "{id}",
+                        transfer_id: id,
+                        cv_id,
+                        source_name,
+                        dest_name: dest_name.clone(),
+                        history,
                     }
                 }
             }
@@ -260,20 +262,18 @@ pub(super) fn CompletedTradeSection(
     let count = trades.len();
 
     rsx! {
-        div { class: "mb-3",
+        div { class: "{CARD_CLS} overflow-hidden mb-3",
             {section_header(count, expanded)}
             if *expanded.read() {
-                div { class: "{CARD_CLS} mt-1",
-                    for (id, cv_b_id, cv_a_id, source_name) in trades {
-                        CompletedTradeRow {
-                            key: "{id}",
-                            transfer_id: id,
-                            cv_b_id,
-                            cv_a_id,
-                            source_name,
-                            dest_name: dest_name.clone(),
-                            history,
-                        }
+                for (id, cv_b_id, cv_a_id, source_name) in trades {
+                    CompletedTradeRow {
+                        key: "{id}",
+                        transfer_id: id,
+                        cv_b_id,
+                        cv_a_id,
+                        source_name,
+                        dest_name: dest_name.clone(),
+                        history,
                     }
                 }
             }
