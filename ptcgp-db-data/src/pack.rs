@@ -6,9 +6,6 @@ use crate::{
     str_table::{StrEntry, StrTable},
 };
 
-#[cfg(feature = "images")]
-use manganis::Asset;
-
 use std::ops::Range;
 
 /// A pack within a set, identified by its subtitle (e.g., `"Charizard"`, `"Mewtwo"`).
@@ -23,10 +20,8 @@ pub struct Pack {
     pub(crate) subtitle_id: usize,
     pub(crate) card_version_ids: &'static [usize],
     pub(crate) variant_ids: Range<usize>,
-    #[cfg(feature = "images")]
-    pub(crate) image: Asset,
-    #[cfg(feature = "images")]
-    pub(crate) logo: Asset,
+    pub(crate) image: &'static str,
+    pub(crate) logo: &'static str,
 }
 
 impl Pack {
@@ -117,15 +112,13 @@ impl Pack {
         }
     }
 
-    /// Full pack artwork.
-    #[cfg(feature = "images")]
-    pub const fn image(&self) -> Asset {
+    /// Full pack artwork URL.
+    pub const fn image(&self) -> &'static str {
         self.image
     }
 
-    /// Pack logo, suitable for space-constrained contexts.
-    #[cfg(feature = "images")]
-    pub const fn logo(&self) -> Asset {
+    /// Pack logo URL, suitable for space-constrained contexts.
+    pub const fn logo(&self) -> &'static str {
         self.logo
     }
 }

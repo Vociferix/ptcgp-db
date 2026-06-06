@@ -6,9 +6,6 @@ use crate::{
     str_table::{StrEntry, StrTable},
 };
 
-#[cfg(feature = "images")]
-use manganis::{Asset, asset};
-
 use std::num::NonZeroUsize;
 use std::ops::Range;
 
@@ -30,8 +27,7 @@ pub struct CardVersion {
     pub(crate) is_original: bool,
     pub(crate) is_tradable: bool,
     pub(crate) duplicate_ids: &'static [usize],
-    #[cfg(feature = "images")]
-    pub(crate) image: Asset,
+    pub(crate) image: &'static str,
 }
 
 impl CardVersion {
@@ -44,8 +40,8 @@ impl CardVersion {
     pub const ILLUSTRATORS: &StrTable = crate::data::ILLUSTRATORS;
 
     /// Image of the card back, which is the same for every card.
-    #[cfg(feature = "images")]
-    pub const BACK: Asset = asset!("ptcgp-images/cards/back.png");
+    pub const BACK: &'static str =
+        "https://cdn.jsdelivr.net/gh/Vociferix/ptcgp-images@v0.8.1/cards/back.png";
 
     /// Returns the version with the given ID without bounds checking.
     ///
@@ -138,9 +134,8 @@ impl CardVersion {
         unsafe { IdSlice::new_unchecked(self.duplicate_ids) }
     }
 
-    /// Card front image.
-    #[cfg(feature = "images")]
-    pub const fn image(&self) -> Asset {
+    /// Card front image URL.
+    pub const fn image(&self) -> &'static str {
         self.image
     }
 }

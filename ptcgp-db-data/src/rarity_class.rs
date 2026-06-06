@@ -2,9 +2,6 @@
 
 use crate::RarityGroup;
 
-#[cfg(feature = "images")]
-use manganis::Asset;
-
 /// The (group, symbol count) pair identifying a rarity class (e.g., Diamond-2, Star-1).
 ///
 /// This is the granularity at which rarity icon and symbol images exist in `ptcgp-images`.
@@ -17,10 +14,8 @@ pub struct RarityClass {
     pub(crate) id: usize,
     pub(crate) group_id: usize,
     pub(crate) count: usize,
-    #[cfg(feature = "images")]
-    pub(crate) icon: Asset,
-    #[cfg(feature = "images")]
-    pub(crate) symbol: Asset,
+    pub(crate) icon: &'static str,
+    pub(crate) symbol: &'static str,
 }
 
 impl RarityClass {
@@ -60,15 +55,13 @@ impl RarityClass {
         self.count
     }
 
-    /// Rarity class icon, suitable for non-text UI contexts such as filter chips.
-    #[cfg(feature = "images")]
-    pub const fn icon(&self) -> Asset {
+    /// Rarity class icon URL, suitable for non-text UI contexts such as filter chips.
+    pub const fn icon(&self) -> &'static str {
         self.icon
     }
 
-    /// Rarity class symbol image (text-height), suitable for inline use within card effect text.
-    #[cfg(feature = "images")]
-    pub const fn symbol(&self) -> Asset {
+    /// Rarity class symbol image URL (text-height), suitable for inline use within card effect text.
+    pub const fn symbol(&self) -> &'static str {
         self.symbol
     }
 }

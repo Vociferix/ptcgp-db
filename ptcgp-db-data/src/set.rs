@@ -5,9 +5,6 @@ use crate::{
     str_table::{StrEntry, StrTable},
 };
 
-#[cfg(feature = "images")]
-use manganis::Asset;
-
 use chrono::NaiveDate;
 
 use std::ops::Range;
@@ -28,10 +25,8 @@ pub struct Set {
     pub(crate) is_promo: bool,
     pub(crate) pack_ids: Range<usize>,
     pub(crate) card_version_ids: Range<usize>,
-    #[cfg(feature = "images")]
-    pub(crate) logo: Asset,
-    #[cfg(feature = "images")]
-    pub(crate) icon: Asset,
+    pub(crate) logo: &'static str,
+    pub(crate) icon: &'static str,
 }
 
 impl Set {
@@ -118,15 +113,13 @@ impl Set {
         self.is_promo
     }
 
-    /// Full-width set logo, suitable for contexts where space allows.
-    #[cfg(feature = "images")]
-    pub const fn logo(&self) -> Asset {
+    /// Full-width set logo URL, suitable for contexts where space allows.
+    pub const fn logo(&self) -> &'static str {
         self.logo
     }
 
-    /// Compact set icon, suitable for space-constrained contexts.
-    #[cfg(feature = "images")]
-    pub const fn icon(&self) -> Asset {
+    /// Compact set icon URL, suitable for space-constrained contexts.
+    pub const fn icon(&self) -> &'static str {
         self.icon
     }
 }

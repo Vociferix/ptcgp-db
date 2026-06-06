@@ -2,9 +2,6 @@
 
 use crate::str_table::{StrEntry, StrTable};
 
-#[cfg(feature = "images")]
-use manganis::Asset;
-
 /// Symbol shape category for a rarity (Diamond, Star, Shiny, or Crown).
 ///
 /// A rarity group identifies the shape of the symbols printed on a card. Together with the
@@ -15,10 +12,8 @@ use manganis::Asset;
 pub struct RarityGroup {
     pub(crate) id: usize,
     pub(crate) name_id: usize,
-    #[cfg(feature = "images")]
-    pub(crate) icon: Asset,
-    #[cfg(feature = "images")]
-    pub(crate) symbol: Asset,
+    pub(crate) icon: &'static str,
+    pub(crate) symbol: &'static str,
 }
 
 impl RarityGroup {
@@ -56,15 +51,13 @@ impl RarityGroup {
         unsafe { Self::NAMES.get_entry_unchecked(self.name_id) }
     }
 
-    /// Rarity group icon, suitable for non-text UI contexts.
-    #[cfg(feature = "images")]
-    pub const fn icon(&self) -> Asset {
+    /// Rarity group icon URL, suitable for non-text UI contexts.
+    pub const fn icon(&self) -> &'static str {
         self.icon
     }
 
-    /// Rarity group symbol image (text-height, suitable for inline use in card effect text).
-    #[cfg(feature = "images")]
-    pub const fn symbol(&self) -> Asset {
+    /// Rarity group symbol image URL (text-height, suitable for inline use in card effect text).
+    pub const fn symbol(&self) -> &'static str {
         self.symbol
     }
 }

@@ -2,9 +2,6 @@
 
 use crate::str_table::{StrEntry, StrTable};
 
-#[cfg(feature = "images")]
-use manganis::Asset;
-
 /// How a [`CardVersion`] is obtained in PTCGP.
 ///
 /// The source code `"Pack"` is special: it means the card has pull rate data and associated
@@ -16,8 +13,7 @@ pub struct CardSource {
     pub(crate) id: usize,
     pub(crate) name_id: usize,
     pub(crate) description_id: usize,
-    #[cfg(feature = "images")]
-    pub(crate) icon: Asset,
+    pub(crate) icon: &'static str,
 }
 
 impl CardSource {
@@ -63,9 +59,8 @@ impl CardSource {
         unsafe { Self::DESCRIPTIONS.get_entry_unchecked(self.description_id) }
     }
 
-    /// Icon representing this source, used in place of a pack logo for non-Pack cards.
-    #[cfg(feature = "images")]
-    pub const fn icon(&self) -> Asset {
+    /// Icon URL representing this source, used in place of a pack logo for non-Pack cards.
+    pub const fn icon(&self) -> &'static str {
         self.icon
     }
 }

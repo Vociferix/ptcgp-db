@@ -195,7 +195,7 @@ pub(crate) fn set_card_count(
     schedule_save();
 }
 
-const fn favicon() -> Asset {
+const fn favicon() -> &'static str {
     let mut srcs = CardSource::ALL;
 
     while let Some((src, tail)) = srcs.split_first() {
@@ -208,7 +208,7 @@ const fn favicon() -> Asset {
     panic!("Card source 'Pack' not found")
 }
 
-const FAVICON: Asset = favicon();
+const FAVICON: &str = favicon();
 
 // ---------------------------------------------------------------------------
 // Drive startup sync (web only)

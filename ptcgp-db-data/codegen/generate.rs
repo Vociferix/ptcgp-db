@@ -1,5 +1,12 @@
 use crate::models::{CardKind, Dataset, PokemonCard, TrainerCard};
 
+const JSDELIVR_BASE: &str = "https://cdn.jsdelivr.net/gh/Vociferix/ptcgp-images@v0.8.1";
+
+fn image_url(path: &str) -> String {
+    let rel = path.strip_prefix("ptcgp-images/").unwrap_or(path);
+    format!("{JSDELIVR_BASE}/{rel}")
+}
+
 use chrono::{Datelike, NaiveDate};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -115,17 +122,15 @@ fn gen_rarity_groups(data: &Dataset) -> TokenStream {
     let groups = data.rarity_groups.iter().map(|group| {
         let id = group.id;
         let name_id = group.name_id;
-        let icon_path = &group.icon_path;
-        let symbol_path = &group.symbol_path;
+        let icon_url = image_url(&group.icon_path);
+        let symbol_url = image_url(&group.symbol_path);
 
         quote! {
             RarityGroup {
                 id: #id,
                 name_id: #name_id,
-                #[cfg(feature = "images")]
-                icon: asset!(#icon_path, AssetOptions::image().with_format(ImageFormat::Webp)),
-                #[cfg(feature = "images")]
-                symbol: asset!(#symbol_path, AssetOptions::image().with_format(ImageFormat::Webp)),
+                icon: #icon_url,
+                symbol: #symbol_url,
             }
         }
     });
@@ -140,18 +145,16 @@ fn gen_rarity_classes(data: &Dataset) -> TokenStream {
         let id = class.id;
         let group_id = class.group_id;
         let count = class.count;
-        let icon_path = &class.icon_path;
-        let symbol_path = &class.symbol_path;
+        let icon_url = image_url(&class.icon_path);
+        let symbol_url = image_url(&class.symbol_path);
 
         quote! {
             RarityClass {
                 id: #id,
                 group_id: #group_id,
                 count: #count,
-                #[cfg(feature = "images")]
-                icon: asset!(#icon_path, AssetOptions::image().with_format(ImageFormat::Webp)),
-                #[cfg(feature = "images")]
-                symbol: asset!(#symbol_path, AssetOptions::image().with_format(ImageFormat::Webp)),
+                icon: #icon_url,
+                symbol: #symbol_url,
             }
         }
     });
@@ -229,8 +232,8 @@ fn gen_sets(data: &Dataset) -> TokenStream {
         let packs_end = set.pack_ids.end;
         let cards_start = set.card_version_ids.start;
         let cards_end = set.card_version_ids.end;
-        let logo_path = &set.logo_path;
-        let icon_path = &set.icon_path;
+        let logo_url = image_url(&set.logo_path);
+        let icon_url = image_url(&set.icon_path);
 
         quote! {
             Set {
@@ -243,10 +246,8 @@ fn gen_sets(data: &Dataset) -> TokenStream {
                 is_promo: #is_promo,
                 pack_ids: #packs_start..#packs_end,
                 card_version_ids: #cards_start..#cards_end,
-                #[cfg(feature = "images")]
-                logo: asset!(#logo_path, AssetOptions::image().with_format(ImageFormat::Webp)),
-                #[cfg(feature = "images")]
-                icon: asset!(#icon_path, AssetOptions::image().with_format(ImageFormat::Webp)),
+                logo: #logo_url,
+                icon: #icon_url,
             }
         }
     });
@@ -265,8 +266,8 @@ fn gen_packs(data: &Dataset) -> TokenStream {
         let card_ids = pack.card_version_ids.as_slice();
         let variants_start = pack.variant_ids.start;
         let variants_end = pack.variant_ids.end;
-        let image_path = &pack.image_path;
-        let logo_path = &pack.logo_path;
+        let img_url = image_url(&pack.image_path);
+        let logo_url = image_url(&pack.logo_path);
 
         quote! {
             Pack {
@@ -276,10 +277,8 @@ fn gen_packs(data: &Dataset) -> TokenStream {
                 subtitle_id: #subtitle_id,
                 card_version_ids: &[#(#card_ids,)*],
                 variant_ids: #variants_start..#variants_end,
-                #[cfg(feature = "images")]
-                image: asset!(#image_path, AssetOptions::image().with_format(ImageFormat::Webp)),
-                #[cfg(feature = "images")]
-                logo: asset!(#logo_path, AssetOptions::image().with_format(ImageFormat::Webp)),
+                image: #img_url,
+                logo: #logo_url,
             }
         }
     });
@@ -394,7 +393,7 @@ fn gen_card_versions(data: &Dataset) -> TokenStream {
         let is_original = card.is_original;
         let is_tradable = card.is_tradable;
         let duplicate_ids = card.duplicate_ids.as_slice();
-        let image_path = &card.image_path;
+        let img_url = image_url(&card.image_path);
 
         quote! {
             CardVersion {
@@ -411,8 +410,7 @@ fn gen_card_versions(data: &Dataset) -> TokenStream {
                 is_original: #is_original,
                 is_tradable: #is_tradable,
                 duplicate_ids: &[#(#duplicate_ids,)*],
-                #[cfg(feature = "images")]
-                image: asset!(#image_path, AssetOptions::image().with_format(ImageFormat::Webp)),
+                image: #img_url,
             }
         }
     });
@@ -427,15 +425,14 @@ fn gen_card_sources(data: &Dataset) -> TokenStream {
         let id = source.id;
         let name_id = source.name_id;
         let description_id = source.description_id;
-        let icon_path = &source.icon_path;
+        let icon_url = image_url(&source.icon_path);
 
         quote! {
             CardSource {
                 id: #id,
                 name_id: #name_id,
                 description_id: #description_id,
-                #[cfg(feature = "images")]
-                icon: asset!(#icon_path, AssetOptions::image().with_format(ImageFormat::Webp)),
+                icon: #icon_url,
             }
         }
     });
@@ -454,18 +451,16 @@ fn gen_elements(data: &Dataset) -> TokenStream {
             quote! { None }
         };
         let name_id = elem.name_id;
-        let icon_path = &elem.icon_path;
-        let symbol_path = &elem.symbol_path;
+        let icon_url = image_url(&elem.icon_path);
+        let symbol_url = image_url(&elem.symbol_path);
 
         quote! {
             Element {
                 id: #id,
                 code: #code,
                 name_id: #name_id,
-                #[cfg(feature = "images")]
-                icon: asset!(#icon_path, AssetOptions::image().with_format(ImageFormat::Webp)),
-                #[cfg(feature = "images")]
-                symbol: asset!(#symbol_path, AssetOptions::image().with_format(ImageFormat::Webp)),
+                icon: #icon_url,
+                symbol: #symbol_url,
             }
         }
     });

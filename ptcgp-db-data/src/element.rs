@@ -2,19 +2,14 @@
 
 use crate::str_table::{StrEntry, StrTable};
 
-#[cfg(feature = "images")]
-use manganis::{Asset, asset};
-
 /// A Pokémon energy type (Grass, Fire, Water, Lightning, Fighting, Psychic, Darkness, Metal,
 /// Dragon, or Colorless).
 pub struct Element {
     pub(crate) id: usize,
     pub(crate) code: Option<char>,
     pub(crate) name_id: usize,
-    #[cfg(feature = "images")]
-    pub(crate) icon: Asset,
-    #[cfg(feature = "images")]
-    pub(crate) symbol: Asset,
+    pub(crate) icon: &'static str,
+    pub(crate) symbol: &'static str,
 }
 
 impl Element {
@@ -25,9 +20,9 @@ impl Element {
     /// Element name strings (e.g., `"Grass"`, `"Fire"`).
     pub const NAMES: &StrTable = crate::data::ELEMENT_NAMES;
 
-    /// Icon to display for an attack with zero energy cost, in place of any element icon.
-    #[cfg(feature = "images")]
-    pub const NO_COST: Asset = asset!("ptcgp-images/elements/icons/no_cost.png");
+    /// Icon URL to display for an attack with zero energy cost, in place of any element icon.
+    pub const NO_COST: &'static str =
+        "https://cdn.jsdelivr.net/gh/Vociferix/ptcgp-images@v0.8.1/elements/icons/no_cost.png";
 
     /// Returns the element with the given ID without bounds checking.
     ///
@@ -65,16 +60,14 @@ impl Element {
         unsafe { Self::NAMES.get_entry_unchecked(self.name_id) }
     }
 
-    /// Element icon, suitable for non-text UI contexts (e.g., filter chips, attack cost display).
-    #[cfg(feature = "images")]
-    pub const fn icon(&self) -> Asset {
+    /// Element icon URL, suitable for non-text UI contexts (e.g., filter chips, attack cost display).
+    pub const fn icon(&self) -> &'static str {
         self.icon
     }
 
-    /// Element symbol image (text-height), suitable for replacing letter placeholders inline
+    /// Element symbol image URL (text-height), suitable for replacing letter placeholders inline
     /// in card effect text.
-    #[cfg(feature = "images")]
-    pub const fn symbol(&self) -> Asset {
+    pub const fn symbol(&self) -> &'static str {
         self.symbol
     }
 }
