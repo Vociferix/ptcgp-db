@@ -73,9 +73,10 @@ fn describe_version(repo: &git2::Repository, short_hash: &str) -> String {
     };
 
     // Tags are "vX.Y.Z" with no hyphens, so any "-" in the output indicates
-    // additional commits since the last tag.
-    if s.contains('-') {
-        format!("{s} (dev)")
+    // additional commits since the last tag. Strip "-N-gabcdef" so only the
+    // tag version is shown; the commit hash is displayed separately in the UI.
+    if let Some((tag, _)) = s.split_once('-') {
+        format!("{tag} (dev)")
     } else {
         s
     }
