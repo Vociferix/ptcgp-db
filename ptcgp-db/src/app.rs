@@ -34,6 +34,34 @@ fn skip_onboarding() -> bool {
 // Per-page persistent state — survives navigation
 // ---------------------------------------------------------------------------
 
+/// A transfer performed during this session; used for undo/dismiss history.
+///
+/// Not persisted across app restarts but survives in-session navigation.
+#[derive(Clone, PartialEq)]
+pub(crate) enum CompletedTransfer {
+    Share {
+        id: u64,
+        cv_id: usize,
+        source_name: String,
+        dest_name: String,
+    },
+    Trade {
+        id: u64,
+        cv_b_id: usize,
+        cv_a_id: usize,
+        source_name: String,
+        dest_name: String,
+    },
+}
+
+impl CompletedTransfer {
+    pub(crate) fn id(&self) -> u64 {
+        match self {
+            Self::Share { id, .. } | Self::Trade { id, .. } => *id,
+        }
+    }
+}
+
 /// Persisted filter + UI state for the Trade page.
 #[derive(Clone)]
 pub(crate) struct TradePageState {
@@ -42,6 +70,10 @@ pub(crate) struct TradePageState {
     pub active_tab: u8, // 0=Shares, 1=Trades, 2=Candidates
     /// Explicitly selected source profiles. Empty means "all inactive profiles".
     pub source_profiles: Vec<String>,
+    /// Transfers completed this session; survives navigation but not app restart.
+    pub completed_transfers: Vec<CompletedTransfer>,
+    /// Monotonically increasing ID for completed transfers; prevents key collisions after dismissals.
+    pub next_transfer_id: u64,
 }
 
 impl Default for TradePageState {
@@ -55,6 +87,8 @@ impl Default for TradePageState {
             show_unobtainable: false,
             active_tab: 0,
             source_profiles: Vec::new(),
+            completed_transfers: Vec::new(),
+            next_transfer_id: 0,
         }
     }
 }
