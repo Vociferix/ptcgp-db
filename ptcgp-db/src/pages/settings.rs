@@ -3,7 +3,11 @@ use ptcgp_db_core::save_data::Theme;
 use ptcgp_db_core::{AppSettings, ProfileStore};
 
 use crate::app::{AppStorage, schedule_save};
+use crate::components::icons::GitHubIcon;
 use crate::components::toggle::Toggle;
+
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+const GIT_HASH: &str = env!("PTCGP_GIT_HASH");
 
 // ---------------------------------------------------------------------------
 // Persistence helper
@@ -186,14 +190,69 @@ pub fn SettingsPage() -> Element {
                               text-gray-500 dark:text-gray-400 mb-3",
                     "About"
                 }
-                div { class: "bg-white dark:bg-gray-800 rounded-lg border \
-                              border-gray-200 dark:border-gray-700 p-4",
-                    p { class: "text-xs text-gray-500 dark:text-gray-400 leading-relaxed",
-                        "The literal and graphical information presented in this application \
-                        about Pokémon Trading Card Game Pocket, including card data, text and \
-                        images, is copyright The Pokémon Company, DeNA Co., Ltd., and/or \
-                        Creatures, Inc. This application is not produced by, endorsed by, \
-                        supported by, or affiliated with any of those copyright holders."
+                div { class: "space-y-3",
+                    // App identity card
+                    div { class: "bg-white dark:bg-gray-800 rounded-lg border \
+                                  border-gray-200/80 dark:border-gray-700/80 p-4 \
+                                  shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] \
+                                  dark:ring-1 dark:ring-white/[0.06]",
+                        div { class: "flex items-start justify-between gap-4",
+                            div { class: "min-w-0",
+                                p { class: "text-sm font-semibold text-gray-900 dark:text-gray-100",
+                                    "ptcgp-db"
+                                }
+                                p { class: "text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-mono",
+                                    "v{APP_VERSION} · {GIT_HASH}"
+                                }
+                                div { class: "flex items-center gap-2 mt-2",
+                                    a {
+                                        href: "https://github.com/Vociferix/ptcgp-db/blob/master/LICENSE",
+                                        target: "_blank",
+                                        rel: "noopener noreferrer",
+                                        class: "text-xs text-gray-500 dark:text-gray-400 \
+                                                hover:text-gray-900 dark:hover:text-gray-100 \
+                                                transition-colors",
+                                        "Apache 2.0"
+                                    }
+                                    span { class: "text-gray-300 dark:text-gray-600 select-none",
+                                        "·"
+                                    }
+                                    a {
+                                        href: "https://github.com/Vociferix/ptcgp-db/issues",
+                                        target: "_blank",
+                                        rel: "noopener noreferrer",
+                                        class: "text-xs text-gray-500 dark:text-gray-400 \
+                                                hover:text-gray-900 dark:hover:text-gray-100 \
+                                                transition-colors",
+                                        "Report an issue"
+                                    }
+                                }
+                            }
+                            a {
+                                href: "https://github.com/Vociferix/ptcgp-db",
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                class: "flex items-center gap-1.5 flex-shrink-0 \
+                                        text-xs text-gray-500 dark:text-gray-400 \
+                                        hover:text-gray-900 dark:hover:text-gray-100 \
+                                        transition-colors mt-0.5",
+                                GitHubIcon { class: "w-4 h-4" }
+                                "GitHub"
+                            }
+                        }
+                    }
+                    // Disclaimer
+                    div { class: "bg-white dark:bg-gray-800 rounded-lg border \
+                                  border-gray-200/80 dark:border-gray-700/80 p-4 \
+                                  shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] \
+                                  dark:ring-1 dark:ring-white/[0.06]",
+                        p { class: "text-xs text-gray-500 dark:text-gray-400 leading-relaxed",
+                            "The literal and graphical information presented in this application \
+                            about Pokémon Trading Card Game Pocket, including card data, text and \
+                            images, is copyright The Pokémon Company, DeNA Co., Ltd., and/or \
+                            Creatures, Inc. This application is not produced by, endorsed by, \
+                            supported by, or affiliated with any of those copyright holders."
+                        }
                     }
                 }
             }

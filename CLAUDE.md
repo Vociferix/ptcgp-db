@@ -244,10 +244,12 @@ Currently available:
 | `ArrowsRightLeft` | `arrows-right-left` | Bottom nav — Trade |
 | `UserIcon` | `user` | Bottom nav — Profiles |
 | `AdjustmentsHorizontal` | `adjustments-horizontal` | Bottom nav — Settings |
+| `GitHubIcon` | GitHub Invertocat mark (not Heroicons) | About section GitHub link |
 
 Each component takes a `class: String` prop for Tailwind sizing and color (e.g.
 `class: "w-4 h-4 text-gray-500 dark:text-gray-400"`). Icons render at `currentColor` so
-text color classes control stroke color.
+text color classes control stroke color. Note: `GitHubIcon` uses `fill` rather than `stroke`
+(it is a filled mark, not an outline icon), but the `class` prop works identically.
 
 To add a new icon: copy the SVG `path` `d` attribute from heroicons.com, add a component following
 the existing pattern in `icons.rs`, and add a row to this table.
