@@ -6,7 +6,7 @@ use crate::app::{AppStorage, schedule_save};
 use crate::components::icons::GitHubIcon;
 use crate::components::toggle::Toggle;
 
-const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+const APP_VERSION: &str = env!("PTCGP_APP_VERSION");
 const GIT_HASH: &str = env!("PTCGP_GIT_HASH");
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ pub fn SettingsPage() -> Element {
                                     "ptcgp-db"
                                 }
                                 p { class: "text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-mono",
-                                    "v{APP_VERSION} · {GIT_HASH}"
+                                    "{APP_VERSION} · {GIT_HASH}"
                                 }
                                 div { class: "flex items-center gap-2 mt-2",
                                     a {
