@@ -57,6 +57,9 @@ jobs:
       - name: Set base path for GitHub Pages
         run: sed -i '/^\[web\.app\]/a base_path = "ptcgp-db"' ptcgp-db/Dioxus.toml
 
+      - name: Clean previous build output
+        run: rm -rf target/dx
+
       - name: Build web
         run: dx build -p ptcgp-db --platform web --release
 

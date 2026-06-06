@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 
 enum Segment {
     Text(String),
-    Symbol(Asset),
+    Symbol(&'static str),
 }
 
 fn parse_segments(text: &str) -> Vec<Segment> {

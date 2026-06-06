@@ -52,9 +52,6 @@ pub use trainer_kind::TrainerKind;
 mod data {
     use crate::*;
 
-    #[cfg(feature = "images")]
-    use manganis::{AssetOptions, ImageFormat, asset};
-
     include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 }
 
