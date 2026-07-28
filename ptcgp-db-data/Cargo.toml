@@ -19,10 +19,10 @@ smol_str = "0.3.6"
 anyhow = "1.0.102"
 chrono = { version = "0.4.44", features = ["serde"] }
 gcd = "2.3.0"
-prettyplease = "0.2.37"
+prettyplease = "0.3.0"
 proc-macro2 = { version = "1.0.106", default-features = false }
 quote = { version = "1.0.45", default-features = false }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.150", features = ["arbitrary_precision"] }
-syn = { version = "2.0.117", default-features = false, features = ["parsing"] }
+syn = { version = "3.0.3", default-features = false, features = ["parsing"] }
 
