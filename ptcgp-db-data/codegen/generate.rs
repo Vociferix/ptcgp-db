@@ -1,6 +1,6 @@
 use crate::models::{CardKind, Dataset, PokemonCard, TrainerCard};
 
-const JSDELIVR_BASE: &str = "https://cdn.jsdelivr.net/gh/Vociferix/ptcgp-images@v0.9.0";
+const JSDELIVR_BASE: &str = "https://cdn.jsdelivr.net/gh/Vociferix/ptcgp-images@v0.10.2";
 
 fn image_url(path: &str) -> String {
     let rel = path.strip_prefix("ptcgp-images/").unwrap_or(path);

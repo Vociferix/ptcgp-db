@@ -355,8 +355,7 @@ fn packs(state: &mut State) -> Result<()> {
             let subtitle_id = str_id(&state.data.pack_subtitles, pack)
                 .context("failed to resolve pack subtitle")?;
 
-            let slug = pack.to_lowercase().replace(" ", "_");
-
+            let slug = make_slug(pack);
             let image_path = format!("ptcgp-images/packs/art/{}/{}.png", set.code, slug);
             let logo_path = format!("ptcgp-images/packs/logos/{}/{}.png", set.code, slug);
 
@@ -1184,5 +1183,27 @@ fn str_id(table: &[String], s: &str) -> Result<usize> {
 }
 
 fn make_slug(s: &str) -> String {
-    s.to_lowercase().replace(" ", "_")
+    let mut prev_underscore = false;
+    s.chars()
+        .map(|ch| {
+            if ch.is_whitespace() || (ch.is_ascii_punctuation() && ch != '-') {
+                '_'
+            } else {
+                ch.to_ascii_lowercase()
+            }
+        })
+        .filter_map(|ch| {
+            if ch == '_' {
+                if prev_underscore {
+                    None
+                } else {
+                    prev_underscore = true;
+                    Some('_')
+                }
+            } else {
+                prev_underscore = false;
+                Some(ch)
+            }
+        })
+        .collect()
 }

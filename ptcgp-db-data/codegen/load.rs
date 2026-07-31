@@ -236,7 +236,30 @@ impl RawData {
             }
 
             for pack in &set.packs {
-                let slug = pack.to_lowercase().replace(" ", "_");
+                let mut prev_underscore = false;
+                let slug: String = pack
+                    .chars()
+                    .map(|ch| {
+                        if ch.is_whitespace() || (ch.is_ascii_punctuation() && ch != '-') {
+                            '_'
+                        } else {
+                            ch.to_ascii_lowercase()
+                        }
+                    })
+                    .filter_map(|ch| {
+                        if ch == '_' {
+                            if prev_underscore {
+                                None
+                            } else {
+                                prev_underscore = true;
+                                Some('_')
+                            }
+                        } else {
+                            prev_underscore = false;
+                            Some(ch)
+                        }
+                    })
+                    .collect();
                 pack_data.push(load_json(format!("pull_rates/{}/{}.json", set.code, slug))?);
             }
         }
