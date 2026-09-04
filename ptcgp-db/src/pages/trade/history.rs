@@ -1,7 +1,8 @@
 //! Completed-transfer history section components for the Trade page.
 //!
-//! Each tab (Shares, Trades) shows a collapsible "Completed (N)" section above the active list.
-//! Every entry can be undone (counts reversed) or dismissed (removed without reversal).
+//! Each tab (Shares, Trades, Pack Points) shows a collapsible "Completed (N)" section above the
+//! active list. Every entry can be undone (counts reversed) or dismissed (removed without
+//! reversal).
 
 use dioxus::prelude::*;
 use ptcgp_db_core::ProfileStore;
@@ -10,8 +11,8 @@ use ptcgp_db_core::save_data::CardVersionId;
 use crate::app::{AppStorage, CompletedTransfer, schedule_save};
 use crate::components::icons::{Check, ChevronDown, ChevronUp, XMark};
 
-use super::CARD_CLS;
 use super::rows::CardPanel;
+use super::{CARD_CLS, COST_PILL_CLS};
 
 // ---------------------------------------------------------------------------
 // Shared styling constants
@@ -362,6 +363,148 @@ fn CompletedTradeRow(
                         "You gave"
                     }
                     CardPanel { cv_id: cv_a_id }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Completed purchase section
+// ---------------------------------------------------------------------------
+
+/// Collapsible section listing pack point purchases made during the current session.
+///
+/// Renders nothing when no purchases exist in `history`.
+#[component]
+pub(super) fn CompletedPurchaseSection(
+    history: Signal<Vec<CompletedTransfer>>,
+    dest_name: String,
+) -> Element {
+    let expanded = use_signal(|| true);
+
+    let h = history.read();
+    let purchases: Vec<(u64, usize, u32)> = h
+        .iter()
+        .rev()
+        .filter_map(|t| {
+            if let CompletedTransfer::Purchase {
+                id, cv_id, cost, ..
+            } = t
+            {
+                Some((*id, *cv_id, *cost))
+            } else {
+                None
+            }
+        })
+        .collect();
+    drop(h);
+
+    if purchases.is_empty() {
+        return rsx! {};
+    }
+
+    let count = purchases.len();
+
+    rsx! {
+        div { class: "{CARD_CLS} overflow-hidden mb-3",
+            {section_header(count, expanded)}
+            if *expanded.read() {
+                for (id, cv_id, cost) in purchases {
+                    CompletedPurchaseRow {
+                        key: "{id}",
+                        transfer_id: id,
+                        cv_id,
+                        cost,
+                        dest_name: dest_name.clone(),
+                        history,
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// One row in the completed purchase history. Shows the card panel, points spent, and
+/// undo/dismiss. Undo removes the copy that the Buy action added.
+#[component]
+fn CompletedPurchaseRow(
+    transfer_id: u64,
+    cv_id: usize,
+    cost: u32,
+    dest_name: String,
+    mut history: Signal<Vec<CompletedTransfer>>,
+) -> Element {
+    let mut store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
+    let dest_for_undo = dest_name.clone();
+
+    let on_undo = use_callback(move |e: Event<MouseData>| {
+        e.stop_propagation();
+        let mut s = store.write();
+        if let Some(st) = s.as_mut() {
+            let cv_key = CardVersionId(cv_id);
+            let owned = st.owned_count(&dest_for_undo, cv_key);
+            let _ = st.set_owned_count(&dest_for_undo, cv_key, owned.saturating_sub(1));
+        }
+        drop(s);
+        schedule_save();
+        history.write().retain(|t| t.id() != transfer_id);
+    });
+
+    let on_dismiss = use_callback(move |e: Event<MouseData>| {
+        e.stop_propagation();
+        history.write().retain(|t| t.id() != transfer_id);
+    });
+
+    rsx! {
+        div { class: "{COMPLETED_ROW_CLS}",
+            // Mobile header (hidden sm+)
+            div { class: "sm:hidden flex items-center gap-2 mb-3",
+                span { class: "{CHECK_BADGE_CLS}",
+                    Check { class: "w-4 h-4 text-green-600 dark:text-green-400" }
+                }
+                div { class: "flex-1 min-w-0",
+                    span { class: "{COST_PILL_CLS}", "{cost} pts" }
+                }
+                div { class: "flex items-center gap-1.5 shrink-0",
+                    button {
+                        r#type: "button",
+                        class: "{UNDO_BTN_CLS}",
+                        onclick: move |e| on_undo.call(e),
+                        "Undo"
+                    }
+                    button {
+                        r#type: "button",
+                        class: "{DISMISS_BTN_CLS}",
+                        onclick: move |e| on_dismiss.call(e),
+                        XMark { class: "w-4 h-4" }
+                    }
+                }
+            }
+            // Body: check badge + card panel + desktop sidebar
+            div { class: "flex items-start gap-3",
+                span { class: "hidden sm:flex {CHECK_BADGE_CLS}",
+                    Check { class: "w-4 h-4 text-green-600 dark:text-green-400" }
+                }
+                div { class: "flex-1 min-w-0",
+                    CardPanel { cv_id }
+                }
+                div { class: "hidden sm:flex flex-col items-end gap-1.5 shrink-0 min-w-[11rem]",
+                    div { class: "flex items-center gap-1.5",
+                        button {
+                            r#type: "button",
+                            class: "{UNDO_BTN_CLS}",
+                            onclick: move |e| on_undo.call(e),
+                            "Undo"
+                        }
+                        button {
+                            r#type: "button",
+                            class: "{DISMISS_BTN_CLS}",
+                            onclick: move |e| on_dismiss.call(e),
+                            XMark { class: "w-4 h-4" }
+                        }
+                    }
+                    span { class: "{COST_PILL_CLS}", "{cost} pts" }
                 }
             }
         }

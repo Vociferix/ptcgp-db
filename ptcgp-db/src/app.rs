@@ -52,12 +52,20 @@ pub(crate) enum CompletedTransfer {
         source_name: String,
         dest_name: String,
     },
+    /// A card bought from a set's pack point shop. Has no source profile — the copy comes
+    /// from the game, not from another account.
+    Purchase {
+        id: u64,
+        cv_id: usize,
+        dest_name: String,
+        cost: u32,
+    },
 }
 
 impl CompletedTransfer {
     pub(crate) fn id(&self) -> u64 {
         match self {
-            Self::Share { id, .. } | Self::Trade { id, .. } => *id,
+            Self::Share { id, .. } | Self::Trade { id, .. } | Self::Purchase { id, .. } => *id,
         }
     }
 }

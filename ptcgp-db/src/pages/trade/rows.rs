@@ -8,6 +8,13 @@ use ptcgp_db_data::{CardVersion, Prob};
 use crate::app::{AppStorage, CardDetailOrigin, CompletedTransfer, schedule_save};
 use crate::routes::Route;
 
+use super::COST_PILL_CLS;
+
+/// Primary action button shared by the recommendation rows ("Transfer", "Buy").
+const ACTION_BTN_CLS: &str = "px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white \
+    hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed \
+    shadow-md shadow-blue-500/30 dark:shadow-blue-900/70 active:shadow-sm active:translate-y-px";
+
 // ---------------------------------------------------------------------------
 // Card display helpers
 // ---------------------------------------------------------------------------
@@ -165,9 +172,6 @@ pub(super) fn ShareRow(
             dest_name: dest_for_xfer.clone(),
         });
     });
-    let btn_cls = "px-3 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white \
-                   hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed \
-                   shadow-md shadow-blue-500/30 dark:shadow-blue-900/70 active:shadow-sm active:translate-y-px";
 
     rsx! {
         div {
@@ -196,7 +200,7 @@ pub(super) fn ShareRow(
                 }
                 button {
                     r#type: "button",
-                    class: "{btn_cls}",
+                    class: "{ACTION_BTN_CLS}",
                     disabled,
                     onclick: move |e| on_transfer.call(e),
                     "Transfer"
@@ -232,7 +236,7 @@ pub(super) fn ShareRow(
                 div { class: "hidden sm:flex flex-col items-end gap-1.5 shrink-0 min-w-[11rem]",
                     button {
                         r#type: "button",
-                        class: "{btn_cls}",
+                        class: "{ACTION_BTN_CLS}",
                         disabled,
                         onclick: move |e| on_transfer.call(e),
                         "Transfer"
@@ -483,18 +487,51 @@ pub(super) fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) ->
     }
 }
 
-/// One pack-point purchase suggestion: card, points cost, and pull rate.
+/// One pack point purchase suggestion: card, points cost, pull rate, and a Buy action that
+/// adds a copy to the destination profile.
 #[component]
-pub(super) fn PurchaseRow(rank: usize, rec: PurchaseRec, dest_name: String) -> Element {
+pub(super) fn PurchaseRow(
+    rank: usize,
+    rec: PurchaseRec,
+    dest_name: String,
+    disabled: bool,
+    history: Signal<Vec<CompletedTransfer>>,
+    next_id: Signal<u64>,
+) -> Element {
+    let mut store = use_context::<Signal<Option<ProfileStore<AppStorage>>>>();
     let mut back_origin = use_context::<Signal<CardDetailOrigin>>();
     let nav = use_navigator();
     let cv_id = rec.cv.id();
+    let cost = rec.cost;
     let rate_label = pull_rate_label(rec.max_rate);
-    let cost_cls = "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold \
-                    bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200";
+    let dest_for_buy = dest_name.clone();
+    let on_buy = use_callback(move |e: Event<MouseData>| {
+        e.stop_propagation();
+        let mut s = store.write();
+        if let Some(st) = s.as_mut() {
+            let cv_key = CardVersionId(cv_id);
+            let owned = st.owned_count(&dest_for_buy, cv_key);
+            let _ = st.set_owned_count(&dest_for_buy, cv_key, owned + 1);
+        }
+        drop(s);
+        schedule_save();
+        let id = {
+            let mut guard = next_id.write();
+            let id = *guard;
+            *guard = id + 1;
+            id
+        };
+        history.write().push(CompletedTransfer::Purchase {
+            id,
+            cv_id,
+            dest_name: dest_for_buy.clone(),
+            cost,
+        });
+    });
+
     rsx! {
         div {
-            class: "flex flex-col p-4 border-b border-gray-100 dark:border-gray-700 \
+            class: "p-4 border-b border-gray-100 dark:border-gray-700 \
                     last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50",
             onclick: move |_| {
                 back_origin.set(CardDetailOrigin::Trade);
@@ -505,34 +542,49 @@ pub(super) fn PurchaseRow(rank: usize, rec: PurchaseRec, dest_name: String) -> E
                         }),
                 );
             },
-            // Mobile header (hidden sm+)
-            div { class: "sm:hidden flex items-start justify-between gap-2 mb-3",
+            // Mobile header (hidden sm+): rank + cost + Buy
+            div { class: "sm:hidden flex items-center gap-2 mb-3",
                 span { class: "shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
                     "#{rank}"
                 }
-                div { class: "flex flex-col items-end gap-1",
-                    span { class: "{cost_cls}", "{rec.cost} pts" }
-                    div { class: "text-xs text-right",
-                        span { class: "text-gray-500 dark:text-gray-400", "{dest_name}: " }
-                        span { class: "font-medium text-gray-800 dark:text-gray-200",
-                            "{rec.dest_count} owned"
-                        }
-                        span { class: "text-gray-500 dark:text-gray-400", " ({rec.needed} needed)" }
-                    }
-                    div { class: "text-xs text-right text-gray-500 dark:text-gray-400",
-                        "Pull rate: {rate_label}"
-                    }
+                div { class: "flex-1 min-w-0",
+                    span { class: "{COST_PILL_CLS}", "{cost} pts" }
+                }
+                button {
+                    r#type: "button",
+                    class: "{ACTION_BTN_CLS}",
+                    disabled,
+                    onclick: move |e| on_buy.call(e),
+                    "Buy"
                 }
             }
+            // Body: desktop rank badge + card panel + desktop stats sidebar
             div { class: "flex items-start gap-3",
                 span { class: "hidden sm:flex shrink-0 w-8 h-8 items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
                     "#{rank}"
                 }
                 div { class: "flex-1 min-w-0",
                     CardPanel { cv_id }
+                    div { class: "sm:hidden mt-1 text-xs",
+                        span { class: "text-gray-500 dark:text-gray-400", "{dest_name}: " }
+                        span { class: "font-medium text-gray-800 dark:text-gray-200",
+                            "{rec.dest_count} owned"
+                        }
+                        span { class: "text-gray-500 dark:text-gray-400", " ({rec.needed} needed)" }
+                    }
+                    div { class: "sm:hidden mt-0.5 text-xs text-gray-500 dark:text-gray-400",
+                        "Pull rate: {rate_label}"
+                    }
                 }
-                div { class: "hidden sm:flex flex-col items-end gap-1.5 shrink-0",
-                    span { class: "{cost_cls}", "{rec.cost} pts" }
+                div { class: "hidden sm:flex flex-col items-end gap-1.5 shrink-0 min-w-[11rem]",
+                    button {
+                        r#type: "button",
+                        class: "{ACTION_BTN_CLS}",
+                        disabled,
+                        onclick: move |e| on_buy.call(e),
+                        "Buy"
+                    }
+                    span { class: "{COST_PILL_CLS}", "{cost} pts" }
                     div { class: "text-xs text-right",
                         span { class: "text-gray-500 dark:text-gray-400", "{dest_name}: " }
                         span { class: "font-medium text-gray-800 dark:text-gray-200",
