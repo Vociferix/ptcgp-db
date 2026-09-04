@@ -289,6 +289,8 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
     let illustrator = cv.illustrator();
     let rarity_icon = cv.rarity().class().icon();
     let rarity_name = cv.rarity().name();
+    let pack_point_cost = cv.rarity().pack_point_cost();
+    let shine_dust = cv.rarity().shine_dust();
     let card_image = cv.image();
     let source_name = cv.source().name();
     let source_desc = cv.source().description();
@@ -354,6 +356,25 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
                             class: "h-6 w-auto object-contain",
                         }
                         span { class: "text-xs text-gray-500 dark:text-gray-400", "{rarity_name}" }
+                    }
+                }
+
+                div { class: "grid grid-cols-2 gap-2",
+                    div {
+                        class: "flex flex-col items-center p-2 rounded bg-gray-50 dark:bg-gray-800",
+                        title: "Pack points needed to buy this card from its set's shop",
+                        span { class: "text-xs text-gray-400 dark:text-gray-500", "Pack Points" }
+                        span { class: "text-sm font-bold tabular-nums text-gray-900 dark:text-gray-100",
+                            "{pack_point_cost}"
+                        }
+                    }
+                    div {
+                        class: "flex flex-col items-center p-2 rounded bg-gray-50 dark:bg-gray-800",
+                        title: "Shine dust earned when a duplicate of this card is received",
+                        span { class: "text-xs text-gray-400 dark:text-gray-500", "Shine Dust" }
+                        span { class: "text-sm font-bold tabular-nums text-gray-900 dark:text-gray-100",
+                            "{shine_dust}"
+                        }
                     }
                 }
 

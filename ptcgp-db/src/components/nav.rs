@@ -43,7 +43,7 @@ fn nav_items() -> impl IntoIterator<Item = NavItem> {
             icon: NavIcon::Cards,
         },
         NavItem {
-            label: "Trade",
+            label: "Trade & Buy",
             route: Route::TradePage {},
             short: "Trade",
             icon: NavIcon::Trade,

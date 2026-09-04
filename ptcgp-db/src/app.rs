@@ -67,7 +67,9 @@ impl CompletedTransfer {
 pub(crate) struct TradePageState {
     pub config: FilterConfig,
     pub show_unobtainable: bool,
-    pub active_tab: u8, // 0=Shares, 1=Trades, 2=Candidates
+    /// Pack-point cap for purchase suggestions. `None` means no cap.
+    pub max_pack_points: Option<u32>,
+    pub active_tab: u8, // 0=Shares, 1=Trades, 2=Candidates, 3=Pack Points
     /// Explicitly selected source profiles. Empty means "all inactive profiles".
     pub source_profiles: Vec<String>,
     /// Transfers completed this session; survives navigation but not app restart.
@@ -85,6 +87,7 @@ impl Default for TradePageState {
                 ..FilterConfig::default()
             },
             show_unobtainable: false,
+            max_pack_points: None,
             active_tab: 0,
             source_profiles: Vec::new(),
             completed_transfers: Vec::new(),
