@@ -27,3 +27,16 @@ fn run() -> Result<()> {
 
     Ok(())
 }
+
+fn make_slug(subtitle: &str) -> String {
+    let nfkd = icu_normalizer::DecomposingNormalizerBorrowed::new_nfkd();
+    let mut slug = String::with_capacity(subtitle.len());
+    for c in nfkd.normalize(&subtitle.to_lowercase()).chars() {
+        if c.is_ascii_alphanumeric() || c == '-' {
+            slug.push(c);
+        } else if c.is_whitespace() && !slug.ends_with('_') {
+            slug.push('_')
+        }
+    }
+    slug.trim_matches('_').to_string()
+}

@@ -93,7 +93,7 @@ fn elements(state: &mut State) -> Result<()> {
     for (id, elem) in state.raw_data.elements.iter().enumerate() {
         let name_id = str_id(&state.data.element_names, &elem.name)
             .context("failed to resolve element name")?;
-        let slug = make_slug(&elem.name);
+        let slug = super::make_slug(&elem.name);
         let icon_path = format!("ptcgp-images/elements/icons/{slug}.png");
         let symbol_path = format!("ptcgp-images/elements/symbols/{slug}.png");
         state.data.elements.push(models::Element {
@@ -122,7 +122,7 @@ fn card_sources(state: &mut State) -> Result<()> {
             .context("failed to resolve card source name")?;
         let description_id = str_id(&state.data.card_source_descriptions, &src.description)
             .context("failed to resolve card source description")?;
-        let slug = make_slug(&src.code);
+        let slug = super::make_slug(&src.code);
         let icon_path = format!("ptcgp-images/card_sources/{slug}.png");
 
         state.data.card_sources.push(models::CardSource {
@@ -150,7 +150,7 @@ fn rarities(state: &mut State) -> Result<()> {
             Entry::Vacant(entry) => {
                 let name_id = str_id(&state.data.rarity_group_names, &rarity.group)
                     .context("failed to resolve rarity group name")?;
-                let slug = make_slug(&rarity.group);
+                let slug = super::make_slug(&rarity.group);
                 let icon_path = format!("ptcgp-images/rarities/icons/{slug}/1.png");
                 let symbol_path = format!("ptcgp-images/rarities/symbols/{slug}/1.png");
                 state.data.rarity_groups.push(models::RarityGroup {
@@ -169,7 +169,7 @@ fn rarities(state: &mut State) -> Result<()> {
         let mut class_id = state.data.rarity_classes.len();
         match classes.entry((rarity.group.clone(), count)) {
             Entry::Vacant(entry) => {
-                let slug = make_slug(&rarity.group);
+                let slug = super::make_slug(&rarity.group);
                 let icon_path = format!("ptcgp-images/rarities/icons/{slug}/{count}.png");
                 let symbol_path = format!("ptcgp-images/rarities/symbols/{slug}/{count}.png");
                 state.data.rarity_classes.push(models::RarityClass {
@@ -355,7 +355,7 @@ fn packs(state: &mut State) -> Result<()> {
             let subtitle_id = str_id(&state.data.pack_subtitles, pack)
                 .context("failed to resolve pack subtitle")?;
 
-            let slug = make_slug(pack);
+            let slug = super::make_slug(pack);
             let image_path = format!("ptcgp-images/packs/art/{}/{}.png", set.code, slug);
             let logo_path = format!("ptcgp-images/packs/logos/{}/{}.png", set.code, slug);
 
@@ -1180,30 +1180,4 @@ fn str_id(table: &[String], s: &str) -> Result<usize> {
     table
         .binary_search_by(|k| Ord::cmp(k.as_str(), s))
         .map_err(|_| anyhow::anyhow!("string {s:?} not in string table"))
-}
-
-fn make_slug(s: &str) -> String {
-    let mut prev_underscore = false;
-    s.chars()
-        .map(|ch| {
-            if ch.is_whitespace() || (ch.is_ascii_punctuation() && ch != '-') {
-                '_'
-            } else {
-                ch.to_ascii_lowercase()
-            }
-        })
-        .filter_map(|ch| {
-            if ch == '_' {
-                if prev_underscore {
-                    None
-                } else {
-                    prev_underscore = true;
-                    Some('_')
-                }
-            } else {
-                prev_underscore = false;
-                Some(ch)
-            }
-        })
-        .collect()
 }

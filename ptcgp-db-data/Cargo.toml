@@ -1,6 +1,6 @@
 [package]
 name = "ptcgp-db-data"
-version = "0.2.0"
+version = "0.5.0"
 edition = "2024"
 license.workspace = true
 build = "codegen/main.rs"
@@ -25,4 +25,5 @@ quote = { version = "1.0.45", default-features = false }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.150", features = ["arbitrary_precision"] }
 syn = { version = "2.0.117", default-features = false, features = ["parsing"] }
+icu_normalizer = { version = "2", features = ["compiled_data"] }
 
