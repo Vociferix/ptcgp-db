@@ -960,8 +960,13 @@ card gives me the most collection progress per point?"
 - the aggregate count across active profiles is below the goal T (`needed > 0`)
 - `max_pull_rate > 0` — cards with no non-promo pack (promo cards, non-Pack-source cards) have
   no shop to buy them from
-- the card's set has not retired — a retired set's shop can no longer be reached, so its cards
-  are always excluded. Unlike the Trade Candidates list, this is not opt-in.
+
+Retired sets are **not** excluded. Pack points are earned and spent per set, and points already
+banked for a set remain spendable after that set stops being offered, so its cards stay valid
+purchase suggestions. Retired-set cards are therefore governed by the Obtainable filter and the
+global "Ignore unobtainable sets" setting exactly as they are elsewhere in the app — included by
+default, excluded when the user asks for obtainable-only. This differs from the Trade Candidates
+list, where retired-set cards are opt-in.
 
 The "Keep >= N" filter does not apply; every other filter behaves as it does on the Summary page.
 
