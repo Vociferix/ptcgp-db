@@ -527,7 +527,7 @@ The **Summary page** is the default. It is the first page shown when the app ope
 
 - Summary (default/home; includes Analysis query features)
 - Card Catalog
-- Trade
+- Trade & Buy (shares, trades, trade candidates, pack point purchases)
 - Profile Manager
 - Import / Export
 - Settings
@@ -776,6 +776,9 @@ aggregate sum and the count editor is disabled.
 - **Card source** (`CardVersion::source()`) — when source is not `"Pack"`, display
   `CardSource::description()` to explain how the card is obtained (e.g., a mission or shop
   purchase)
+- **Pack point cost** (`Rarity::pack_point_cost()`) — points needed to buy this card from its
+  set's shop — and **shine dust yield** (`Rarity::shine_dust()`) — dust earned when a duplicate
+  of this card is received. Both are properties of the card's rarity.
 - **Duplicate versions** (`CardVersion::duplicates()`): other card versions with the same rarity,
   illustrator, and finish released in a different set. These are the "same physical card" reprinted.
 - **All versions** of the same abstract card (`CardVersion::card().versions()`): includes
@@ -816,6 +819,9 @@ The layout of these fields is left to implementation judgment.
 
 The Trade page assists users who play PTCGP on multiple accounts — each represented by a profile
 — in deciding which cards to share or trade between accounts and in recording completed transfers.
+It also covers the other way to acquire a specific card without trading it: buying it from a
+set's pack point shop. Because that section is useful with a single profile, the page is labelled
+**Trade & Buy** in the navigation sidebar (the narrow bottom bar keeps the shorter "Trade").
 
 **Active profiles are the destination** (the profiles that should receive cards); inactive
 profiles are the sources (alternates). Active profiles follow the same aggregation model as the
@@ -942,6 +948,46 @@ be re-obtained from packs, making them more precious despite having a non-zero `
 from historical data. These cards are **excluded from the list by default** and shown only when the
 user opts in via a toggle (consistent with how unobtainable packs are handled elsewhere). When
 shown, they are visually flagged (e.g., a warning indicator) to signal they cannot be re-obtained.
+
+### Pack Point Purchases
+
+A ranked list of cards worth buying from a set's pack point shop, available even when only one
+profile exists. Pack points accumulate per set (5 per pack opened) and are spent in that set's
+shop on a specific card of the user's choosing, so the question the section answers is "which
+card gives me the most collection progress per point?"
+
+**Eligibility**: only cards where:
+- the aggregate count across active profiles is below the goal T (`needed > 0`)
+- `max_pull_rate > 0` — cards with no non-promo pack (promo cards, non-Pack-source cards) have
+  no shop to buy them from
+- the card's set has not retired — a retired set's shop can no longer be reached, so its cards
+  are always excluded. Unlike the Trade Candidates list, this is not opt-in.
+
+The "Keep >= N" filter does not apply; every other filter behaves as it does on the Summary page.
+
+**Value formula**:
+
+```
+value = pack_point_cost * max_pull_rate
+```
+
+Where `pack_point_cost` is `Rarity::pack_point_cost()` for the card's rarity and `max_pull_rate`
+is the card's highest aggregate pull rate across all non-promo packs. Lower value = better buy.
+The list is sorted ascending by value.
+
+Intuitively: a card scores well by being cheap, by being unlikely to arrive from a pack, or by
+any balance of the two. Points spent on a card that packs would have handed over anyway are
+mostly wasted.
+
+**Maximum pack point cost**: the app does not track the user's point balance for each set — and
+should not — so without a cap the list would be dominated by expensive cards the user cannot
+afford. A max-cost filter is therefore always visible above the list rather than tucked into the
+advanced filter panel. Pack point costs come from a small fixed set of rarity tiers, so the
+filter offers exactly those tier values plus "Any"; any threshold between two tiers yields the
+same results as the next tier down. Default: "Any".
+
+Rows are formatted like Recommended Shares, with the pack point cost shown in place of the
+source and destination profile information.
 
 ---
 

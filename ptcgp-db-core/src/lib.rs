@@ -7,6 +7,7 @@ pub mod filter;
 pub mod migration;
 pub mod probability;
 pub mod profile_store;
+pub mod purchase_data;
 pub mod queries;
 pub mod save_data;
 pub mod settings;
@@ -25,6 +26,7 @@ pub use probability::{
     desired_pull_rate, max_card_pull_rate,
 };
 pub use profile_store::{ProfileStore, ProfileStoreError};
+pub use purchase_data::{PurchaseRec, build_purchases, pack_point_cost_tiers};
 pub use queries::{RenameError, SavedQueries};
 pub use save_data::{
     AppSettingsSaveData, CardKindFilter, CardVersionId, CountThreshold, FilterConfig,

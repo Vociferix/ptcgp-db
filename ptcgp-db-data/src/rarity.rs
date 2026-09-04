@@ -75,13 +75,15 @@ impl Rarity {
         unsafe { RarityGroup::from_id_unchecked(self.group_id) }
     }
 
-    /// In-game dust cost to craft a card of this rarity.
-    pub const fn craft_cost(&self) -> u32 {
+    /// In-game pack point cost to craft a card of this rarity.
+    ///
+    /// 5 pack points are earned for a specific set for each opened pack in that set.
+    pub const fn pack_point_cost(&self) -> u32 {
         self.craft_cost
     }
 
     /// In-game dust earned when receiving a duplicate card of this rarity.
-    pub const fn dupe_dust(&self) -> u32 {
+    pub const fn shine_dust(&self) -> u32 {
         self.dupe_dust
     }
 }
@@ -93,8 +95,8 @@ impl std::fmt::Debug for Rarity {
             .field("code", &self.code())
             .field("name", &self.name())
             .field("class", self.class())
-            .field("craft_cost", &self.craft_cost)
-            .field("dupe_dust", &self.dupe_dust)
+            .field("pack_point_cost", &self.craft_cost)
+            .field("shine_dust", &self.dupe_dust)
             .finish()
     }
 }

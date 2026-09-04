@@ -1,4 +1,4 @@
-//! Trade page: share/trade recommendations and candidate card lists.
+//! Trade page: share/trade recommendations, candidate card lists, and pack-point purchases.
 
 mod history;
 mod rows;
@@ -7,16 +7,19 @@ use std::collections::HashSet;
 
 use dioxus::prelude::*;
 use ptcgp_db_core::save_data::FilterConfig;
-use ptcgp_db_core::{AppSettings, ProfileStore, build_candidates, build_shares, build_trades};
+use ptcgp_db_core::{
+    AppSettings, ProfileStore, build_candidates, build_purchases, build_shares, build_trades,
+    pack_point_cost_tiers,
+};
 use ptcgp_db_data::Card;
 
 use crate::app::{AppStorage, CompletedTransfer, TradePageState};
-use crate::components::icons::{ChevronDown, ChevronUp};
+use crate::components::icons::{Check, ChevronDown, ChevronUp};
 use crate::components::toggle::{Toggle, ToggleCheckbox};
 use crate::components::{FilterMode, FilterToolbar};
 
 use history::{CompletedShareSection, CompletedTradeSection};
-use rows::{CandidateRow, ShareRow, TradeRow};
+use rows::{CandidateRow, PurchaseRow, ShareRow, TradeRow};
 
 /// Card container class shared between active lists and completed-transfer section bodies.
 pub(super) const CARD_CLS: &str = "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 \
@@ -36,6 +39,7 @@ enum Tab {
     Shares,
     Trades,
     Candidates,
+    Points,
 }
 
 #[component]
@@ -224,6 +228,103 @@ fn SourceProfileItem(
 }
 
 // ---------------------------------------------------------------------------
+// Max pack points dropdown
+// ---------------------------------------------------------------------------
+
+/// Single-select cap on how many pack points a suggested card may cost.
+///
+/// The app does not know the user's point balance per set, so the cap keeps the list from
+/// filling with cards they cannot afford. Pack point costs come from a small fixed set of
+/// rarity tiers, so the options are exactly those tiers — any threshold in between yields the
+/// same results as the next tier down.
+#[component]
+fn MaxPointsDropdown(selected: Signal<Option<u32>>) -> Element {
+    let mut open = use_signal(|| false);
+    let current = *selected.read();
+    let open_now = *open.read();
+    let tiers = pack_point_cost_tiers();
+
+    rsx! {
+        div { class: "relative",
+            button {
+                r#type: "button",
+                class: DROPDOWN_TRIGGER_CLS,
+                onclick: move |_| open.toggle(),
+                match current {
+                    Some(max) => rsx! { "Max points: {max}" },
+                    None => rsx! { "Max points: any" },
+                }
+                if open_now {
+                    ChevronUp { class: "w-4 h-4 text-gray-500 dark:text-gray-400" }
+                } else {
+                    ChevronDown { class: "w-4 h-4 text-gray-500 dark:text-gray-400" }
+                }
+            }
+
+            if open_now {
+                div {
+                    class: "fixed inset-0 z-10",
+                    onclick: move |_| open.set(false),
+                }
+                div { class: "absolute left-0 top-full mt-1 z-20 min-w-40 \
+                              max-h-80 overflow-y-auto overflow-x-hidden \
+                              rounded-md border border-gray-200/60 dark:border-gray-600/60 \
+                              bg-white dark:bg-gray-700 \
+                              shadow-xl dark:shadow-[0_4px_28px_rgba(0,0,0,0.7)] \
+                              ring-1 ring-black/5 dark:ring-white/[0.09] py-1",
+                    MaxPointsItem {
+                        label: "Any",
+                        value: None,
+                        selected,
+                        open,
+                    }
+                    for tier in tiers {
+                        MaxPointsItem {
+                            key: "{tier}",
+                            label: "{tier} pts",
+                            value: Some(tier),
+                            selected,
+                            open,
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// One option in the max pack points dropdown.
+#[component]
+fn MaxPointsItem(
+    label: String,
+    value: Option<u32>,
+    mut selected: Signal<Option<u32>>,
+    mut open: Signal<bool>,
+) -> Element {
+    let checked = *selected.read() == value;
+    let row_cls = if checked {
+        "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer select-none \
+         bg-blue-50 dark:bg-blue-950/80 hover:bg-blue-100 dark:hover:bg-blue-900/60"
+    } else {
+        "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer select-none \
+         hover:bg-gray-50 dark:hover:bg-gray-600"
+    };
+    rsx! {
+        div {
+            class: "{row_cls}",
+            onclick: move |_| {
+                selected.set(value);
+                open.set(false);
+            },
+            span { class: "flex-1 truncate text-gray-800 dark:text-gray-100", "{label}" }
+            if checked {
+                Check { class: "w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Trade page
 // ---------------------------------------------------------------------------
 
@@ -239,8 +340,10 @@ pub fn TradePage() -> Element {
     let active_tab: Signal<Tab> = use_signal(|| match init.active_tab {
         1 => Tab::Trades,
         2 => Tab::Candidates,
+        3 => Tab::Points,
         _ => Tab::Shares,
     });
+    let max_points: Signal<Option<u32>> = use_signal(|| init.max_pack_points);
     let source_profiles: Signal<Vec<String>> = use_signal(|| init.source_profiles.clone());
     let completed_transfers: Signal<Vec<CompletedTransfer>> =
         use_signal(|| init.completed_transfers.clone());
@@ -250,15 +353,18 @@ pub fn TradePage() -> Element {
     let mut shares_limit = use_signal(|| 10usize);
     let mut trades_limit = use_signal(|| 10usize);
     let mut candidates_limit = use_signal(|| 10usize);
+    let mut purchases_limit = use_signal(|| 10usize);
 
     use_drop(move || {
         let mut state = trade_state_ctx.write();
         state.config = config.read().clone();
         state.show_unobtainable = *show_unobtainable.read();
+        state.max_pack_points = *max_points.read();
         state.active_tab = match *active_tab.read() {
             Tab::Shares => 0,
             Tab::Trades => 1,
             Tab::Candidates => 2,
+            Tab::Points => 3,
         };
         state.source_profiles = source_profiles.read().clone();
         state.completed_transfers = completed_transfers.read().clone();
@@ -357,6 +463,15 @@ pub fn TradePage() -> Element {
         *show_unobtainable.read(),
     );
 
+    let mut purchases = build_purchases(
+        store_ref,
+        &settings_guard,
+        &cfg,
+        today,
+        matched_name_ids.as_deref(),
+        *max_points.read(),
+    );
+
     drop(cfg);
     drop(settings_guard);
     drop(store_guard);
@@ -373,12 +488,16 @@ pub fn TradePage() -> Element {
     candidates.truncate(*candidates_limit.read());
     let candidates_remaining = candidates_total - candidates.len();
 
+    let purchases_total = purchases.len();
+    purchases.truncate(*purchases_limit.read());
+    let purchases_remaining = purchases_total - purchases.len();
+
     let show_more_cls = "w-full px-4 py-3 text-center text-sm text-blue-600 dark:text-blue-400 \
         hover:bg-gray-50 dark:hover:bg-gray-700/50 border-t border-gray-100 dark:border-gray-700";
 
     rsx! {
         div { class: "max-w-4xl mx-auto p-4 sm:p-6 space-y-4",
-            h1 { class: "text-2xl font-bold text-gray-900 dark:text-gray-100", "Trade" }
+            h1 { class: "text-2xl font-bold text-gray-900 dark:text-gray-100", "Trade & Buy" }
 
             FilterToolbar { config, mode: FilterMode::Trade }
 
@@ -389,6 +508,11 @@ pub fn TradePage() -> Element {
                     TabBtn {
                         label: "Candidates",
                         tab: Tab::Candidates,
+                        active_tab,
+                    }
+                    TabBtn {
+                        label: "Pack Points",
+                        tab: Tab::Points,
                         active_tab,
                     }
                 }
@@ -502,6 +626,37 @@ pub fn TradePage() -> Element {
                                         class: "{show_more_cls}",
                                         onclick: move |_| *candidates_limit.write() += 10,
                                         "Show more ({candidates_remaining} remaining)"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                Tab::Points => rsx! {
+                    div {
+                        div { class: "flex items-center gap-2 mb-3",
+                            MaxPointsDropdown { selected: max_points }
+                        }
+                        div { class: "{CARD_CLS}",
+                            if purchases.is_empty() {
+                                p { class: "p-6 text-sm text-gray-500 dark:text-gray-400",
+                                    "No pack-point suggestions match the current filters."
+                                }
+                            } else {
+                                for (rank, rec) in purchases.into_iter().enumerate() {
+                                    PurchaseRow {
+                                        key: "{rec.cv.id()}",
+                                        rank: rank + 1,
+                                        rec,
+                                        dest_name: dest_name.clone(),
+                                    }
+                                }
+                                if purchases_remaining > 0 {
+                                    button {
+                                        r#type: "button",
+                                        class: "{show_more_cls}",
+                                        onclick: move |_| *purchases_limit.write() += 10,
+                                        "Show more ({purchases_remaining} remaining)"
                                     }
                                 }
                             }

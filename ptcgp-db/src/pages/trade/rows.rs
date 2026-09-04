@@ -1,8 +1,8 @@
-//! Row components for the Trade page: share, trade, and candidate recommendation rows.
+//! Row components for the Trade page: share, trade, candidate, and pack-point purchase rows.
 
 use dioxus::prelude::*;
 use ptcgp_db_core::save_data::CardVersionId;
-use ptcgp_db_core::{CandidateRec, ProfileStore, ShareRec, TradeRec};
+use ptcgp_db_core::{CandidateRec, ProfileStore, PurchaseRec, ShareRec, TradeRec};
 use ptcgp_db_data::{CardVersion, Prob};
 
 use crate::app::{AppStorage, CardDetailOrigin, CompletedTransfer, schedule_save};
@@ -473,6 +473,72 @@ pub(super) fn CandidateRow(rank: usize, rec: CandidateRec, dest_name: String) ->
                             "{rec.dest_count} owned"
                         }
                         span { class: "text-gray-500 dark:text-gray-400", " ({rec.excess} excess)" }
+                    }
+                    div { class: "text-xs text-right text-gray-500 dark:text-gray-400",
+                        "Pull rate: {rate_label}"
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// One pack-point purchase suggestion: card, points cost, and pull rate.
+#[component]
+pub(super) fn PurchaseRow(rank: usize, rec: PurchaseRec, dest_name: String) -> Element {
+    let mut back_origin = use_context::<Signal<CardDetailOrigin>>();
+    let nav = use_navigator();
+    let cv_id = rec.cv.id();
+    let rate_label = pull_rate_label(rec.max_rate);
+    let cost_cls = "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold \
+                    bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200";
+    rsx! {
+        div {
+            class: "flex flex-col p-4 border-b border-gray-100 dark:border-gray-700 \
+                    last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50",
+            onclick: move |_| {
+                back_origin.set(CardDetailOrigin::Trade);
+                drop(
+                    nav
+                        .push(Route::CardDetailPage {
+                            card_id: cv_id,
+                        }),
+                );
+            },
+            // Mobile header (hidden sm+)
+            div { class: "sm:hidden flex items-start justify-between gap-2 mb-3",
+                span { class: "shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
+                    "#{rank}"
+                }
+                div { class: "flex flex-col items-end gap-1",
+                    span { class: "{cost_cls}", "{rec.cost} pts" }
+                    div { class: "text-xs text-right",
+                        span { class: "text-gray-500 dark:text-gray-400", "{dest_name}: " }
+                        span { class: "font-medium text-gray-800 dark:text-gray-200",
+                            "{rec.dest_count} owned"
+                        }
+                        span { class: "text-gray-500 dark:text-gray-400", " ({rec.needed} needed)" }
+                    }
+                    div { class: "text-xs text-right text-gray-500 dark:text-gray-400",
+                        "Pull rate: {rate_label}"
+                    }
+                }
+            }
+            div { class: "flex items-start gap-3",
+                span { class: "hidden sm:flex shrink-0 w-8 h-8 items-center justify-center rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
+                    "#{rank}"
+                }
+                div { class: "flex-1 min-w-0",
+                    CardPanel { cv_id }
+                }
+                div { class: "hidden sm:flex flex-col items-end gap-1.5 shrink-0",
+                    span { class: "{cost_cls}", "{rec.cost} pts" }
+                    div { class: "text-xs text-right",
+                        span { class: "text-gray-500 dark:text-gray-400", "{dest_name}: " }
+                        span { class: "font-medium text-gray-800 dark:text-gray-200",
+                            "{rec.dest_count} owned"
+                        }
+                        span { class: "text-gray-500 dark:text-gray-400", " ({rec.needed} needed)" }
                     }
                     div { class: "text-xs text-right text-gray-500 dark:text-gray-400",
                         "Pull rate: {rate_label}"
