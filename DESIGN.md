@@ -989,6 +989,15 @@ same results as the next tier down. Default: "Any".
 Rows are formatted like Recommended Shares, with the pack point cost shown in place of the
 source and destination profile information.
 
+**Recording purchases**: each suggestion carries a **Buy** action that adds one copy of the card
+to the destination, the same way "Record transfer" does for a share; the card then drops out of
+the suggestions on the next recalculation. Completed purchases appear in the same collapsible
+"Completed (N)" section used by the Shares and Trades tabs, each with **Undo** (removes the
+copy again) and **Dismiss** (keeps it, drops the history entry). As with the other tabs, the
+action is disabled while multiple profiles are active, since the destination count is an
+aggregate. Pack point balances are not tracked, so nothing is deducted — the cost is displayed
+for reference only.
+
 ---
 
 ## Profile Manager

@@ -18,13 +18,17 @@ use crate::components::icons::{Check, ChevronDown, ChevronUp};
 use crate::components::toggle::{Toggle, ToggleCheckbox};
 use crate::components::{FilterMode, FilterToolbar};
 
-use history::{CompletedShareSection, CompletedTradeSection};
+use history::{CompletedPurchaseSection, CompletedShareSection, CompletedTradeSection};
 use rows::{CandidateRow, PurchaseRow, ShareRow, TradeRow};
 
 /// Card container class shared between active lists and completed-transfer section bodies.
 pub(super) const CARD_CLS: &str = "bg-white dark:bg-gray-800 rounded-lg border border-gray-200/80 \
     dark:border-gray-700/80 shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] \
     dark:ring-1 dark:ring-white/[0.06]";
+
+/// Pack point cost pill, shared by the purchase suggestion and completed-purchase rows.
+pub(super) const COST_PILL_CLS: &str = "inline-flex items-center px-1.5 py-0.5 rounded text-xs \
+    font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200";
 
 const DROPDOWN_TRIGGER_CLS: &str = "flex items-center gap-1 px-2 h-8 rounded-md text-sm font-medium \
      bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 \
@@ -637,10 +641,11 @@ pub fn TradePage() -> Element {
                         div { class: "flex items-center gap-2 mb-3",
                             MaxPointsDropdown { selected: max_points }
                         }
+                        CompletedPurchaseSection { history: completed_transfers, dest_name: dest_name.clone() }
                         div { class: "{CARD_CLS}",
                             if purchases.is_empty() {
                                 p { class: "p-6 text-sm text-gray-500 dark:text-gray-400",
-                                    "No pack-point suggestions match the current filters."
+                                    "No pack point suggestions match the current filters."
                                 }
                             } else {
                                 for (rank, rec) in purchases.into_iter().enumerate() {
@@ -649,6 +654,9 @@ pub fn TradePage() -> Element {
                                         rank: rank + 1,
                                         rec,
                                         dest_name: dest_name.clone(),
+                                        disabled: multi_active,
+                                        history: completed_transfers,
+                                        next_id,
                                     }
                                 }
                                 if purchases_remaining > 0 {
