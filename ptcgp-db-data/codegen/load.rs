@@ -236,7 +236,6 @@ impl RawData {
             }
 
             for pack in &set.packs {
-                let mut prev_underscore = false;
                 let slug = super::make_slug(pack);
                 pack_data.push(load_json(format!("pull_rates/{}/{}.json", set.code, slug))?);
             }

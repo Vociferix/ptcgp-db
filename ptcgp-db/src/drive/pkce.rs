@@ -16,7 +16,7 @@ const RETURN_HASH_KEY: &str = "ptcgp-db-return-hash";
 /// well within the RFC 7636 length constraints.
 pub fn generate_verifier() -> String {
     let mut bytes = [0u8; 64];
-    getrandom::getrandom(&mut bytes).expect("WASM crypto RNG unavailable");
+    getrandom::fill(&mut bytes).expect("WASM crypto RNG unavailable");
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
@@ -31,7 +31,7 @@ pub fn derive_challenge(verifier: &str) -> String {
 /// Generates a cryptographically random CSRF state token (16 bytes, base64url).
 pub fn generate_state() -> String {
     let mut bytes = [0u8; 16];
-    getrandom::getrandom(&mut bytes).expect("WASM crypto RNG unavailable");
+    getrandom::fill(&mut bytes).expect("WASM crypto RNG unavailable");
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
