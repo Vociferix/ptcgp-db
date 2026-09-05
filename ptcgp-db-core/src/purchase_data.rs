@@ -35,9 +35,11 @@ pub struct PurchaseRec {
 ///
 /// A card qualifies when the aggregate count across active profiles is below the goal and the
 /// card is obtainable from packs (`max_pull_rate > 0`).  Cards with no non-promo pack have no
-/// set shop to buy them from and are omitted, as are cards from retired sets, whose shops can
-/// no longer be reached.  `max_cost` caps the pack points per card so the list is not dominated
-/// by cards the user cannot afford; `None` means no cap.
+/// set shop to buy them from and are omitted.  Retired sets are left to the caller's filters:
+/// points already earned for a set remain spendable after it retires, so those cards are
+/// included or excluded by the Obtainable filter like anywhere else.  `max_cost` caps the pack
+/// points per card so the list is not dominated by cards the user cannot afford; `None` means
+/// no cap.
 ///
 /// Ranking is ascending by `pack_point_cost × max_pull_rate`: a card scores well by being cheap,
 /// by being hard to pull from packs, or by any balance of the two.
@@ -61,12 +63,6 @@ pub fn build_purchases<S: Storage + Clone>(
 
         let cost = cv.rarity().pack_point_cost();
         if max_cost.is_some_and(|max| cost > max) {
-            continue;
-        }
-
-        // The pack-point shop for a retired set is gone, so its cards cannot be bought
-        // regardless of the Obtainable filter.
-        if cv.set().retirement_date().is_some_and(|d| d <= today) {
             continue;
         }
 
@@ -201,6 +197,17 @@ mod tests {
         })
     }
 
+    /// A pack-obtainable card whose set has a retirement date, plus a date after it.
+    fn retired_card() -> Option<(&'static CardVersion, NaiveDate)> {
+        let cv = CardVersion::ALL.iter().find(|c| {
+            c.set().retirement_date().is_some()
+                && !c.set().is_promo()
+                && max_card_pull_rate(CardVersionId(c.id())) != Prob::ZERO
+        })?;
+        // Far enough ahead that the set is definitely retired.
+        Some((cv, NaiveDate::from_ymd_opt(2999, 1, 1)?))
+    }
+
     #[test]
     fn owned_at_goal_is_not_suggested() {
         let Some(cv) = buyable_card() else { return };
@@ -281,6 +288,56 @@ mod tests {
             recs.windows(2).all(|w| w[0].value <= w[1].value),
             "purchase suggestions must be ordered best-value first"
         );
+    }
+
+    /// Pack points earned for a set stay spendable after the set retires, so retired-set cards
+    /// are included unless a filter excludes them.
+    #[test]
+    fn retired_set_card_is_suggested_when_no_obtainable_filter() {
+        let Some((cv, after)) = retired_card() else {
+            return;
+        };
+        let recs = build_purchases(
+            &store(),
+            &AppSettings::default(),
+            &cfg(1),
+            after,
+            None,
+            None,
+        );
+        assert!(recs.iter().any(|r| r.cv.id() == cv.id()));
+    }
+
+    #[test]
+    fn retired_set_card_is_excluded_by_obtainable_only_filter() {
+        let Some((cv, after)) = retired_card() else {
+            return;
+        };
+        let config = FilterConfig {
+            goal: 1,
+            obtainable: Some(true),
+            ..Default::default()
+        };
+        let recs = build_purchases(
+            &store(),
+            &AppSettings::default(),
+            &config,
+            after,
+            None,
+            None,
+        );
+        assert!(!recs.iter().any(|r| r.cv.id() == cv.id()));
+    }
+
+    #[test]
+    fn retired_set_card_is_excluded_by_ignore_unobtainable_setting() {
+        let Some((cv, after)) = retired_card() else {
+            return;
+        };
+        let mut settings = AppSettings::default();
+        settings.set_ignore_unobtainable_sets(true);
+        let recs = build_purchases(&store(), &settings, &cfg(1), after, None, None);
+        assert!(!recs.iter().any(|r| r.cv.id() == cv.id()));
     }
 
     #[test]
