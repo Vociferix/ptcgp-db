@@ -900,9 +900,14 @@ For each (source profile, rarity class) pair, the best trade is selected indepen
   count < T, choose the one with the **highest receive-value** — the card the destination most
   benefits from getting.
 - **Card A** (destination gives, source receives): among cards where `CardVersion::is_tradable()`
-  is `true` in that same rarity class, where the aggregate destination count > T (excess > 0) and
-  the source count < T (source wants it), choose the one with the **lowest trade-candidate value**
-  — the card cheapest for the destination to part with (most surplus, most re-obtainable).
+  is `true` in that same rarity class where the aggregate destination count > T (excess > 0),
+  choose the one with the **lowest trade-candidate value** — the card cheapest for the
+  destination to part with (most surplus, most re-obtainable). Cards the source still wants
+  (source count < T) rank ahead of cards it already has, but a card the source already has is
+  **not** excluded: at the rarer classes the destination often has excess of only one card, and
+  excluding it would suppress the entire (source, rarity class) recommendation rather than
+  offering a slightly less attractive trade. When Card A is such a fallback pick, the row says
+  so, since the source may be less willing to accept it.
 
 Both must exist for a recommendation to be generated for that (source, rarity class) pair. Rank
 recommendations by the receive-value of Card B. Display both sides of each proposed trade clearly

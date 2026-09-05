@@ -58,6 +58,10 @@ pub struct TradeRec {
     pub card_a_dest_count: u32,
     pub card_a_source_count: u32,
     pub card_a_max_rate: Prob,
+    /// `true` when the source still needs `card_a` (its count is below the goal), making it the
+    /// more attractive offer.  `false` marks a fallback pick: the source already has enough of
+    /// the card, but it is still the cheapest thing the destination can part with.
+    pub card_a_source_wants: bool,
 }
 
 /// A card the destination holds in excess — a good candidate to give in trades.
@@ -212,6 +216,9 @@ pub fn build_shares<S: Storage + Clone>(
 /// For each source profile and rarity class, finds the best card the source can provide
 /// (`card_b`) and the best card the destination can give back (`card_a`).  Pairs are ranked
 /// by the receive value of `card_b`.
+///
+/// `card_a` prefers a card the source still needs, falling back to one it already has when no
+/// wanted card is available — see [`TradeRec::card_a_source_wants`].
 pub fn build_trades<S: Storage + Clone>(
     store: &ProfileStore<S>,
     settings: &AppSettings,
@@ -303,19 +310,28 @@ pub fn build_trades<S: Storage + Clone>(
                 1.0 / (b_data.max_rate.as_f64() * (goal - b_data.dest_raw) as f64)
             };
 
+            // Cards the source still wants are the better offer, but a card it already has is
+            // far better than no recommendation at all: at the rarer classes the destination
+            // often has excess of only one card, so requiring `src_cnt < goal` here would drop
+            // the whole (source, rarity class) pair. Rank wanted cards first and fall back.
             let best_a = card_data
                 .iter()
                 .zip(src_counts.iter())
-                .filter(|(d, src_cnt)| {
+                .filter(|(d, _)| {
                     d.rarity_class_id == rarity_class_id
                         && d.dest_raw > excess_threshold
-                        && **src_cnt < goal
                         && d.max_rate != Prob::ZERO
                 })
-                .min_by(|(da, _), (db, _)| {
-                    let va = 1.0 / (da.max_rate.as_f64() * (da.dest_raw - excess_threshold) as f64);
-                    let vb = 1.0 / (db.max_rate.as_f64() * (db.dest_raw - excess_threshold) as f64);
-                    va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
+                .min_by(|(da, sa), (db, sb)| {
+                    let wants_a = **sa < goal;
+                    let wants_b = **sb < goal;
+                    wants_b.cmp(&wants_a).then_with(|| {
+                        let va =
+                            1.0 / (da.max_rate.as_f64() * (da.dest_raw - excess_threshold) as f64);
+                        let vb =
+                            1.0 / (db.max_rate.as_f64() * (db.dest_raw - excess_threshold) as f64);
+                        va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
+                    })
                 });
 
             let Some((a_data, a_src_count_ref)) = best_a else {
@@ -334,6 +350,7 @@ pub fn build_trades<S: Storage + Clone>(
                 card_a_dest_count: a_data.dest_raw,
                 card_a_source_count: a_src_count,
                 card_a_max_rate: a_data.max_rate,
+                card_a_source_wants: a_src_count < goal,
             });
         }
     }
@@ -411,7 +428,7 @@ pub fn build_candidates<S: Storage + Clone>(
 mod tests {
     use super::*;
     use chrono::NaiveDate;
-    use ptcgp_db_data::CardVersion;
+    use ptcgp_db_data::{CardVersion, RarityClass};
 
     use crate::AppSettings;
     use crate::profile_store::ProfileStore;
@@ -667,6 +684,233 @@ mod tests {
     // ---------------------------------------------------------------------------
     // build_candidates — smoke tests
     // ---------------------------------------------------------------------------
+
+    /// Regression: a source that already owns the destination's only excess card in a rarity
+    /// class used to suppress that class entirely, so no trade was ever offered for it.
+    #[test]
+    fn source_owning_the_excess_card_still_yields_a_trade() {
+        let Some(class_id) = star_one_class_id() else {
+            return;
+        };
+        let pool: Vec<&'static CardVersion> = CardVersion::ALL
+            .iter()
+            .filter(|c| c.is_tradable() && c.rarity().class().id() == class_id)
+            .collect();
+        if pool.len() < 5 {
+            return;
+        }
+        let give = pool[0];
+
+        let mut store = store_with_two_profiles();
+        // Dest holds 3 copies of `give` — its only excess card in this class.
+        store
+            .set_owned_count("Dest", CardVersionId(give.id()), 3)
+            .unwrap();
+        // Source holds other cards of the same class that Dest needs, and one copy of `give`.
+        for want in &pool[1..5] {
+            store
+                .set_owned_count("Source", CardVersionId(want.id()), 1)
+                .unwrap();
+        }
+        store
+            .set_owned_count("Source", CardVersionId(give.id()), 1)
+            .unwrap();
+
+        let cfg = FilterConfig {
+            goal: 1,
+            trade_excess_threshold: 2,
+            ..Default::default()
+        };
+        let inactive = vec!["Source".to_string()];
+        let recs = build_trades(
+            &store,
+            &AppSettings::default(),
+            &cfg,
+            today(),
+            &inactive,
+            None,
+        );
+
+        let rec = recs
+            .iter()
+            .find(|r| r.card_a.rarity().class().id() == class_id)
+            .expect("a trade should still be offered when the source already owns the give card");
+        assert_eq!(rec.card_a.id(), give.id());
+        assert!(
+            !rec.card_a_source_wants,
+            "the fallback pick must be flagged as one the source already has"
+        );
+    }
+
+    /// A card the source still needs outranks one it already has.
+    #[test]
+    fn card_a_prefers_a_card_the_source_still_wants() {
+        let Some(class_id) = star_one_class_id() else {
+            return;
+        };
+        let pool: Vec<&'static CardVersion> = CardVersion::ALL
+            .iter()
+            .filter(|c| c.is_tradable() && c.rarity().class().id() == class_id)
+            .collect();
+        if pool.len() < 6 {
+            return;
+        }
+        let owned_by_source = pool[0];
+        let wanted_by_source = pool[1];
+
+        let mut store = store_with_two_profiles();
+        store
+            .set_owned_count("Dest", CardVersionId(owned_by_source.id()), 5)
+            .unwrap();
+        store
+            .set_owned_count("Dest", CardVersionId(wanted_by_source.id()), 3)
+            .unwrap();
+        store
+            .set_owned_count("Source", CardVersionId(owned_by_source.id()), 1)
+            .unwrap();
+        for want in &pool[2..6] {
+            store
+                .set_owned_count("Source", CardVersionId(want.id()), 1)
+                .unwrap();
+        }
+
+        let cfg = FilterConfig {
+            goal: 1,
+            trade_excess_threshold: 2,
+            ..Default::default()
+        };
+        let inactive = vec!["Source".to_string()];
+        let recs = build_trades(
+            &store,
+            &AppSettings::default(),
+            &cfg,
+            today(),
+            &inactive,
+            None,
+        );
+
+        let rec = recs
+            .iter()
+            .find(|r| r.card_a.rarity().class().id() == class_id)
+            .expect("a trade should be offered");
+        assert_eq!(
+            rec.card_a.id(),
+            wanted_by_source.id(),
+            "a card the source still needs must outrank one it already has"
+        );
+        assert!(rec.card_a_source_wants);
+    }
+
+    /// Deterministic xorshift, so a failing case is reproducible without a dev-dependency.
+    fn xorshift(state: &mut u64) -> u64 {
+        let mut x = *state;
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        *state = x;
+        x
+    }
+
+    /// Independent oracle: does any valid (card_a, card_b) pair exist for this rarity class?
+    fn trade_pair_exists(
+        store: &ProfileStore<MemStorage>,
+        settings: &AppSettings,
+        cfg: &FilterConfig,
+        source: &str,
+        class_id: usize,
+    ) -> bool {
+        let goal = cfg.goal.max(1);
+        let threshold = cfg.trade_excess_threshold.max(goal);
+        let merge = settings.merge_duplicate_printings();
+        let any_version = cfg.any_version_owned;
+        let (mut has_a, mut has_b) = (false, false);
+
+        for cv in CardVersion::ALL {
+            if merge && !cv.is_original() && !cv.duplicates().is_empty() {
+                continue;
+            }
+            if !cv.is_tradable()
+                || !filter_card(cv, cfg, settings, today(), None, None)
+                || cv.rarity().class().id() != class_id
+            {
+                continue;
+            }
+            let dest = raw_dest_count(cv, store, merge, any_version);
+            let src = raw_source_count(cv, store, source, merge);
+            if dest < goal && src > 0 {
+                has_b = true;
+            }
+            if dest > threshold && max_card_pull_rate(CardVersionId(cv.id())) != Prob::ZERO {
+                has_a = true;
+            }
+        }
+        has_a && has_b
+    }
+
+    /// Whenever a rarity class has both a card to receive and a card to give, `build_trades`
+    /// must list a recommendation for it. This is the invariant the Card A fallback restores.
+    #[test]
+    fn every_class_with_an_available_pair_is_listed() {
+        let inactive = vec!["Source".to_string()];
+        let mut seed = 0x2026_0904_u64;
+
+        for goal in 1..=3u32 {
+            for threshold in 1..=4u32 {
+                for merge in [false, true] {
+                    for any_version in [false, true] {
+                        let mut settings = AppSettings::default();
+                        settings.set_merge_duplicate_printings(merge);
+                        let cfg = FilterConfig {
+                            goal,
+                            trade_excess_threshold: threshold,
+                            any_version_owned: any_version,
+                            ..Default::default()
+                        };
+
+                        let mut store = store_with_two_profiles();
+                        for _ in 0..250 {
+                            let idx = (xorshift(&mut seed) as usize) % CardVersion::ALL.len();
+                            let cv = &CardVersion::ALL[idx];
+                            let dest_n = (xorshift(&mut seed) % 6) as u32;
+                            let src_n = (xorshift(&mut seed) % 3) as u32;
+                            if dest_n > 0 {
+                                store
+                                    .set_owned_count("Dest", CardVersionId(cv.id()), dest_n)
+                                    .unwrap();
+                            }
+                            if src_n > 0 {
+                                store
+                                    .set_owned_count("Source", CardVersionId(cv.id()), src_n)
+                                    .unwrap();
+                            }
+                        }
+
+                        let recs = build_trades(&store, &settings, &cfg, today(), &inactive, None);
+                        for class_id in 0..RarityClass::ALL.len() {
+                            let expected =
+                                trade_pair_exists(&store, &settings, &cfg, "Source", class_id);
+                            let listed = recs
+                                .iter()
+                                .any(|r| r.card_a.rarity().class().id() == class_id);
+                            assert_eq!(
+                                expected, listed,
+                                "goal={goal} keep={threshold} merge={merge} \
+                                 any_version={any_version} class={class_id}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// The 1-star (Star, one symbol) class the reported bug was found in.
+    fn star_one_class_id() -> Option<usize> {
+        RarityClass::ALL
+            .iter()
+            .find(|c| c.group().name().as_str() == "Star" && c.count() == 1)
+            .map(|c| c.id())
+    }
 
     #[test]
     fn build_candidates_no_excess_returns_empty() {
