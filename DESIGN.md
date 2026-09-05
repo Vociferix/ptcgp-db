@@ -834,6 +834,13 @@ the single-profile case, a prompt to create an additional profile; in the all-ac
 to deselect at least one profile to use it as a source. The Trade Candidates section is always
 shown regardless.
 
+When more than one inactive profile exists, a **Sources** selector narrows the recommendations to
+specific source profiles; selecting none means "all inactive profiles". The selection tracks the
+profile list rather than going stale: renaming a selected profile carries the selection over, and
+a profile that is deleted or activated is dropped from it. A selection that empties this way
+reverts to "all inactive profiles" — it must never leave the page filtering on names that no
+longer match, which would show "no recommendations" while blaming the filters.
+
 ### Collection Goal
 
 The page exposes the same filter toolbar and goal number input (T) as the Summary page,

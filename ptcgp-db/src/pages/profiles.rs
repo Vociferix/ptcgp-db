@@ -3,7 +3,7 @@ use ptcgp_db_core::{
     ProfileData, ProfileStore, ProfilesSaveData, migrate_profiles, storage::Storage as _,
 };
 
-use crate::app::{AppStorage, schedule_save};
+use crate::app::{AppStorage, TradePageState, schedule_save};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -49,7 +49,7 @@ fn do_rename(
     match store
         .write()
         .as_mut()
-        .map(|s| s.rename_profile(&old_name, new_name))
+        .map(|s| s.rename_profile(&old_name, new_name.clone()))
     {
         Some(Ok(())) => editing.set(None),
         Some(Err(e)) => {
@@ -58,6 +58,18 @@ fn do_rename(
         }
         None => return,
     }
+
+    // The Trade page stores its selected source profiles by name, so carry the rename over
+    // instead of leaving a stale entry that would silently stop matching.
+    if let Some(mut trade_state) = try_consume_context::<Signal<TradePageState>>() {
+        let mut state = trade_state.write();
+        for selected in state.source_profiles.iter_mut() {
+            if *selected == old_name {
+                selected.clone_from(&new_name);
+            }
+        }
+    }
+
     schedule_save();
 }
 
