@@ -403,6 +403,11 @@ pub(super) fn TradeRow(
                     p { class: "text-xs font-semibold text-red-700 dark:text-red-400 mb-2",
                         "You give"
                     }
+                    if !rec.card_a_source_wants {
+                        span { class: "inline-flex items-center mb-2 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200",
+                            "{rec.source_name} already has this"
+                        }
+                    }
                     TradeCardHalf {
                         cv_id: rec.card_a.id(),
                         you_label: dest_name.clone(),
