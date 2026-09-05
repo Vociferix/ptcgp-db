@@ -87,6 +87,13 @@ fn empty_state_sources(single_profile: bool) -> Element {
 // Source profile dropdown
 // ---------------------------------------------------------------------------
 
+/// Whether `name` can currently act as a trade source: a profile that still exists and is not
+/// active. Active profiles are the destination, so they are never sources.
+fn is_selectable_source(store: &ProfileStore<AppStorage>, name: &str) -> bool {
+    store.profiles().iter().any(|p| p.name == name)
+        && !store.active_profile_names().iter().any(|n| n == name)
+}
+
 /// Multi-select dropdown for choosing which inactive profiles act as sources.
 ///
 /// An empty selection means "all inactive profiles". Selecting specific profiles
@@ -106,10 +113,7 @@ fn SourceProfileDropdown(selected: Signal<Vec<String>>) -> Element {
     let profiles = s.profiles();
 
     let sel = selected.read();
-    let count = sel
-        .iter()
-        .filter(|n| profiles.iter().any(|p| &p.name == *n) && !active_names.contains(*n))
-        .count();
+    let count = sel.iter().filter(|n| is_selectable_source(s, n)).count();
     drop(sel);
 
     let open_now = *open.read();
@@ -348,11 +352,32 @@ pub fn TradePage() -> Element {
         _ => Tab::Shares,
     });
     let max_points: Signal<Option<u32>> = use_signal(|| init.max_pack_points);
-    let source_profiles: Signal<Vec<String>> = use_signal(|| init.source_profiles.clone());
+    let mut source_profiles: Signal<Vec<String>> = use_signal(|| init.source_profiles.clone());
     let completed_transfers: Signal<Vec<CompletedTransfer>> =
         use_signal(|| init.completed_transfers.clone());
     let next_id: Signal<u64> = use_signal(|| init.next_transfer_id);
     drop(init);
+
+    // Drop selected sources that are no longer selectable — deleted profiles, and profiles the
+    // user has since activated (an active profile is a destination, not a source). Without this
+    // the stale names would keep filtering, and a selection that goes entirely stale would
+    // silently yield no recommendations at all. Pruning to empty restores "all inactive
+    // profiles". Renames are handled at the rename site so the selection follows the new name.
+    use_effect(move || {
+        let guard = store.read();
+        let Some(s) = guard.as_ref() else {
+            return;
+        };
+        if source_profiles
+            .read()
+            .iter()
+            .any(|n| !is_selectable_source(s, n))
+        {
+            source_profiles
+                .write()
+                .retain(|n| is_selectable_source(s, n));
+        }
+    });
 
     let mut shares_limit = use_signal(|| 10usize);
     let mut trades_limit = use_signal(|| 10usize);
