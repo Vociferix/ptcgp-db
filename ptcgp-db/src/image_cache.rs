@@ -120,10 +120,16 @@ pub struct ImageCache {
 
 impl ImageCache {
     /// Creates the handle. Call once, from `use_context_provider`.
+    ///
+    /// Both signals are owned by [`ScopeId::ROOT`] rather than the calling component. The
+    /// background store task runs in the root scope so it survives the image unmounting, and a
+    /// signal owned by a deeper scope cannot legally be written from there — the root scope is
+    /// an ancestor of the owner, not a descendant. Owning them at the root also makes the
+    /// lifetime genuinely correct: the root outlives every scope that touches them.
     pub fn new() -> Self {
         Self {
-            ready: Signal::new(false),
-            inner: Signal::new(CacheInner::default()),
+            ready: Signal::new_in_scope(false, ScopeId::ROOT),
+            inner: Signal::new_in_scope(CacheInner::default(), ScopeId::ROOT),
         }
     }
 
