@@ -66,10 +66,45 @@ struct CacheInner {
     resolved: HashMap<String, String>,
     /// Insertion order of `resolved`, for oldest-first eviction.
     order: VecDeque<String>,
-    /// URLs with an in-flight read or store, so duplicate work is not started.
-    pending: HashSet<String>,
     /// Whether the one-time startup scan has been claimed.
     scanning: bool,
+}
+
+impl CacheInner {
+    /// Records an object URL for `url` and returns the one that should be displayed.
+    ///
+    /// Each mounted image reads its own bytes back, so a second object URL can arrive for a URL
+    /// that already has one. The duplicate is released and the established URL returned —
+    /// returning the released one would leave the caller displaying a revoked blob, which never
+    /// loads.
+    fn insert_resolved(&mut self, url: &str, object_url: String) -> String {
+        if let Some(existing) = self.resolved.get(url) {
+            revoke(&object_url);
+            return existing.clone();
+        }
+        self.resolved.insert(url.to_string(), object_url.clone());
+        self.order.push_back(url.to_string());
+        while self.order.len() > MAX_RESOLVED {
+            let Some(oldest) = self.order.pop_front() else {
+                break;
+            };
+            if let Some(stale) = self.resolved.remove(&oldest) {
+                revoke(&stale);
+            }
+        }
+        object_url
+    }
+
+    /// Releases every object URL and drops all session state.
+    fn clear(&mut self) {
+        for (_, object_url) in self.resolved.drain() {
+            revoke(&object_url);
+        }
+        self.order.clear();
+        self.known.clear();
+        // Cleared so re-enabling the setting scans again rather than staying inert.
+        self.scanning = false;
+    }
 }
 
 /// App-wide handle to the image cache.
@@ -128,21 +163,6 @@ impl ImageCache {
         self.inner.peek().known.contains(url)
     }
 
-    /// Whether a read or store for `url` is already in flight.
-    pub fn is_pending(&self, url: &str) -> bool {
-        self.inner.peek().pending.contains(url)
-    }
-
-    /// Claims `url` for work. Returns `false` when another task already holds it.
-    pub fn claim(&mut self, url: &str) -> bool {
-        self.inner.write().pending.insert(url.to_string())
-    }
-
-    /// Releases a claim taken by [`claim`](Self::claim).
-    pub fn release(&mut self, url: &str) {
-        self.inner.write().pending.remove(url);
-    }
-
     /// Notes that `url` is now stored in Cache Storage.
     pub fn mark_known(&mut self, url: &str) {
         self.inner.write().known.insert(url.to_string());
@@ -154,39 +174,18 @@ impl ImageCache {
     }
 
     /// Stores an object URL for `url`, evicting the oldest entries past [`MAX_RESOLVED`].
-    pub fn insert_resolved(&mut self, url: &str, object_url: String) {
-        let mut inner = self.inner.write();
-        if inner.resolved.contains_key(url) {
-            // Another task won the race; drop this duplicate rather than leaking it.
-            revoke(&object_url);
-            return;
-        }
-        inner.resolved.insert(url.to_string(), object_url);
-        inner.order.push_back(url.to_string());
-        while inner.order.len() > MAX_RESOLVED {
-            let Some(oldest) = inner.order.pop_front() else {
-                break;
-            };
-            if let Some(stale) = inner.resolved.remove(&oldest) {
-                revoke(&stale);
-            }
-        }
+    ///
+    /// Returns the object URL to display, which is not necessarily the one passed in — see
+    /// [`CacheInner::insert_resolved`].
+    pub fn insert_resolved(&mut self, url: &str, object_url: String) -> String {
+        self.inner.write().insert_resolved(url, object_url)
     }
 
     /// Drops all session state and releases every object URL.
     ///
     /// Does not touch Cache Storage — see [`delete_all`] for that.
     pub fn reset(&mut self) {
-        let mut inner = self.inner.write();
-        for (_, object_url) in inner.resolved.drain() {
-            revoke(&object_url);
-        }
-        inner.order.clear();
-        inner.known.clear();
-        inner.pending.clear();
-        // Cleared so re-enabling the setting scans again rather than staying inert.
-        inner.scanning = false;
-        drop(inner);
+        self.inner.write().clear();
         self.ready.set(false);
     }
 }
@@ -388,6 +387,67 @@ mod tests {
             "expected a version tag like v0.11.0, got {version:?}"
         );
         assert!(!version.contains('/'), "version must be a single segment");
+    }
+
+    /// Regression: a second object URL arriving for an already-resolved image must not be handed
+    /// back to the caller. The duplicate is released, so displaying it left the image
+    /// permanently blank.
+    #[test]
+    fn duplicate_resolve_returns_the_established_url() {
+        let mut inner = CacheInner::default();
+        let first = inner.insert_resolved("https://cdn/a.png", "blob:first".to_string());
+        let second = inner.insert_resolved("https://cdn/a.png", "blob:second".to_string());
+
+        assert_eq!(first, "blob:first");
+        assert_eq!(
+            second, "blob:first",
+            "the duplicate is revoked, so the established URL must be returned instead"
+        );
+        assert_eq!(inner.resolved.len(), 1);
+    }
+
+    #[test]
+    fn resolve_returns_the_url_it_stored() {
+        let mut inner = CacheInner::default();
+        let returned = inner.insert_resolved("https://cdn/a.png", "blob:a".to_string());
+        assert_eq!(returned, "blob:a");
+        assert_eq!(
+            inner.resolved.get("https://cdn/a.png").map(String::as_str),
+            Some("blob:a")
+        );
+    }
+
+    #[test]
+    fn oldest_resolved_entries_are_evicted_past_the_cap() {
+        let mut inner = CacheInner::default();
+        for i in 0..MAX_RESOLVED + 10 {
+            inner.insert_resolved(&format!("https://cdn/{i}.png"), format!("blob:{i}"));
+        }
+        assert_eq!(inner.resolved.len(), MAX_RESOLVED);
+        assert!(
+            !inner.resolved.contains_key("https://cdn/0.png"),
+            "the oldest entry should have been evicted"
+        );
+        let newest = format!("https://cdn/{}.png", MAX_RESOLVED + 9);
+        assert!(inner.resolved.contains_key(&newest));
+    }
+
+    #[test]
+    fn clear_drops_every_entry_and_lets_a_later_scan_run() {
+        let mut inner = CacheInner::default();
+        inner.insert_resolved("https://cdn/a.png", "blob:a".to_string());
+        inner.known.insert("https://cdn/a.png".to_string());
+        inner.scanning = true;
+
+        inner.clear();
+
+        assert!(inner.resolved.is_empty());
+        assert!(inner.order.is_empty());
+        assert!(inner.known.is_empty());
+        assert!(
+            !inner.scanning,
+            "re-enabling the setting must be able to scan again"
+        );
     }
 
     #[test]

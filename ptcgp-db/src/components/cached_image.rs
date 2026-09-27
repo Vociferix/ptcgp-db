@@ -1,5 +1,6 @@
 //! The app's image element. Serves from the local image cache when that setting is on.
 
+use dioxus::core::spawn_forever;
 use dioxus::prelude::*;
 use ptcgp_db_core::AppSettings;
 
@@ -74,20 +75,18 @@ pub fn CachedImage(
             source.set(Source::Local(object_url));
             return;
         }
-        if cache.is_pending(&url) || !cache.claim(&url) {
-            return;
-        }
 
-        let known = cache.is_known(&url);
-        if known {
+        if cache.is_known(&url) {
             source.set(Source::Reading);
-        }
-        spawn(async move {
-            if known {
+            // Scope-bound: if this image goes away mid-read the result has nobody to go to, and
+            // the next mount simply reads again. Deliberately not shared with other components
+            // displaying the same URL — waiting on someone else's task leaves this one stuck on
+            // the placeholder if that task is cancelled, which unmounting does.
+            spawn(async move {
                 match image_cache::object_url(&url).await {
                     Some(object_url) => {
-                        cache.insert_resolved(&url, object_url.clone());
-                        source.set(Source::Local(object_url));
+                        let display = cache.insert_resolved(&url, object_url);
+                        source.set(Source::Local(display));
                     }
                     None => {
                         // Entry vanished (quota reclaim, manual clear); fall back to the network.
@@ -95,13 +94,16 @@ pub fn CachedImage(
                         source.set(Source::Remote);
                     }
                 }
-            } else if image_cache::store(&url).await {
-                // Stored for next time. The element keeps its CDN URL for this render rather
-                // than swapping to a blob, so nothing already painted is disturbed.
-                cache.mark_known(&url);
-            }
-            cache.release(&url);
-        });
+            });
+        } else {
+            // Root-scoped so scrolling past an image still finishes storing it. Touches only
+            // cache state, never this component's signals, so outliving the component is safe.
+            spawn_forever(async move {
+                if image_cache::store(&url).await {
+                    cache.mark_known(&url);
+                }
+            });
+        }
     });
 
     let loading = loading.unwrap_or("eager");
@@ -129,6 +131,10 @@ pub fn CachedImage(
                 alt: "{alt}",
                 class: "{class}",
                 loading: "{loading}",
+                // Last line of defence: an object URL can go stale (evicted from the in-memory
+                // cap while still displayed, or revoked as the setting is turned off). Falling
+                // back to the CDN guarantees an image never stays blank.
+                onerror: move |_| source.set(Source::Remote),
             }
         },
     }
