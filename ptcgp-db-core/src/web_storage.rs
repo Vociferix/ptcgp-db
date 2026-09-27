@@ -162,6 +162,7 @@ mod tests {
             ignore_premium_mission: false,
             ignore_gold_shop: false,
             merge_duplicate_printings: false,
+            cache_images: false,
         }
     }
 
