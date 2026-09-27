@@ -506,6 +506,15 @@ quota-backed rather than LRU-evicted, and requests persistent storage so the bro
 reclaim it. This is **web only** — the desktop build hides the setting and its code compiles to
 no-ops, since complicating both platforms is not worth it for a build that is not used.
 
+**Persistent storage may be refused.** Firefox prompts for it; Chrome decides silently from
+engagement heuristics. A refusal must **not** disable the setting or be treated as an error: the
+cache still works, it is merely best-effort, and the browser may reclaim it when disk space runs
+low — at which point images are simply downloaded again. Auto-disabling would discard a feature
+that mostly works, and on browsers that never prompt it would switch the setting off for reasons
+the user never saw. The Settings page instead states that images are cached but evictable, so the
+toggle never claims more than it has. Persistence is re-checked before being requested, so an
+origin that already granted it is never prompted again.
+
 **Behavior**
 
 - Default **off**. While off, images load straight from the CDN and no cache is touched.

@@ -115,6 +115,7 @@ impl CacheInner {
 #[derive(Clone, Copy)]
 pub struct ImageCache {
     ready: Signal<bool>,
+    persistent: Signal<bool>,
     inner: Signal<CacheInner>,
 }
 
@@ -129,8 +130,23 @@ impl ImageCache {
     pub fn new() -> Self {
         Self {
             ready: Signal::new_in_scope(false, ScopeId::ROOT),
+            persistent: Signal::new_in_scope(false, ScopeId::ROOT),
             inner: Signal::new_in_scope(CacheInner::default(), ScopeId::ROOT),
         }
+    }
+
+    /// Whether the browser granted persistent storage, so cached images are protected from
+    /// being reclaimed. Reading this subscribes the caller.
+    ///
+    /// `false` does **not** mean caching is broken: the cache still works, it is just
+    /// best-effort and the browser may clear it when disk space runs low.
+    pub fn is_persistent(&self) -> bool {
+        *self.persistent.read()
+    }
+
+    /// Records whether persistent storage was granted.
+    pub fn set_persistent(&mut self, granted: bool) {
+        self.persistent.set(granted);
     }
 
     /// Whether the cached-URL set has loaded. Reading this subscribes the caller.
@@ -193,6 +209,7 @@ impl ImageCache {
     pub fn reset(&mut self) {
         self.inner.write().clear();
         self.ready.set(false);
+        self.persistent.set(false);
     }
 }
 
@@ -325,14 +342,26 @@ mod platform {
     ///
     /// Chrome decides from engagement heuristics without prompting; Firefox prompts. A denial
     /// is not an error — the cache still works, it is just evictable.
-    pub async fn request_persistence() {
+    pub async fn ensure_persistence() -> bool {
         let Some(window) = web_sys::window() else {
-            return;
+            return false;
         };
-        let Ok(promise) = window.navigator().storage().persist() else {
-            return;
+        let storage = window.navigator().storage();
+
+        // Check first so an already-granted origin is never prompted again.
+        if let Ok(promise) = storage.persisted()
+            && let Ok(granted) = JsFuture::from(promise).await
+            && granted.is_truthy()
+        {
+            return true;
+        }
+
+        let Ok(promise) = storage.persist() else {
+            return false;
         };
-        let _ = JsFuture::from(promise).await;
+        JsFuture::from(promise)
+            .await
+            .is_ok_and(|granted| granted.is_truthy())
     }
 
     /// Releases an object URL so its blob can be freed.
@@ -370,15 +399,17 @@ mod platform {
     /// No-op: there is no cache to delete.
     pub async fn delete_all() {}
 
-    /// No-op: storage persistence is a browser concept.
-    pub async fn request_persistence() {}
+    /// No-op: storage persistence is a browser concept. Reports "not persistent".
+    pub async fn ensure_persistence() -> bool {
+        false
+    }
 
     /// No-op: there are no object URLs to release.
     pub fn revoke(_object_url: &str) {}
 }
 
 pub use platform::{
-    cached_urls, delete_all, object_url, prune_stale, request_persistence, revoke, store,
+    cached_urls, delete_all, ensure_persistence, object_url, prune_stale, revoke, store,
 };
 
 #[cfg(test)]

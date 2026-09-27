@@ -512,7 +512,10 @@ pub fn App() -> Element {
         }
         spawn(async move {
             crate::image_cache::prune_stale().await;
-            crate::image_cache::request_persistence().await;
+            // A denial is not a failure: the cache still works, it is just evictable. The
+            // Settings page says so rather than the setting silently claiming more than it has.
+            let persistent = crate::image_cache::ensure_persistence().await;
+            cache.set_persistent(persistent);
             let known = crate::image_cache::cached_urls().await;
             cache.set_known(known);
         });

@@ -106,6 +106,9 @@ pub fn SettingsPage() -> Element {
     let images_section = {
         let image_cache = use_context::<crate::image_cache::ImageCache>();
         let cache_images = settings.read().cache_images();
+        // A denied persistent-storage request still leaves a working cache, so the setting stays
+        // on; say plainly that the browser may reclaim it rather than implying it is broken.
+        let evictable = cache_images && image_cache.ready() && !image_cache.is_persistent();
         rsx! {
             section {
                 h2 { class: "text-xs font-semibold uppercase tracking-wider \
@@ -120,6 +123,13 @@ pub fn SettingsPage() -> Element {
                         description: "Keep downloaded card and set images in browser storage so they load instantly on later visits. Images are kept until you turn this off, which deletes them.",
                         checked: cache_images,
                         on_change: move |v| set_image_caching(v, settings, store, image_cache),
+                    }
+                    if evictable {
+                        div { class: "py-3",
+                            p { class: "text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded p-2",
+                                "Your browser declined persistent storage, so images are still cached but may be cleared when disk space runs low. Anything cleared is simply downloaded again. To keep them permanently, allow persistent storage for this site in your browser settings."
+                            }
+                        }
                     }
                 }
             }
