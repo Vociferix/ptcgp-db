@@ -6,6 +6,7 @@ use dioxus::prelude::*;
 use ptcgp_db_core::save_data::FilterConfig;
 
 use super::seg_btn_cls;
+use crate::components::CachedImage;
 
 // ---------------------------------------------------------------------------
 // Rarity — segmented icon button group (multi-select)
@@ -62,7 +63,7 @@ fn RarityBtn(rarity: &'static RarityClass, active: bool, config: Signal<FilterCo
                     cfg.rarities.push(id);
                 }
             },
-            img {
+            CachedImage {
                 src: "{rarity.icon()}",
                 alt: "{rarity.group().name()} {rarity.count()}",
                 class: "h-5 w-auto",
@@ -130,7 +131,7 @@ fn ElementBtn(
                     cfg.elements.push(id);
                 }
             },
-            img {
+            CachedImage {
                 src: "{element.icon()}",
                 alt: "{element.name()}",
                 class: "h-5 w-5",

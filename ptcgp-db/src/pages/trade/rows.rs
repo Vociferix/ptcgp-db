@@ -6,6 +6,7 @@ use ptcgp_db_core::{CandidateRec, ProfileStore, PurchaseRec, ShareRec, TradeRec}
 use ptcgp_db_data::{CardVersion, Prob};
 
 use crate::app::{AppStorage, CardDetailOrigin, CompletedTransfer, schedule_save};
+use crate::components::CachedImage;
 use crate::routes::Route;
 
 use super::COST_PILL_CLS;
@@ -33,7 +34,7 @@ pub(super) fn CardPanel(cv_id: usize) -> Element {
     let card_image = cv.image();
     rsx! {
         div { class: "flex items-center gap-3 min-w-0",
-            img {
+            CachedImage {
                 src: "{card_image}",
                 alt: "{card_name}",
                 class: "w-14 h-20 object-cover rounded flex-shrink-0",
@@ -46,12 +47,12 @@ pub(super) fn CardPanel(cv_id: usize) -> Element {
                     "{set_code} {number:03}"
                 }
                 div { class: "flex items-center gap-1.5 mt-1",
-                    img {
+                    CachedImage {
                         src: "{set_icon}",
                         alt: "",
                         class: "h-5 w-auto max-w-14 object-contain flex-shrink-0",
                     }
-                    img {
+                    CachedImage {
                         src: "{rarity_icon}",
                         alt: "",
                         class: "h-5 w-auto object-contain flex-shrink-0",
@@ -91,7 +92,7 @@ pub(super) fn TradeCardHalf(
     let card_image = cv.image();
     rsx! {
         div { class: "flex gap-2",
-            img {
+            CachedImage {
                 src: "{card_image}",
                 alt: "{card_name}",
                 class: "w-14 h-20 object-cover rounded flex-shrink-0",
@@ -102,12 +103,12 @@ pub(super) fn TradeCardHalf(
                 }
                 p { class: "text-xs text-gray-500 dark:text-gray-400", "{set_code} {number:03}" }
                 div { class: "flex items-center gap-1",
-                    img {
+                    CachedImage {
                         src: "{set_icon}",
                         alt: "",
                         class: "h-5 w-auto max-w-14 object-contain flex-shrink-0",
                     }
-                    img {
+                    CachedImage {
                         src: "{rarity_icon}",
                         alt: "",
                         class: "h-5 w-auto object-contain flex-shrink-0",
@@ -346,7 +347,7 @@ pub(super) fn TradeRow(
                     span { class: "text-xs font-medium text-gray-800 dark:text-gray-200",
                         "{dest_name}"
                     }
-                    img {
+                    CachedImage {
                         src: "{rarity_icon}",
                         alt: "",
                         class: "h-5 w-auto object-contain flex-shrink-0 ml-1",

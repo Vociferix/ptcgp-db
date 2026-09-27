@@ -98,6 +98,21 @@ impl AppSettings {
     pub fn set_merge_duplicate_printings(&mut self, value: bool) {
         self.data.merge_duplicate_printings = value;
     }
+
+    /// When `true`, images are cached locally and served from that cache when available.
+    ///
+    /// Web only — other platforms ignore it. See DESIGN.md §Image Caching.
+    pub fn cache_images(&self) -> bool {
+        self.data.cache_images
+    }
+
+    /// Sets the `cache_images` preference.
+    ///
+    /// Turning this off is expected to delete the cache; the caller is responsible for that,
+    /// since the cache lives in browser storage the core crate cannot reach.
+    pub fn set_cache_images(&mut self, value: bool) {
+        self.data.cache_images = value;
+    }
 }
 
 impl Default for AppSettings {
@@ -110,6 +125,7 @@ impl Default for AppSettings {
                 ignore_premium_mission: false,
                 ignore_gold_shop: false,
                 merge_duplicate_printings: false,
+                cache_images: false,
             },
         }
     }
@@ -127,6 +143,25 @@ mod tests {
         assert!(!s.ignore_premium_mission());
         assert!(!s.ignore_gold_shop());
         assert!(!s.merge_duplicate_printings());
+        assert!(!s.cache_images());
+    }
+
+    /// Settings written before `cache_images` existed must still load, defaulting it off.
+    #[test]
+    fn settings_without_cache_images_field_deserialize() {
+        let json = r#"{
+            "format_version": 1,
+            "theme": "System",
+            "ignore_unobtainable_sets": true,
+            "ignore_premium_mission": false,
+            "ignore_gold_shop": false,
+            "merge_duplicate_printings": true
+        }"#;
+        let data: AppSettingsSaveData =
+            serde_json::from_str(json).expect("legacy settings must deserialize");
+        assert!(!data.cache_images);
+        assert!(data.ignore_unobtainable_sets);
+        assert!(data.merge_duplicate_printings);
     }
 
     #[test]

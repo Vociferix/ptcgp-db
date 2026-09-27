@@ -54,6 +54,27 @@ fn SettingToggle(
     }
 }
 
+/// Applies the image-caching setting, deleting the cache when it is turned off.
+///
+/// Extracted from the toggle's handler because `dx fmt` mangles multi-line closures used as
+/// RSX props.
+#[cfg(target_arch = "wasm32")]
+fn set_image_caching(
+    enabled: bool,
+    mut settings: Signal<AppSettings>,
+    store: Signal<Option<ProfileStore<AppStorage>>>,
+    mut image_cache: crate::image_cache::ImageCache,
+) {
+    settings.write().set_cache_images(enabled);
+    persist_settings(settings, store);
+    if !enabled {
+        // Release the object URLs first so nothing keeps displaying a revoked blob, then drop
+        // the stored bytes. Re-enabling rescans from scratch.
+        image_cache.reset();
+        spawn(async move { crate::image_cache::delete_all().await });
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Settings page
 // ---------------------------------------------------------------------------
@@ -79,6 +100,33 @@ pub fn SettingsPage() -> Element {
     };
     #[cfg(not(target_arch = "wasm32"))]
     let drive_section = rsx! {};
+
+    // Web only: the cache lives in browser storage, so there is nothing to offer elsewhere.
+    #[cfg(target_arch = "wasm32")]
+    let images_section = {
+        let image_cache = use_context::<crate::image_cache::ImageCache>();
+        let cache_images = settings.read().cache_images();
+        rsx! {
+            section {
+                h2 { class: "text-xs font-semibold uppercase tracking-wider \
+                              text-gray-500 dark:text-gray-400 mb-3",
+                    "Images"
+                }
+                div { class: "bg-white dark:bg-gray-800 rounded-lg border \
+                              border-gray-200/80 dark:border-gray-700/80 px-4 \
+                              divide-y divide-gray-100 dark:divide-gray-700 shadow-md dark:shadow-[0_4px_20px_rgba(0,0,0,0.55)] dark:ring-1 dark:ring-white/[0.06]",
+                    SettingToggle {
+                        label: "Cache images locally",
+                        description: "Keep downloaded card and set images in browser storage so they load instantly on later visits. Images are kept until you turn this off, which deletes them.",
+                        checked: cache_images,
+                        on_change: move |v| set_image_caching(v, settings, store, image_cache),
+                    }
+                }
+            }
+        }
+    };
+    #[cfg(not(target_arch = "wasm32"))]
+    let images_section = rsx! {};
 
     rsx! {
         div { class: "max-w-2xl mx-auto p-6 space-y-6",
@@ -144,6 +192,8 @@ pub fn SettingsPage() -> Element {
                     }
                 }
             }
+
+            {images_section}
 
             // ── Filters ────────────────────────────────────────────────────
             section {

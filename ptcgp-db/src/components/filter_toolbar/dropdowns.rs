@@ -1,3 +1,4 @@
+use crate::components::CachedImage;
 use crate::components::icons::{ChevronDown, ChevronUp};
 use crate::components::toggle::ToggleCheckbox;
 use dioxus::prelude::*;
@@ -66,7 +67,7 @@ pub fn SetDropdown(config: Signal<FilterConfig>) -> Element {
                 if let Some(src) = single_icon {
                     // w-9 (36px) keeps the icon legible while staying within the 21px
                     // headroom at the @lg breakpoint (measured row content 491px vs 512px).
-                    img {
+                    CachedImage {
                         src: "{src}",
                         class: "h-5 w-9 object-contain shrink-0",
                         alt: "Set",
@@ -134,12 +135,12 @@ fn SetItem(
 
     rsx! {
         div { class: "{row_cls}", onclick: on_select,
-            img {
+            CachedImage {
                 src: "{set.icon()}",
                 alt: "{set.code()}",
                 class: "h-5 w-auto max-w-14 object-contain shrink-0",
             }
-            img {
+            CachedImage {
                 src: "{set.logo()}",
                 alt: "{set.name()}",
                 class: "h-10 w-auto max-w-32 object-contain",
@@ -236,7 +237,7 @@ fn PackGroup(
         if let Some(set) = Set::from_id(set_id) {
             div { class: "flex items-center px-3 py-1 \
                           bg-gray-50 dark:bg-gray-800/60",
-                img {
+                CachedImage {
                     src: "{set.icon()}",
                     alt: "{set.code()}",
                     class: "h-6 w-auto max-w-14 object-contain",
@@ -281,7 +282,7 @@ fn PackItem(
 
     rsx! {
         div { class: "{row_cls}", onclick: on_select,
-            img {
+            CachedImage {
                 src: "{pack.logo()}",
                 alt: "{pack.title()}",
                 // Generous height — pack logos need more room than set logos.
@@ -370,7 +371,7 @@ fn SourceItem(
 
     rsx! {
         div { class: "{row_cls}", onclick: on_select,
-            img {
+            CachedImage {
                 src: "{source.icon()}",
                 alt: "{source.name()}",
                 class: "h-7 w-7 object-contain shrink-0",

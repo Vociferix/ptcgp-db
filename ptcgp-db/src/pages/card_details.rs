@@ -9,6 +9,7 @@ use ptcgp_db_core::{AppSettings, CARD_PULL_RATES, ProfileStore};
 use ptcgp_db_data::CardVersion;
 
 use crate::app::{AppStorage, CardDetailOrigin, set_card_count};
+use crate::components::CachedImage;
 use crate::components::count_spinner::CountSpinner;
 use crate::components::effect_text::EffectText;
 use crate::components::icons::ArrowLeft;
@@ -104,7 +105,7 @@ fn PackPullBlock(pack_id: usize, overall_pct: f64, cv_id: usize) -> Element {
     rsx! {
         div { class: "flex flex-col gap-1.5",
             div { class: "flex items-center gap-3 rounded px-1 hover:bg-gray-100 dark:hover:bg-gray-700/50",
-                img {
+                CachedImage {
                     src: "{logo}",
                     alt: "",
                     class: "h-12 w-24 object-contain flex-shrink-0",
@@ -156,14 +157,14 @@ fn AttackRow(attack_id: usize) -> Element {
             div { class: "flex items-center gap-2",
                 div { class: "flex items-center gap-1 shrink-0",
                     if cost.is_empty() {
-                        img {
+                        CachedImage {
                             src: "{ptcgp_db_data::Element::NO_COST}",
                             alt: "",
                             class: "h-5 w-5 object-contain",
                         }
                     } else {
                         for elem in cost.iter() {
-                            img {
+                            CachedImage {
                                 src: "{elem.icon()}",
                                 alt: "",
                                 class: "h-5 w-5 object-contain",
@@ -233,7 +234,7 @@ fn VersionCard(cv_id: usize, current_id: usize, on_click: EventHandler<usize>) -
             r#type: "button",
             class: "flex flex-col items-center gap-1 cursor-pointer",
             onclick: move |_| on_click.call(cv_id),
-            img {
+            CachedImage {
                 src: "{card_image}",
                 alt: "",
                 class: "w-14 h-20 object-cover rounded {ring_cls}",
@@ -307,11 +308,14 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
     rsx! {
         div { class: "flex flex-col h-full overflow-y-auto",
             div { class: "flex justify-center p-4 bg-gray-50 dark:bg-gray-800/50 shrink-0",
-                img {
-                    src: "{card_image}",
-                    alt: "{name}",
-                    class: "h-64 w-auto object-contain rounded shadow-md cursor-zoom-in",
+                div {
+                    class: "cursor-zoom-in",
                     onclick: move |_| lightbox_open.set(true),
+                    CachedImage {
+                        src: "{card_image}",
+                        alt: "{name}",
+                        class: "h-64 w-auto object-contain rounded shadow-md",
+                    }
                 }
             }
 
@@ -350,7 +354,7 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
                         on_change: move |n| set_card_count(cv_id, n, store),
                     }
                     div { class: "flex items-center gap-2 ml-auto",
-                        img {
+                        CachedImage {
                             src: "{rarity_icon}",
                             alt: "",
                             class: "h-6 w-auto object-contain",
@@ -425,7 +429,7 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
                         }
 
                         div { class: "flex items-center gap-2",
-                            img {
+                            CachedImage {
                                 src: "{p.element().icon()}",
                                 alt: "",
                                 class: "h-5 w-5 object-contain",
@@ -450,7 +454,7 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
                                         .find(|e| e.code() == Some('C'))
                                     {
                                         for _ in 0..p.retreat_cost() {
-                                            img {
+                                            CachedImage {
                                                 src: "{colorless.icon()}",
                                                 alt: "",
                                                 class: "h-5 w-5 object-contain",
@@ -467,7 +471,7 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
                                     "Weakness"
                                 }
                                 div { class: "flex items-center gap-1",
-                                    img {
+                                    CachedImage {
                                         src: "{w.icon()}",
                                         alt: "",
                                         class: "h-5 w-5 object-contain",
@@ -613,7 +617,7 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
                     }
                 },
                 onclick: move |_| lightbox_open.set(false),
-                img {
+                CachedImage {
                     src: "{card_image}",
                     alt: "{name}",
                     class: "max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] object-contain rounded shadow-2xl",

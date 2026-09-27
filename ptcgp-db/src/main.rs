@@ -2,6 +2,10 @@ mod app;
 mod components;
 #[cfg(target_arch = "wasm32")]
 mod drive;
+// Off the web the platform layer is a set of no-ops and nothing calls the cache-management
+// entry points, so most of this module is deliberately unused there.
+#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code, unused_imports))]
+mod image_cache;
 mod pages;
 mod routes;
 

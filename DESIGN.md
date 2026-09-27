@@ -110,8 +110,11 @@ Git submodule at `ptcgp-db-data/ptcgp-images`. Contains all image assets. Key di
 | `elements/icons/no_cost.png` | Special icon for 0-energy attack cost |
 | `card_sources/` | Icons for non-Pack card acquisition methods |
 
-All images must be referenced using Dioxus's `asset!()` macro, never by raw string paths. The
-`asset!()` macro ensures correct path resolution and bundling across all platforms.
+Images are **not** bundled with the app. They are served from a version-pinned jsDelivr CDN
+path derived from this repository's `ptcgp-images` tag, and the data crate exposes each image as
+a ready-made absolute URL (`CardVersion::image()`, `Set::icon()`, and so on). Never construct
+these URLs in the UI — always use the accessor. The CDN sends `immutable` with a one-year
+max-age, so the browser may cache them freely.
 
 ### Data Consumption Strategy
 
@@ -122,13 +125,16 @@ All images must be referenced using Dioxus's `asset!()` macro, never by raw stri
   crate so that incremental builds skip it when unchanged. Initial compilation may take up to 10
   minutes; this is acceptable.
 
-- **Images**: Bundled at build time using `asset!()` via `dx`. Images are loaded lazily by the
-  UI — only images for currently visible components are loaded.
+- **Images**: Served at runtime from a version-pinned jsDelivr URL rather than bundled, which
+  keeps the deployed site small — the full image set exceeds 1 GB. Images are loaded lazily by
+  the UI — only images for currently visible components are loaded. See §Image Caching for the
+  optional durable local cache.
 
 ### Image Path Conventions
 
-All image paths in `ptcgp-images` follow consistent derivable conventions. The `asset!()` macro
-call should use these paths relative to the `ptcgp-images` root.
+All image paths in `ptcgp-images` follow consistent derivable conventions. The data crate
+appends these paths to the pinned CDN base; the table below is the path relative to the
+`ptcgp-images` root.
 
 | Image | Path pattern | Notes |
 |---|---|---|
@@ -483,6 +489,51 @@ Use images from `ptcgp-images` liberally, following these conventions:
 - **Cards**: use `cards/` images whenever a card is referenced and space permits showing the full
   card. Card images average ~300 KB; load them lazily (only when visible).
 - **0-energy attack cost**: use `elements/icons/no_cost.png`.
+
+All images render through a single shared `CachedImage` component rather than a raw `img`
+element, so every image in the app caches identically. Adding a raw `img` for a
+`ptcgp-images` URL is a bug — it silently bypasses the cache.
+
+### Image Caching
+
+Images are fetched from the CDN, which already marks them `immutable` for a year. That is not
+enough on its own: the browser's HTTP cache is a shared, size-limited pool, and with thousands of
+card images at ~270 KB each its entries are evicted long before a collection is fully local, so
+the app never reaches a state where every image loads instantly.
+
+An opt-in setting therefore copies downloaded images into the **Cache Storage API**, which is
+quota-backed rather than LRU-evicted, and requests persistent storage so the browser will not
+reclaim it. This is **web only** — the desktop build hides the setting and its code compiles to
+no-ops, since complicating both platforms is not worth it for a build that is not used.
+
+**Behavior**
+
+- Default **off**. While off, images load straight from the CDN and no cache is touched.
+- Cached images are kept **indefinitely**. There is no expiry and no size cap; the practical
+  ceiling is the full image set.
+- Turning the setting **off deletes the cache** and releases every object URL.
+- On a cache **miss** the CDN URL is rendered immediately, so a first view looks exactly as it
+  does with caching off, and the bytes are stored in the background for next time.
+- On a **hit** the image is read back from storage as an object URL. Because an `img` element
+  cannot read Cache Storage synchronously, a cached image shows a transparent placeholder for the
+  few milliseconds the read takes. The element keeps its classes in every state so layout never
+  shifts. Once read, it is served from memory for the rest of the session.
+- Object URLs are capped in memory (oldest-first eviction) because each one pins its image blob.
+  An evicted entry is simply re-read from storage the next time it is displayed.
+
+**Image set versions**
+
+Image URLs are pinned to a `ptcgp-images` tag, so publishing a build that points at a newer tag
+changes every URL and would strand the previous version's images forever. The cache name embeds
+the image set version — parsed from the URLs themselves rather than hardcoded — so a bumped tag
+starts a fresh cache, and startup deletes any cache belonging to a superseded version.
+
+**Fetching**
+
+Images are fetched explicitly with CORS rather than relying on the `no-cors` request an `img`
+element makes. jsDelivr sends `access-control-allow-origin: *`, so the stored response is not
+opaque and counts its real size against the storage quota instead of a multi-megabyte padding
+figure.
 
 ---
 
@@ -1106,6 +1157,14 @@ A settings area (page or panel) for app-wide preferences. At minimum:
   hidden from the Card Catalog, excluded from set completion counts, excluded from probability
   calculations, and excluded from all query results
 - Default: off (premium cards are shown)
+- Persisted across sessions
+
+**Cache images locally** (web only)
+- Toggle: when enabled, downloaded images are stored durably in the browser and served from
+  there on later visits. See §Image Caching.
+- Default: off
+- Turning it off deletes the cached images
+- Hidden on platforms other than web
 - Persisted across sessions
 
 **Ignore Gold Shop cards**

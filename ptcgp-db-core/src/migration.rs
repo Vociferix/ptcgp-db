@@ -137,6 +137,7 @@ mod tests {
             ignore_premium_mission: false,
             ignore_gold_shop: false,
             merge_duplicate_printings: false,
+            cache_images: false,
         };
         let migrated = migrate_settings(data.clone()).unwrap();
         assert_eq!(migrated, data);
@@ -151,6 +152,7 @@ mod tests {
             ignore_premium_mission: false,
             ignore_gold_shop: false,
             merge_duplicate_printings: false,
+            cache_images: false,
         };
         assert!(matches!(
             migrate_settings(data),
