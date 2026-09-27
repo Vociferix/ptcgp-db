@@ -1,10 +1,12 @@
 use crate::models::{CardKind, Dataset, PokemonCard, TrainerCard};
 
-const JSDELIVR_BASE: &str = "https://cdn.jsdelivr.net/gh/Vociferix/ptcgp-images@v0.11.0";
+const IMAGE_REPO_VERSION: &str = "0.11.0";
+
+const JSDELIVR_BASE: &str = "https://cdn.jsdelivr.net/gh/Vociferix/ptcgp-images@v";
 
 fn image_url(path: &str) -> String {
     let rel = path.strip_prefix("ptcgp-images/").unwrap_or(path);
-    format!("{JSDELIVR_BASE}/{rel}")
+    format!("{JSDELIVR_BASE}{IMAGE_REPO_VERSION}/{rel}")
 }
 
 use chrono::{Datelike, NaiveDate};
@@ -31,7 +33,13 @@ pub fn generate(data: Dataset) -> TokenStream {
     let pack_variants = gen_pack_variants(&data);
     let pack_slots = gen_pack_slots(&data);
 
+    let card_back = image_url("ptcgp-images/cards/back.png");
+    let no_cost_energy = image_url("ptcgp-images/elements/icons/no_cost.png");
+
     quote! {
+        pub const CARD_BACK: &str = #card_back;
+        pub const NO_COST_ENERGY: &str = #no_cost_energy;
+
         #strings
         #rarity_groups
         #rarity_classes

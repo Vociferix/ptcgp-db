@@ -21,8 +21,7 @@ impl Element {
     pub const NAMES: &StrTable = crate::data::ELEMENT_NAMES;
 
     /// Icon URL to display for an attack with zero energy cost, in place of any element icon.
-    pub const NO_COST: &'static str =
-        "https://cdn.jsdelivr.net/gh/Vociferix/ptcgp-images@v0.8.1/elements/icons/no_cost.png";
+    pub const NO_COST: &'static str = crate::data::NO_COST_ENERGY;
 
     /// Returns the element with the given ID without bounds checking.
     ///
