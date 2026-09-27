@@ -40,8 +40,7 @@ impl CardVersion {
     pub const ILLUSTRATORS: &StrTable = crate::data::ILLUSTRATORS;
 
     /// Image of the card back, which is the same for every card.
-    pub const BACK: &'static str =
-        "https://cdn.jsdelivr.net/gh/Vociferix/ptcgp-images@v0.8.1/cards/back.png";
+    pub const BACK: &'static str = crate::data::CARD_BACK;
 
     /// Returns the version with the given ID without bounds checking.
     ///
