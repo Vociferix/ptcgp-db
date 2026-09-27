@@ -95,6 +95,15 @@ impl CacheInner {
         object_url
     }
 
+    /// Drops any object URL held for `url` and stops treating it as cached.
+    fn invalidate(&mut self, url: &str) {
+        if let Some(object_url) = self.resolved.remove(url) {
+            revoke(&object_url);
+        }
+        self.order.retain(|held| held != url);
+        self.known.remove(url);
+    }
+
     /// Releases every object URL and drops all session state.
     fn clear(&mut self) {
         for (_, object_url) in self.resolved.drain() {
@@ -193,6 +202,14 @@ impl ImageCache {
     /// Forgets `url`, after a read found nothing, so it falls back to the network.
     pub fn forget(&mut self, url: &str) {
         self.inner.write().known.remove(url);
+    }
+
+    /// Discards everything held for `url` — its object URL and its cached status.
+    ///
+    /// Used when a displayed object URL turns out to be dead: releasing it stops any other image
+    /// reusing it, and `url` falls back to the network.
+    pub fn invalidate(&mut self, url: &str) {
+        self.inner.write().invalidate(url);
     }
 
     /// Stores an object URL for `url`, evicting the oldest entries past [`MAX_RESOLVED`].
@@ -467,6 +484,29 @@ mod tests {
         );
         let newest = format!("https://cdn/{}.png", MAX_RESOLVED + 9);
         assert!(inner.resolved.contains_key(&newest));
+    }
+
+    /// A dead object URL must be dropped from both maps, so the next render falls back to the
+    /// network instead of retrying a URL that will fail again.
+    #[test]
+    fn invalidate_drops_the_entry_and_its_cached_status() {
+        let mut inner = CacheInner::default();
+        inner.known.insert("https://cdn/a.png".to_string());
+        inner.known.insert("https://cdn/b.png".to_string());
+        inner.insert_resolved("https://cdn/a.png", "blob:a".to_string());
+        inner.insert_resolved("https://cdn/b.png", "blob:b".to_string());
+
+        inner.invalidate("https://cdn/a.png");
+
+        assert!(!inner.resolved.contains_key("https://cdn/a.png"));
+        assert!(!inner.known.contains("https://cdn/a.png"));
+        assert!(!inner.order.iter().any(|u| u == "https://cdn/a.png"));
+        // Unrelated entries are untouched.
+        assert_eq!(
+            inner.resolved.get("https://cdn/b.png").map(String::as_str),
+            Some("blob:b")
+        );
+        assert!(inner.known.contains("https://cdn/b.png"));
     }
 
     #[test]

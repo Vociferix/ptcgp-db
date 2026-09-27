@@ -17,6 +17,15 @@ enum Source {
     Local(String),
 }
 
+/// Releases a dead object URL so the next render falls back to the CDN.
+///
+/// A free function rather than an inline closure because `dx fmt` mangles multi-line closures
+/// used as RSX props.
+fn discard_dead_url(mut cache: ImageCache, mut revision: Signal<u32>, url: &str) {
+    cache.invalidate(url);
+    *revision.write() += 1;
+}
+
 /// An `<img>` backed by the local image cache.
 ///
 /// Used for every image in the app so all of them cache identically. With the setting off this
@@ -42,73 +51,66 @@ pub fn CachedImage(
 ) -> Element {
     let settings = use_context::<Signal<AppSettings>>();
     let cache = use_context::<ImageCache>();
+    // Bumped when this image's own cache read finishes, purely to trigger a re-render so the
+    // block below re-derives. The cache is read non-reactively, so one image resolving never
+    // re-renders all the others.
+    let mut revision = use_signal(|| 0u32);
 
-    // Decided during the first render, not in an effect: an effect runs after the browser has
-    // already started fetching whatever the first paint asked for, which would defeat the cache.
-    let mut source = use_signal(|| {
-        if !settings.peek().cache_images() || !cache.ready() {
-            return Source::Remote;
-        }
-        match cache.resolved(&src) {
-            Some(object_url) => Source::Local(object_url),
-            None if cache.is_known(&src) => Source::Reading,
-            None => Source::Remote,
-        }
-    });
-
-    // Reads `cache_images` and `ready` reactively so enabling the setting, or the startup scan
-    // finishing, kicks off work for images that are already mounted.
-    let effect_src = src.clone();
-    use_effect(move || {
-        if !settings.read().cache_images() {
-            // Disabling revokes every object URL, so stop displaying one immediately.
-            source.set(Source::Remote);
+    // `use_reactive!` is required here: `src` is a plain prop, and an effect otherwise re-runs
+    // only when a signal it read changes. Without it, re-rendering this component with a
+    // different URL — as the catalog's detail panel does on every selection — would never start
+    // a read for the new image.
+    use_effect(use_reactive!(|src| {
+        if !settings.read().cache_images() || !cache.ready() {
             return;
         }
-        if !cache.ready() {
-            return;
-        }
-        let url = effect_src.clone();
         let mut cache = cache;
-
-        if let Some(object_url) = cache.resolved(&url) {
-            source.set(Source::Local(object_url));
+        if cache.resolved(&src).is_some() {
             return;
         }
-
+        let url = src.clone();
         if cache.is_known(&url) {
-            source.set(Source::Reading);
-            // Scope-bound: if this image goes away mid-read the result has nobody to go to, and
-            // the next mount simply reads again. Deliberately not shared with other components
-            // displaying the same URL — waiting on someone else's task leaves this one stuck on
-            // the placeholder if that task is cancelled, which unmounting does.
+            // Scope-bound: if this image is replaced or unmounted mid-read the result has nobody
+            // to go to, and whatever renders next simply reads again.
             spawn(async move {
                 match image_cache::object_url(&url).await {
                     Some(object_url) => {
-                        let display = cache.insert_resolved(&url, object_url);
-                        source.set(Source::Local(display));
+                        cache.insert_resolved(&url, object_url);
                     }
                     None => {
                         // Entry vanished (quota reclaim, manual clear); fall back to the network.
                         cache.forget(&url);
-                        source.set(Source::Remote);
                     }
                 }
+                *revision.write() += 1;
             });
         } else {
             // Root-scoped so scrolling past an image still finishes storing it. Touches only
-            // cache state, never this component's signals, so outliving the component is safe.
+            // shared cache state, never this component's signals, so outliving it is safe.
             spawn_forever(async move {
                 if image_cache::store(&url).await {
                     cache.mark_known(&url);
                 }
             });
         }
-    });
+    }));
+
+    // Derived from `src` on every render rather than held across renders. A value initialised
+    // once per mount kept displaying the previous image whenever this component was re-rendered
+    // with a new URL instead of being remounted.
+    let _revision = *revision.read();
+    let display = if !settings.read().cache_images() {
+        Source::Remote
+    } else if let Some(object_url) = cache.resolved(&src) {
+        Source::Local(object_url)
+    } else if cache.is_known(&src) {
+        Source::Reading
+    } else {
+        Source::Remote
+    };
 
     let loading = loading.unwrap_or("eager");
-    let current = source.read().clone();
-    match current {
+    match display {
         Source::Remote => rsx! {
             img {
                 src: "{src}",
@@ -125,17 +127,21 @@ pub fn CachedImage(
                 loading: "{loading}",
             }
         },
-        Source::Local(object_url) => rsx! {
-            img {
-                src: "{object_url}",
-                alt: "{alt}",
-                class: "{class}",
-                loading: "{loading}",
-                // Last line of defence: an object URL can go stale (evicted from the in-memory
-                // cap while still displayed, or revoked as the setting is turned off). Falling
-                // back to the CDN guarantees an image never stays blank.
-                onerror: move |_| source.set(Source::Remote),
+        Source::Local(object_url) => {
+            let dead = src.clone();
+            rsx! {
+                img {
+                    src: "{object_url}",
+                    alt: "{alt}",
+                    class: "{class}",
+                    loading: "{loading}",
+                    // Last line of defence: an object URL can go stale (evicted from the
+                    // in-memory cap while still displayed, or revoked as the setting is switched
+                    // off). Discarding it makes the next render fall back to the CDN, so an
+                    // image is never left blank.
+                    onerror: move |_| discard_dead_url(cache, revision, &dead),
+                }
             }
-        },
+        }
     }
 }
