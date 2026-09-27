@@ -15,7 +15,7 @@ jobs:
     name: Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -25,7 +25,7 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Compute submodule hash
@@ -51,7 +51,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Compute submodule hash
@@ -74,7 +74,7 @@ jobs:
     name: WASM Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Compute submodule hash
@@ -99,7 +99,7 @@ jobs:
     name: RSX Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Compute submodule hash
@@ -111,7 +111,7 @@ jobs:
           cache-all-crates: "true"
       - name: Cache dx binary
         id: cache-dx
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cargo/bin/dx
           key: dx-${{ runner.os }}-${{ env.DX_VERSION }}
@@ -125,7 +125,7 @@ jobs:
     name: Web Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Compute submodule hash
@@ -139,7 +139,7 @@ jobs:
           cache-all-crates: "true"
       - name: Cache dx binary
         id: cache-dx
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cargo/bin/dx
           key: dx-${{ runner.os }}-${{ env.DX_VERSION }}
@@ -147,7 +147,7 @@ jobs:
         if: steps.cache-dx.outputs.cache-hit != 'true'
         run: cargo install dioxus-cli --version ${{ env.DX_VERSION }} --locked
       - name: Cache dx tools
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.local/share/.dx/tools
           key: dx-tools-${{ runner.os }}-${{ env.DX_VERSION }}
@@ -158,7 +158,7 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-audit
