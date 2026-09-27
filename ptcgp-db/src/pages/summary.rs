@@ -9,6 +9,7 @@ use ptcgp_db_data::{Pack, Set};
 use ptcgp_db_core::storage::Storage as _;
 
 use crate::app::{AppStorage, SummaryPageState};
+use crate::components::CachedImage;
 use crate::components::icons::{ChevronDown, ChevronUp, XMark};
 use crate::components::{FilterMode, FilterToolbar};
 use crate::routes::Route;
@@ -460,13 +461,13 @@ fn PackSubRow(
             class: "grid grid-cols-[1fr_auto_auto] gap-x-4 py-2 pl-8 pr-4 items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/60",
             onclick: on_click,
             div { class: "flex items-center gap-3 min-w-0",
-                img {
+                CachedImage {
                     src: "{pack.image()}",
                     alt: "",
                     class: "h-24 w-auto object-contain shrink-0",
                 }
                 div { class: "hidden sm:block min-w-0",
-                    img {
+                    CachedImage {
                         src: "{pack.logo()}",
                         alt: "{pack.title()}",
                         class: "h-12 w-auto max-w-56 object-contain",
@@ -545,12 +546,12 @@ fn SetCompletionRow(
                         }
                     }
                     div { class: "flex flex-col sm:flex-row items-center gap-1 sm:gap-2",
-                        img {
+                        CachedImage {
                             src: "{set.icon()}",
                             alt: "",
                             class: "h-5 w-auto max-w-14 object-contain shrink-0",
                         }
-                        img {
+                        CachedImage {
                             src: "{set.logo()}",
                             alt: "{set_name}",
                             class: "h-10 w-auto max-w-32 object-contain shrink-0",
@@ -814,14 +815,14 @@ pub fn SummaryPage() -> Element {
                                         apply_catalog_filter(CatalogNav::Pack(pack.id()), config, catalog_filter);
                                         drop(nav.push(Route::CatalogPage {}));
                                     },
-                                    img {
+                                    CachedImage {
                                         src: "{pack.image()}",
                                         alt: "{pack.title()}",
                                         class: "h-40 w-auto object-contain shrink-0",
                                     }
                                     div { class: "flex flex-col gap-1",
                                         div { class: "flex items-center gap-2",
-                                            img {
+                                            CachedImage {
                                                 src: "{pack.set().icon()}",
                                                 alt: "",
                                                 class: "h-5 w-auto max-w-14 object-contain shrink-0",

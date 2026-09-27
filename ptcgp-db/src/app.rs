@@ -8,6 +8,7 @@ use ptcgp_db_core::storage::Storage as _;
 use ptcgp_db_core::{AppSettings, ProfileStore, SavedQueries};
 use ptcgp_db_data::CardSource;
 
+use crate::image_cache::ImageCache;
 use crate::pages::OnboardingPage;
 use crate::routes::Route;
 
@@ -309,6 +310,8 @@ pub fn App() -> Element {
     // Tracks which page the user navigated to CardDetailPage from, for the back button label/route.
     let _: Signal<CardDetailOrigin> =
         use_context_provider(|| Signal::new(CardDetailOrigin::default()));
+    // Local image cache, read by every CachedImage. Inert until the setting is enabled.
+    let image_cache: ImageCache = use_context_provider(ImageCache::new);
     // Drive sync state (web only; always provided so hook count is stable per platform).
     #[cfg(target_arch = "wasm32")]
     let mut drive_state: Signal<DriveState> =
@@ -496,6 +499,25 @@ pub fn App() -> Element {
         drive_state.set(DriveState::Connecting);
         spawn(async move {
             startup_drive_sync(drive_state, store, settings, queries).await;
+        });
+    });
+
+    // Populate the image cache index once the setting is on — after a fresh start, or the
+    // moment the user enables it. Also drops caches left by older image-set versions, and asks
+    // the browser to treat the storage as persistent so it is not reclaimed.
+    use_effect(move || {
+        let mut cache = image_cache;
+        if !settings.read().cache_images() || cache.ready() || !cache.begin_scan() {
+            return;
+        }
+        spawn(async move {
+            crate::image_cache::prune_stale().await;
+            // A denial is not a failure: the cache still works, it is just evictable. The
+            // Settings page says so rather than the setting silently claiming more than it has.
+            let persistent = crate::image_cache::ensure_persistence().await;
+            cache.set_persistent(persistent);
+            let known = crate::image_cache::cached_urls().await;
+            cache.set_known(known);
         });
     });
 

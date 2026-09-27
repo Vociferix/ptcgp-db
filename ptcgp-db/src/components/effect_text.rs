@@ -1,5 +1,7 @@
 use dioxus::prelude::*;
 
+use crate::components::CachedImage;
+
 enum Segment {
     Text(String),
     Symbol(&'static str),
@@ -49,7 +51,7 @@ pub fn EffectText(text: String, #[props(default)] class: String) -> Element {
                 match seg {
                     Segment::Text(t) => rsx! { "{t}" },
                     Segment::Symbol(asset) => rsx! {
-                        img {
+                        CachedImage {
                             src: "{asset}",
                             alt: "",
                             class: "inline h-4 w-4 mx-0.5 align-middle object-contain",

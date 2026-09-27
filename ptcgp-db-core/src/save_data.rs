@@ -129,6 +129,12 @@ pub struct AppSettingsSaveData {
     /// When `true`, card versions linked by `CardVersion::duplicates()` are treated as a
     /// single logical card throughout the app.
     pub merge_duplicate_printings: bool,
+
+    /// When `true`, downloaded images are kept in a durable local cache and served from it on
+    /// later visits. Web only; ignored on other platforms. Defaults to `false`, and defaults on
+    /// load so settings written before this field existed deserialize cleanly.
+    #[serde(default)]
+    pub cache_images: bool,
 }
 
 /// UI color scheme preference.

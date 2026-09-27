@@ -5,6 +5,7 @@ use ptcgp_db_core::{AppSettings, CARD_PULL_RATES, ProfileStore, filter_card};
 use ptcgp_db_data::{Card, CardVersion};
 
 use crate::app::{AppStorage, CardDetailOrigin, set_card_count};
+use crate::components::CachedImage;
 use crate::components::count_spinner::CountSpinner;
 use crate::components::icons::{ChevronDown, ChevronUp};
 use crate::components::{FilterMode, FilterToolbar};
@@ -567,7 +568,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
                 },
             }
 
-            img {
+            CachedImage {
                 src: "{card_image}",
                 alt: "",
                 loading: "lazy",
@@ -584,7 +585,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
             }
 
             div { class: "hidden lg:flex w-12 h-full justify-center items-center flex-shrink-0",
-                img {
+                CachedImage {
                     src: "{set_icon}",
                     alt: "",
                     class: "h-full w-full object-contain",
@@ -592,11 +593,11 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
             }
 
             div { class: "flex w-28 h-full py-2 justify-center items-center flex-shrink-0",
-                img { src: "{pack_logo}", alt: "", class: "{logo_img_class}" }
+                CachedImage { src: "{pack_logo}", alt: "", class: "{logo_img_class}" }
             }
 
             div { class: "hidden lg:flex w-20 justify-center flex-shrink-0",
-                img {
+                CachedImage {
                     src: "{rarity_icon}",
                     alt: "",
                     class: "h-6 max-w-full object-contain",
@@ -605,7 +606,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
 
             div { class: "hidden lg:flex w-12 justify-center flex-shrink-0",
                 if let Some(icon) = element_icon {
-                    img {
+                    CachedImage {
                         src: "{icon}",
                         alt: "",
                         class: "h-5 w-5 object-contain",
