@@ -1,6 +1,6 @@
 use crate::models::{CardKind, Dataset, PokemonCard, TrainerCard};
 
-const IMAGE_REPO_VERSION: &str = "0.11.0";
+const IMAGE_REPO_VERSION: &str = "0.12.0";
 
 const JSDELIVR_BASE: &str = "https://cdn.jsdelivr.net/gh/Vociferix/ptcgp-images@v";
 
