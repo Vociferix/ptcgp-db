@@ -1,12 +1,10 @@
 use crate::models::{CardKind, Dataset, PokemonCard, TrainerCard};
 
-const IMAGE_REPO_VERSION: &str = /*"0.12.0"*/ "master";
-
-const JSDELIVR_BASE: &str = "https://cdn.jsdelivr.net/gh/Vociferix/ptcgp-images@v";
+const JSDELIVR_BASE: &str = "https://cdn.jsdelivr.net/gh/Vociferix/ptcgp-images@latest";
 
 fn image_url(path: &str) -> String {
     let rel = path.strip_prefix("ptcgp-images/").unwrap_or(path);
-    format!("{JSDELIVR_BASE}{IMAGE_REPO_VERSION}/{rel}")
+    format!("{JSDELIVR_BASE}/{rel}")
 }
 
 use chrono::{Datelike, NaiveDate};
