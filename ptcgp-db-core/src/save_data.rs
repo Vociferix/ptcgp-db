@@ -32,28 +32,39 @@ impl<'de> Deserialize<'de> for CardVersionId {
         use ptcgp_db_data::Set;
         use std::borrow::Cow;
         let s: Cow<'de, str> = Cow::deserialize(d)?;
-        // Set codes may contain `-` (e.g. "P-A"), so split at the last hyphen only.
-        let (set_code, num_str) = s.rsplit_once('-').ok_or_else(|| {
-            de::Error::custom(format_args!("expected SET-NUMBER format, got {s:?}"))
-        })?;
-        let number: usize = num_str
-            .parse()
-            .map_err(|_| de::Error::custom(format_args!("invalid card number in {s:?}")))?;
-        // Find the set by code, then index into its card_versions by number (1-indexed).
-        let set_code_id = Set::CODES
+        // Set codes may contain `-` (e.g. "P-A") and numbers may be negative (e.g. "A1--5"),
+        // so neither a first- nor last-hyphen split is reliable. Instead, match each known set
+        // code as a prefix followed by `-` and a parseable number.
+        let (set, number) = Set::ALL
             .iter()
-            .position(|code| code == set_code)
-            .ok_or_else(|| de::Error::custom(format_args!("unknown set code {set_code:?}")))?;
-        let set = Set::ALL
-            .iter()
-            .find(|set| set.code().id() == set_code_id)
-            .ok_or_else(|| de::Error::custom(format_args!("unknown set code {set_code:?}")))?;
-        if number == 0 || number > set.card_versions().len() {
-            return Err(de::Error::custom(format_args!(
-                "invalid card number {number} for set {set_code}"
-            )));
-        }
-        Ok(CardVersionId(set.card_versions()[number - 1].id()))
+            .find_map(|set| {
+                let number = s
+                    .strip_prefix(set.code().as_str())?
+                    .strip_prefix('-')?
+                    .parse::<isize>()
+                    .ok()?;
+                Some((set, number))
+            })
+            .ok_or_else(|| {
+                de::Error::custom(format_args!("expected SET-NUMBER format, got {s:?}"))
+            })?;
+        let versions = set.card_versions();
+        // Collector numbers usually match the 1-based position within the set, so check that
+        // slot first and only scan when it doesn't match.
+        let at_position = usize::try_from(number)
+            .ok()
+            .and_then(|n| n.checked_sub(1))
+            .and_then(|i| versions.get(i))
+            .filter(|cv| cv.number() == number);
+        at_position
+            .or_else(|| versions.iter().find(|cv| cv.number() == number))
+            .map(|cv| CardVersionId(cv.id()))
+            .ok_or_else(|| {
+                de::Error::custom(format_args!(
+                    "invalid card number {number} for set {}",
+                    set.code()
+                ))
+            })
     }
 }
 
@@ -295,4 +306,37 @@ pub enum CountThreshold {
     LessThan(u32),
     /// Match cards where owned count is greater than or equal to `n`.
     AtLeast(u32),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CardVersionId;
+    use ptcgp_db_data::CardVersion;
+
+    #[test]
+    fn card_version_id_round_trips_for_every_version() {
+        for cv in CardVersion::ALL {
+            let id = CardVersionId(cv.id());
+            let json = serde_json::to_string(&id).unwrap();
+            let back: CardVersionId = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, id, "round trip failed for {json}");
+        }
+    }
+
+    #[test]
+    fn card_version_id_rejects_malformed_keys() {
+        for key in [
+            "\"A1\"",
+            "\"A1-\"",
+            "\"A1-x\"",
+            "\"ZZZ-1\"",
+            "\"A1-99999\"",
+            "\"A1--99999\"",
+        ] {
+            assert!(
+                serde_json::from_str::<CardVersionId>(key).is_err(),
+                "{key} should not parse"
+            );
+        }
+    }
 }

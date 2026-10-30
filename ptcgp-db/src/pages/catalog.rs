@@ -2,13 +2,14 @@ use dioxus::document;
 use dioxus::prelude::*;
 use ptcgp_db_core::save_data::{CardVersionId, FilterConfig};
 use ptcgp_db_core::{AppSettings, CARD_PULL_RATES, ProfileStore, filter_card};
-use ptcgp_db_data::{Card, CardVersion};
+use ptcgp_db_data::{Card, CardVersion, Element as PkmnElement};
 
 use crate::app::{AppStorage, CardDetailOrigin, set_card_count};
+use crate::card_number::CardNumber;
 use crate::components::CachedImage;
 use crate::components::count_spinner::CountSpinner;
 use crate::components::icons::{ChevronDown, ChevronUp};
-use crate::components::{FilterMode, FilterToolbar};
+use crate::components::{ElementIcons, FilterMode, FilterToolbar};
 use crate::routes::Route;
 
 use super::card_details::DetailPanel;
@@ -54,12 +55,22 @@ struct SortConfig {
 // Row visual style helpers
 // ---------------------------------------------------------------------------
 
-fn element_tint_class(cv: &CardVersion) -> &'static str {
+/// Background tint classes for a row, split in two so dual-element rows can render a gradient
+/// without allocating. Single-element rows use a flat tint and leave the second entry empty.
+fn element_tint_classes(cv: &CardVersion) -> [&'static str; 2] {
     let Some(pkmn) = cv.card().pokemon() else {
-        return "";
+        return ["", ""];
     };
-    let name = pkmn.element().name();
-    match name.as_str() {
+    let mut elements = pkmn.elements().iter();
+    match (elements.next(), elements.next()) {
+        (Some(a), Some(b)) => [element_tint_from(a), element_tint_to(b)],
+        (Some(a), None) => [element_tint_flat(a), ""],
+        _ => ["", ""],
+    }
+}
+
+fn element_tint_flat(element: &PkmnElement) -> &'static str {
+    match element.name().as_str() {
         "Grass" => "bg-element-grass/10",
         "Fire" => "bg-element-fire/10",
         "Water" => "bg-element-water/10",
@@ -74,12 +85,42 @@ fn element_tint_class(cv: &CardVersion) -> &'static str {
     }
 }
 
-fn element_color_hex(cv: &CardVersion) -> &'static str {
-    let Some(pkmn) = cv.card().pokemon() else {
-        return "#6b7280";
-    };
-    let name = pkmn.element().name();
-    match name.as_str() {
+fn element_tint_from(element: &PkmnElement) -> &'static str {
+    match element.name().as_str() {
+        "Grass" => "bg-linear-to-r from-element-grass/10",
+        "Fire" => "bg-linear-to-r from-element-fire/10",
+        "Water" => "bg-linear-to-r from-element-water/10",
+        "Lightning" => "bg-linear-to-r from-element-lightning/10",
+        "Fighting" => "bg-linear-to-r from-element-fighting/10",
+        "Psychic" => "bg-linear-to-r from-element-psychic/10",
+        "Darkness" => "bg-linear-to-r from-element-darkness/10",
+        "Metal" => "bg-linear-to-r from-element-metal/10",
+        "Dragon" => "bg-linear-to-r from-element-dragon/10",
+        "Colorless" => "bg-linear-to-r from-element-colorless/10",
+        _ => "bg-linear-to-r",
+    }
+}
+
+fn element_tint_to(element: &PkmnElement) -> &'static str {
+    match element.name().as_str() {
+        "Grass" => "to-element-grass/10",
+        "Fire" => "to-element-fire/10",
+        "Water" => "to-element-water/10",
+        "Lightning" => "to-element-lightning/10",
+        "Fighting" => "to-element-fighting/10",
+        "Psychic" => "to-element-psychic/10",
+        "Darkness" => "to-element-darkness/10",
+        "Metal" => "to-element-metal/10",
+        "Dragon" => "to-element-dragon/10",
+        "Colorless" => "to-element-colorless/10",
+        _ => "",
+    }
+}
+
+const NEUTRAL_HEX: &str = "#6b7280";
+
+fn element_color_hex(element: &PkmnElement) -> &'static str {
+    match element.name().as_str() {
         "Grass" => "#4ade80",
         "Fire" => "#ef4444",
         "Water" => "#38bdf8",
@@ -90,7 +131,29 @@ fn element_color_hex(cv: &CardVersion) -> &'static str {
         "Metal" => "#94a3b8",
         "Dragon" => "#ca8a04",
         "Colorless" => "#d1d5db",
-        _ => "#6b7280",
+        _ => NEUTRAL_HEX,
+    }
+}
+
+/// Inline style for a Star-rarity row's element-colored edge. Dual-element rows get a
+/// two-color gradient border, unless the foil rainbow border already occupies `border-image`,
+/// in which case they fall back to an outline in the first element's color.
+fn star_border_style(cv: &CardVersion) -> String {
+    let mut elements = cv
+        .card()
+        .pokemon()
+        .into_iter()
+        .flat_map(|p| p.elements().iter());
+    let (first, second) = (elements.next(), elements.next());
+    let hex_a = first.map_or(NEUTRAL_HEX, element_color_hex);
+    match second {
+        Some(b) if !cv.is_foil() => {
+            let hex_b = element_color_hex(b);
+            format!(
+                "border-image: linear-gradient(90deg, {hex_a}80, {hex_b}80) 1; border-width: 1px; border-style: solid;"
+            )
+        }
+        _ => format!("outline: 1px solid {hex_a}80; outline-offset: -1px;"),
     }
 }
 
@@ -102,10 +165,7 @@ fn row_border_style(cv: &CardVersion) -> String {
     };
     let group_name = cv.rarity().group().name();
     let rarity_border = match group_name.as_str() {
-        "Star" => {
-            let hex = element_color_hex(cv);
-            format!("outline: 1px solid {hex}80; outline-offset: -1px;")
-        }
+        "Star" => star_border_style(cv),
         "Shiny" => "outline: 1px solid #c0c0c080; outline-offset: -1px;".to_string(),
         "Crown" => "outline: 2px solid #f59e0b; outline-offset: -2px;".to_string(),
         _ => String::new(),
@@ -276,17 +336,20 @@ pub fn CatalogPage() -> Element {
             }
             SortColumn::Element => {
                 sort_with_dir(&mut ids, sc.dir, |a, b| {
-                    let ea = CardVersion::ALL[a]
-                        .card()
-                        .pokemon()
-                        .map(|p| p.element().id())
-                        .unwrap_or(usize::MAX);
-                    let eb = CardVersion::ALL[b]
-                        .card()
-                        .pokemon()
-                        .map(|p| p.element().id())
-                        .unwrap_or(usize::MAX);
-                    ea.cmp(&eb)
+                    let element_ids = |id: usize| {
+                        CardVersion::ALL[id]
+                            .card()
+                            .pokemon()
+                            .map(|p| p.elements().as_ids())
+                    };
+                    // Lexicographic on the id list puts dual-element cards right after their
+                    // primary element; non-Pokémon sort last.
+                    match (element_ids(a), element_ids(b)) {
+                        (Some(ea), Some(eb)) => ea.cmp(eb),
+                        (Some(_), None) => std::cmp::Ordering::Less,
+                        (None, Some(_)) => std::cmp::Ordering::Greater,
+                        (None, None) => std::cmp::Ordering::Equal,
+                    }
                 });
             }
             SortColumn::PullRate => {
@@ -479,7 +542,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
     let cv = &CardVersion::ALL[cv_id];
     let pd = &CARD_PULL_RATES[cv_id];
 
-    let tint = element_tint_class(cv);
+    let [tint_a, tint_b] = element_tint_classes(cv);
     let premium = premium_tint_class(cv);
     let border_style = row_border_style(cv);
 
@@ -526,11 +589,11 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
         .unwrap_or_default();
 
     let set_code = cv.set().code();
-    let number = cv.number().get();
+    let number = CardNumber(cv.number());
     let name = cv.card().name();
     let rarity_icon = cv.rarity().class().icon();
     let card_image = cv.image();
-    let element_icon = cv.card().pokemon().map(|p| p.element().icon());
+    let pokemon = cv.card().pokemon();
     let set_icon = cv.set().icon();
     let (pack_logo, is_source_icon) = {
         let mut packs = cv.packs().iter();
@@ -548,7 +611,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
 
     rsx! {
         div {
-            class: "relative flex items-center gap-2 px-3 cursor-pointer {tint} {premium} {selected_class}",
+            class: "relative flex items-center gap-2 px-3 cursor-pointer {tint_a} {tint_b} {premium} {selected_class}",
             style: "height: {ITEM_HEIGHT}px; {border_style}",
             onclick: move |_| selected.set(Some(cv_id)),
 
@@ -577,7 +640,7 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
 
             div { class: "flex flex-col flex-1 min-w-0",
                 span { class: "text-xs text-gray-400 dark:text-gray-500 tabular-nums leading-none",
-                    "{set_code} {number:03}"
+                    "{set_code} {number}"
                 }
                 span { class: "text-sm font-medium text-gray-900 dark:text-gray-100 leading-snug",
                     "{name}"
@@ -605,12 +668,8 @@ fn CatalogRow(cv_id: usize, selected: Signal<Option<usize>>, multi_active: bool)
             }
 
             div { class: "hidden lg:flex w-12 justify-center flex-shrink-0",
-                if let Some(icon) = element_icon {
-                    CachedImage {
-                        src: "{icon}",
-                        alt: "",
-                        class: "h-5 w-5 object-contain",
-                    }
+                if let Some(pokemon) = pokemon {
+                    ElementIcons { pokemon, class: "h-5 w-5" }
                 }
             }
 

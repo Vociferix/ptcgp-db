@@ -77,7 +77,9 @@ pub fn filter_card(
     {
         return false;
     }
-    if !cfg.elements.is_empty() && pkmn.is_none_or(|p| !cfg.elements.contains(&p.element().id())) {
+    if !cfg.elements.is_empty()
+        && pkmn.is_none_or(|p| p.elements().iter().all(|e| !cfg.elements.contains(&e.id())))
+    {
         return false;
     }
     if cfg.foil.is_some_and(|f| cv.is_foil() != f) {

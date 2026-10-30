@@ -9,10 +9,11 @@ use ptcgp_db_core::{AppSettings, CARD_PULL_RATES, ProfileStore};
 use ptcgp_db_data::CardVersion;
 
 use crate::app::{AppStorage, CardDetailOrigin, set_card_count};
-use crate::components::CachedImage;
+use crate::card_number::CardNumber;
 use crate::components::count_spinner::CountSpinner;
 use crate::components::effect_text::EffectText;
 use crate::components::icons::ArrowLeft;
+use crate::components::{CachedImage, ElementIcons};
 use crate::routes::Route;
 
 // ---------------------------------------------------------------------------
@@ -198,7 +199,7 @@ fn AttackRow(attack_id: usize) -> Element {
 fn VersionChip(cv_id: usize, current_id: usize, on_click: EventHandler<usize>) -> Element {
     let cv = &CardVersion::ALL[cv_id];
     let set_code = cv.set().code();
-    let number = cv.number().get();
+    let number = CardNumber(cv.number());
     let rarity = cv.rarity().name();
     let is_current = cv_id == current_id;
     let cls = if is_current {
@@ -212,7 +213,7 @@ fn VersionChip(cv_id: usize, current_id: usize, on_click: EventHandler<usize>) -
             class: "{cls}",
             title: "{rarity}",
             onclick: move |_| on_click.call(cv_id),
-            "{set_code} {number:03}"
+            "{set_code} {number}"
         }
     }
 }
@@ -222,7 +223,7 @@ fn VersionCard(cv_id: usize, current_id: usize, on_click: EventHandler<usize>) -
     let cv = &CardVersion::ALL[cv_id];
     let card_image = cv.image();
     let set_code = cv.set().code();
-    let number = cv.number().get();
+    let number = CardNumber(cv.number());
     let is_current = cv_id == current_id;
     let ring_cls = if is_current {
         "ring-2 ring-blue-500 dark:ring-blue-400"
@@ -239,9 +240,7 @@ fn VersionCard(cv_id: usize, current_id: usize, on_click: EventHandler<usize>) -
                 alt: "",
                 class: "w-14 h-20 object-cover rounded {ring_cls}",
             }
-            span { class: "text-xs text-gray-500 dark:text-gray-400 tabular-nums",
-                "{set_code} {number:03}"
-            }
+            span { class: "text-xs text-gray-500 dark:text-gray-400 tabular-nums", "{set_code} {number}" }
         }
     }
 }
@@ -285,7 +284,7 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
     };
 
     let set_code = cv.set().code();
-    let number = cv.number().get();
+    let number = CardNumber(cv.number());
     let name = cv.card().name();
     let illustrator = cv.illustrator();
     let rarity_icon = cv.rarity().class().icon();
@@ -326,7 +325,7 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
                             "{name}"
                         }
                         p { class: "text-xs text-gray-400 dark:text-gray-500 tabular-nums",
-                            "{set_code} {number:03}"
+                            "{set_code} {number}"
                         }
                     }
                     div { class: "flex flex-col items-end gap-1 shrink-0",
@@ -429,13 +428,14 @@ pub(super) fn CardDetailBody(cv_id: usize, on_navigate: EventHandler<usize>) -> 
                         }
 
                         div { class: "flex items-center gap-2",
-                            CachedImage {
-                                src: "{p.element().icon()}",
-                                alt: "",
-                                class: "h-5 w-5 object-contain",
-                            }
+                            ElementIcons { pokemon: p, class: "h-5 w-5" }
                             span { class: "text-sm text-gray-700 dark:text-gray-300",
-                                "{p.element().name()}"
+                                for (i, element) in p.elements().iter().enumerate() {
+                                    if i > 0 {
+                                        " / "
+                                    }
+                                    "{element.name()}"
+                                }
                             }
                         }
 

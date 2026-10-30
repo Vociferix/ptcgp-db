@@ -6,7 +6,6 @@ use crate::{
     str_table::{StrEntry, StrTable},
 };
 
-use std::num::NonZeroUsize;
 use std::ops::Range;
 
 /// A specific physical card: one set, collector number, rarity, illustrator, and finish.
@@ -19,7 +18,7 @@ pub struct CardVersion {
     pub(crate) set_id: usize,
     pub(crate) card_id: usize,
     pub(crate) pack_ids: Range<usize>,
-    pub(crate) number: NonZeroUsize,
+    pub(crate) number: isize,
     pub(crate) rarity_id: usize,
     pub(crate) illustrator_id: usize,
     pub(crate) source_id: usize,
@@ -87,9 +86,9 @@ impl CardVersion {
         unsafe { crate::slice_unchecked(Pack::ALL, self.pack_ids.start, self.pack_ids.end) }
     }
 
-    /// Collector number within the set (1-indexed). Displayed as zero-padded in card codes
-    /// (e.g., `A2b 025`).
-    pub const fn number(&self) -> NonZeroUsize {
+    /// Collector number within the set. Usually positive, but may be zero or negative. Displayed
+    /// as zero-padded in card codes (e.g., `A2b 025`).
+    pub const fn number(&self) -> isize {
         self.number
     }
 
