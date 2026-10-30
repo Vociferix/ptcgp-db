@@ -27,7 +27,7 @@ struct Lookups {
     // { set_id -> { pack_subtitle -> pack_id } }
     packs: HashMap<usize, HashMap<String, usize>>,
     // { set_id -> { number -> card_version_id } }
-    card_versions: HashMap<usize, HashMap<usize, usize>>,
+    card_versions: HashMap<usize, HashMap<isize, usize>>,
     // { pack_id -> { variant_name -> pack_variant_id } }
     pack_variants: HashMap<usize, HashMap<String, usize>>,
 }
@@ -459,7 +459,11 @@ fn card_versions(state: &mut State) -> Result<()> {
             .get(&card_ver.rarity)
             .ok_or_else(|| anyhow::anyhow!("failed to resolve rarity {:?}", card_ver.rarity))?;
         let set_code = state.data.set_codes[state.data.sets[set_id].code_id].as_str();
-        let image_path = format!("ptcgp-images/cards/{}/{:03}.png", set_code, card_ver.number);
+        let image_path = if card_ver.number < 0 {
+            format!("ptcgp-images/cards/{}/{:04}.png", set_code, card_ver.number)
+        } else {
+            format!("ptcgp-images/cards/{}/{:03}.png", set_code, card_ver.number)
+        };
 
         let pack_ids = state.data.sets[set_id].pack_ids.clone();
         let pack_ids = if card_ver.packs.is_empty() {
@@ -489,6 +493,7 @@ fn card_versions(state: &mut State) -> Result<()> {
             card_id: card_ver.card_id,
             pack_ids,
             number: card_ver.number,
+            index: card_ver.index,
             rarity_id,
             illustrator_id,
             source_id,
@@ -500,7 +505,7 @@ fn card_versions(state: &mut State) -> Result<()> {
         });
     }
 
-    card_versions.sort_by(|l, r| Ord::cmp(&(l.set_id, l.number), &(r.set_id, r.number)));
+    card_versions.sort_by(|l, r| Ord::cmp(&(l.set_id, l.index), &(r.set_id, r.index)));
 
     card_versions
         .iter_mut()
@@ -672,9 +677,12 @@ fn cards(state: &mut State) -> Result<()> {
                         )
                     })?;
 
-                let element_id = *state.lookups.elements.get(&pkmn.element).ok_or_else(|| {
-                    anyhow::anyhow!("failed to resolve element {:?}", pkmn.element)
-                })?;
+                let mut element_ids: Vec<_> = Vec::with_capacity(pkmn.element.len());
+                for element in &pkmn.element {
+                    element_ids.push(*state.lookups.elements.get(element).ok_or_else(|| {
+                        anyhow::anyhow!("failed to resolve element {:?}", pkmn.element)
+                    })?);
+                }
 
                 let stage_id = *state.lookups.stages.get(&pkmn.stage).ok_or_else(|| {
                     anyhow::anyhow!("failed to resolve pokemon card stage {:?}", pkmn.stage)
@@ -794,7 +802,7 @@ fn cards(state: &mut State) -> Result<()> {
                     kind: models::CardKind::Pokemon(models::PokemonCard {
                         card_id: id,
                         base_id,
-                        element_id,
+                        element_ids,
                         stage_id,
                         retreat_cost: pkmn.retreat_cost,
                         hp: pkmn.hp,
@@ -977,7 +985,7 @@ fn pack_slots(state: &mut State) -> Result<()> {
                 let mut card_pull_rates: Vec<models::CardVersionPullRate> = Vec::new();
                 for (number, rates) in &variant.card_rates {
                     if let Some(rate) = &rates[slot_idx] {
-                        let number: usize = number
+                        let number: isize = number
                             .parse()
                             .context("invalid card version number in pull rates")?;
                         let card_version_id = *state

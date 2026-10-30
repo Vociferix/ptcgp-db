@@ -6,6 +6,7 @@ use ptcgp_db_core::{CandidateRec, ProfileStore, PurchaseRec, ShareRec, TradeRec}
 use ptcgp_db_data::{CardVersion, Prob};
 
 use crate::app::{AppStorage, CardDetailOrigin, CompletedTransfer, schedule_save};
+use crate::card_number::CardNumber;
 use crate::components::CachedImage;
 use crate::routes::Route;
 
@@ -28,7 +29,7 @@ pub(super) fn CardPanel(cv_id: usize) -> Element {
     };
     let card_name = cv.card().name();
     let set_code = cv.set().code();
-    let number = cv.number().get();
+    let number = CardNumber(cv.number());
     let rarity_icon = cv.rarity().class().icon();
     let set_icon = cv.set().icon();
     let card_image = cv.image();
@@ -43,9 +44,7 @@ pub(super) fn CardPanel(cv_id: usize) -> Element {
                 p { class: "text-sm font-semibold text-gray-900 dark:text-gray-100 line-clamp-2",
                     "{card_name}"
                 }
-                p { class: "text-xs text-gray-500 dark:text-gray-400 mt-0.5",
-                    "{set_code} {number:03}"
-                }
+                p { class: "text-xs text-gray-500 dark:text-gray-400 mt-0.5", "{set_code} {number}" }
                 div { class: "flex items-center gap-1.5 mt-1",
                     CachedImage {
                         src: "{set_icon}",
@@ -86,7 +85,7 @@ pub(super) fn TradeCardHalf(
     };
     let card_name = cv.card().name();
     let set_code = cv.set().code();
-    let number = cv.number().get();
+    let number = CardNumber(cv.number());
     let rarity_icon = cv.rarity().class().icon();
     let set_icon = cv.set().icon();
     let card_image = cv.image();
@@ -101,7 +100,7 @@ pub(super) fn TradeCardHalf(
                 p { class: "text-sm font-semibold text-gray-900 dark:text-gray-100 line-clamp-2",
                     "{card_name}"
                 }
-                p { class: "text-xs text-gray-500 dark:text-gray-400", "{set_code} {number:03}" }
+                p { class: "text-xs text-gray-500 dark:text-gray-400", "{set_code} {number}" }
                 div { class: "flex items-center gap-1",
                     CachedImage {
                         src: "{set_icon}",

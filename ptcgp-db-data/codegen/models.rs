@@ -127,7 +127,8 @@ pub struct CardVersion {
     pub set_id: usize,
     pub card_id: usize,
     pub pack_ids: Range<usize>,
-    pub number: usize,
+    pub number: isize,
+    pub index: usize,
     pub rarity_id: usize,
     pub illustrator_id: Option<usize>,
     pub source_id: usize,
@@ -195,7 +196,7 @@ pub struct Stage {
 pub struct PokemonCard {
     pub card_id: usize,
     pub base_id: usize,
-    pub element_id: usize,
+    pub element_ids: Vec<usize>,
     pub stage_id: usize,
     pub retreat_cost: u8,
     pub hp: u32,

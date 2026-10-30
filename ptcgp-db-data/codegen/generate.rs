@@ -1,6 +1,6 @@
 use crate::models::{CardKind, Dataset, PokemonCard, TrainerCard};
 
-const IMAGE_REPO_VERSION: &str = "0.12.0";
+const IMAGE_REPO_VERSION: &str = /*"0.12.0"*/ "master";
 
 const JSDELIVR_BASE: &str = "https://cdn.jsdelivr.net/gh/Vociferix/ptcgp-images@v";
 
@@ -324,7 +324,7 @@ fn gen_cards(data: &Dataset) -> TokenStream {
 fn gen_pokemon_card(pkmn: &PokemonCard) -> TokenStream {
     let card_id = pkmn.card_id;
     let base_id = pkmn.base_id;
-    let element_id = pkmn.element_id;
+    let element_ids = pkmn.element_ids.as_slice();
     let stage_id = pkmn.stage_id;
     let retreat_cost = pkmn.retreat_cost;
     let hp = pkmn.hp;
@@ -356,7 +356,7 @@ fn gen_pokemon_card(pkmn: &PokemonCard) -> TokenStream {
         CardKind::Pokemon(PokemonCard {
             card_id: #card_id,
             base_id: #base_id,
-            element_id: #element_id,
+            element_ids: &[#(#element_ids),*],
             stage_id: #stage_id,
             retreat_cost: #retreat_cost,
             hp: #hp,
@@ -410,7 +410,7 @@ fn gen_card_versions(data: &Dataset) -> TokenStream {
                 set_id: #set_id,
                 card_id: #card_id,
                 pack_ids: #packs_start..#packs_end,
-                number: std::num::NonZeroUsize::new(#number).unwrap(),
+                number: #number,
                 rarity_id: #rarity_id,
                 illustrator_id: #illustrator_id,
                 source_id: #source_id,

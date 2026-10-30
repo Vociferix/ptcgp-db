@@ -83,7 +83,7 @@ pub struct Card {
 #[derive(Deserialize)]
 pub struct CardVersionRef {
     pub set: String,
-    pub number: usize,
+    pub number: isize,
 }
 
 #[derive(Deserialize)]
@@ -104,7 +104,7 @@ pub enum CardKind {
 #[derive(Deserialize)]
 pub struct PokemonCard {
     pub natdex_number: usize,
-    pub element: String,
+    pub element: Vec<String>,
     pub stage: String,
     pub hp: u32,
     pub retreat_cost: u8,
@@ -150,7 +150,8 @@ pub struct TrainerCard {
 #[derive(Deserialize)]
 pub struct CardVersion {
     pub set: String,
-    pub number: usize,
+    pub number: isize,
+    pub index: usize,
     pub card_id: usize,
     pub rarity: String,
     #[serde(default)]

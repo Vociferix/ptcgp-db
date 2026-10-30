@@ -28,7 +28,7 @@ pub enum CardKind {
 pub struct PokemonCard {
     pub(crate) card_id: usize,
     pub(crate) base_id: usize,
-    pub(crate) element_id: usize,
+    pub(crate) element_ids: &'static [usize],
     pub(crate) stage_id: usize,
     pub(crate) retreat_cost: u8,
     pub(crate) hp: u32,
@@ -220,8 +220,8 @@ impl PokemonCard {
     }
 
     /// Energy type of this Pokémon.
-    pub const fn element(&self) -> &'static Element {
-        unsafe { Element::from_id_unchecked(self.element_id) }
+    pub const fn elements(&self) -> &'static IdSlice<Element> {
+        unsafe { IdSlice::new_unchecked(self.element_ids) }
     }
 
     /// Evolution stage: Basic, Stage 1, or Stage 2.
@@ -301,7 +301,7 @@ impl std::fmt::Debug for PokemonCard {
         f.debug_struct("PokemonCard")
             .field("id", &self.card_id)
             .field("base_pokemon", self.base_pokemon())
-            .field("element", self.element())
+            .field("elements", &self.elements())
             .field("stage", self.stage())
             .field("retreat_cost", &self.retreat_cost)
             .field("hp", &self.hp)

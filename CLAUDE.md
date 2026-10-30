@@ -270,6 +270,21 @@ Owned-card count editor. Props:
 Increment/decrement call `on_change(stored_count ± 1)`. Text input commits on blur or Enter,
 reverts on Escape or non-numeric input.
 
+### ElementIcons (`components/element_icons.rs`)
+
+Renders a Pokémon's element icons (`PokemonCard::elements()` has length 1 or 2). Props:
+`pokemon: &'static PokemonCard`, `class: String` (sizes each icon, e.g. `"h-5 w-5"`). Dual
+elements mirror the printed card: overlap by a quarter of the icon (`-ml-[5px]` at 20px) with
+element 0 on top. Always use
+this for element icons rather than rendering `element.icon()` directly.
+
+### CardNumber (`card_number.rs`)
+
+`CardVersion::number()` is `isize` and may be ≤ 0. Display it via the `CardNumber(isize)`
+newtype (`"{set_code} {number}"` → `A2b 025`, `A2b -005`), never `{number:03}` directly.
+The data crate's `Element` type collides with Dioxus's `Element`; import it as
+`Element as PkmnElement` in component files.
+
 ## PR process
 
 Each task gets its own branch and pull request.

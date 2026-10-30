@@ -83,7 +83,9 @@ impl Set {
         unsafe { crate::slice_unchecked(Pack::ALL, self.pack_ids.start, self.pack_ids.end) }
     }
 
-    /// All card versions in this set, sorted by collector number.
+    /// All card versions in this set, in source order (`index` in ptcgp-data). This usually
+    /// matches collector number order, but collector numbers are not guaranteed to equal
+    /// position within the slice.
     pub const fn card_versions(&self) -> &'static [CardVersion] {
         unsafe {
             crate::slice_unchecked(
