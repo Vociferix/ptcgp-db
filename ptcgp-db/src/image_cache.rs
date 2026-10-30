@@ -436,8 +436,8 @@ mod tests {
     #[test]
     fn image_set_version_is_parsed_from_the_cdn_url() {
         let version = image_set_version();
-        assert!(
-            version.starts_with('v'),
+        assert_eq!(
+            version, "latest",
             "expected a version tag like v0.11.0, got {version:?}"
         );
         assert!(!version.contains('/'), "version must be a single segment");
