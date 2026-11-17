@@ -31,7 +31,7 @@ wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = ["Blob", "Cache", "CacheStorage", "Document", "History", "Location", "Navigator", "Request", "RequestInit", "RequestMode", "Response", "Storage", "StorageManager", "Url", "UrlSearchParams", "VisibilityState", "Window"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-rfd = "0.17"
+rfd = "0.18"
 tokio = { version = "1", features = ["time"] }
 
 [build-dependencies]
